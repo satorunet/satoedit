@@ -3,6 +3,10 @@ import HinokiCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleAutoUpdateHM(_:)) {
+            menuItem.state = AppUpdater.shared.automaticChecksOn ? .on : .off
+            return AppUpdater.shared.isAvailable
+        }
         if menuItem.action == #selector(toggleExtensionHM(_:)),
            let e = (menuItem.representedObject as? String).flatMap(EditorExtension.init(rawValue:)) {
             // 開いた瞬間に分かるよう、ON / OFF を色つきで頭に出す (title は変えない: キー割り当てが名前で覚えているため)
@@ -117,6 +121,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         NSWindow.allowsAutomaticWindowTabbing = true
         // 設定で選んだ色のアイコンにする (Finder 側は選んだときに変えてあるので、ここでは Dock だけ)
         AppIcon.apply(updateFinder: false)
+        AppUpdater.shared.start()   // 自動アップデート (配布用のアプリのときだけ動く)
         NSApp.activate(ignoringOtherApps: true)
         // Finder の右クリックメニュー (サービス) から呼ばれる
         NSApp.servicesProvider = FinderServices.shared
@@ -358,6 +363,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func openThemeHM(_ sender: Any?) { SettingsWindowController.shared.show(.theme) }
     @objc func openSettingsHM(_ sender: Any?) { SettingsWindowController.shared.show() }
+    // 自動アップデート
+    @objc func checkForUpdatesHM(_ sender: Any?) { AppUpdater.shared.checkForUpdates(sender) }
+    @objc func toggleAutoUpdateHM(_ sender: Any?) { AppUpdater.shared.toggleAutomaticChecks(sender) }
     @objc func openGeneralSettingsHM(_ sender: Any?) { SettingsWindowController.shared.show(.general) }
     @objc func openFileTypeSettingsHM(_ sender: Any?) { SettingsWindowController.shared.show(.fileType) }
     @objc func openKeySettingsHM(_ sender: Any?) { SettingsWindowController.shared.show(.keys) }

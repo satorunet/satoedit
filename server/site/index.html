@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>さとるエディタ (β テスト版) — 書く・まとめる・共有する、がサクサクできるテキストエディタ</title>
-<meta name="description" content="さとるエディタは、編集・管理・共有がかんたんにサクサクできる総合テキストエディタです (β テスト版)。ふつうのエディタ・原稿用紙・A4 用紙を切り替えて書けて、テキストは一覧と版の履歴で管理。AI アシスト・読み上げも使えて、リンク 1 つで公開できます。Mac / Windows 対応、無料、ソースは MIT ライセンスで公開。">
+<title>さとるエディタ (β テスト版) — みんなの声で育てていくテキストエディタ</title>
+<meta name="description" content="さとるエディタは、書く・まとめる・共有するがサクサクできるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ改善していきます。Mac / Windows 対応、無料、オープンソース (MIT)。">
 <meta property="og:site_name" content="さとるエディタ">
-<meta property="og:title" content="さとるエディタ (β テスト版) — 書く・まとめる・共有する、がサクサク">
-<meta property="og:description" content="編集・管理・共有がかんたんにサクサクできる総合テキストエディタ。版の履歴・AI アシスト・リンクで公開共有。Mac / Windows 対応、無料、オープンソース (MIT)。いまは β テスト版です。">
+<meta property="og:title" content="さとるエディタ (β テスト版) — みんなの声で育てていくテキストエディタ">
+<meta property="og:description" content="書く・まとめる・共有するがサクサクできるテキストエディタ。いまは β テスト版で、みんなの意見をもとに改善中。Mac / Windows・無料・オープンソース。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://docs.satoru.net/">
-<meta property="og:image" content="https://docs.satoru.net/site/shot-genko.jpg?v=20261121u">
+<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261121x">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/site/icon.png?v=4">
@@ -102,42 +102,48 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .ft-bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;border-top:1px solid var(--ln);padding-top:16px;padding-bottom:26px;font-size:.8rem;color:var(--mut)}
 .ft-bottom a{color:var(--mut);text-decoration:none;font-weight:700}
 @media (max-width:760px){.ft-in{grid-template-columns:1fr;gap:26px}}
+
+.beta-note{display:flex;gap:14px;align-items:flex-start;text-align:left;max-width:720px;margin:26px auto 0;background:#fff7ea;border:1px solid #f5c26b;border-radius:14px;padding:14px 18px;color:#6b4a00;font-size:.95rem;line-height:1.7}
+.beta-note b{color:#b26a00}
+.beta-note .ic{font-size:1.4rem;line-height:1}
+.kicker.beta{color:#fff;background:#ff8c1a}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.cards>div{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:16px 18px}
+.cards b{display:block;font-size:1.05rem;margin-bottom:4px}
+.cards p{margin:0;color:var(--mut);font-size:.93rem;line-height:1.75}
+.cards .exp{font-style:normal;font-size:.68rem;font-weight:700;color:#b26a00;background:#fff3dc;border:1px solid #f5c26b;border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:10px;max-width:760px}
+.steps li{counter-increment:s;position:relative;padding:12px 16px 12px 52px;background:var(--card);border:1px solid var(--ln);border-radius:12px;color:var(--mut)}
+.steps li b{color:var(--fg)}
+.steps li::before{content:counter(s);position:absolute;left:16px;top:12px;width:24px;height:24px;border-radius:50%;background:#ff8c1a;color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
 <nav class="top"><div class="w">
   <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタ</a>
-  <a class="l" href="#edit">編集</a>
-  <a class="l" href="#manage">管理</a>
-  <a class="l" href="#share">共有</a>
+  <a class="l" href="#features">できること</a>
+  <a class="l" href="#beta">β テストについて</a>
   <a class="l" href="#feedback">ご意見</a>
   <a class="dl-s" href="#download">ダウンロード</a>
 </div></nav>
 
 <header class="hero"><div class="w">
-  <span class="kicker">β テスト版 ・ Mac / Windows ・ 無料・オープンソース</span>
-  <h1>書く・まとめる・共有する。<br>ぜんぶ<em>サクサク</em>、ひとつのエディタで。</h1>
-  <p class="lead">さとるエディタは、編集・管理・共有がかんたんにできる総合テキストエディタです。ふつうのエディタ・原稿用紙・A4 用紙を切り替えて書けて、書いたテキストは一覧でまとまり、保存のたびに版の履歴が残ります。AI アシストや読み上げも使えて、できた文章はリンク 1 つで公開できます。</p>
+  <span class="kicker beta">β テスト版 ・ 実験中</span>
+  <h1>書く・まとめる・共有する。<br>みんなの声で<em>育てていく</em>エディタ。</h1>
+  <p class="lead">さとるエディタは、ふつうのメモから作文・原稿まで、ひとつで書けるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ良くしていきます。</p>
   <div class="dls">
-    <a class="dl" href="#download">⬇ ダウンロード <small>無料</small></a>
-    <a class="dl ghost" href="#share">リンクで公開共有について</a>
-    <a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub (ソース)</a>
+    <a class="dl" href="#download">⬇ 無料でダウンロード <small>Mac / Windows</small></a>
+    <a class="dl ghost" href="#feedback">💬 意見を送る</a>
   </div>
-  <div class="hero-shot"><img src="/site/shot-genko.jpg?v=20261121u" width="1800" height="1520" alt="さとるエディタの画面。左にテキストの一覧とフォルダ、右に原稿用紙で書いた作文"></div>
-
-  <div class="pillars">
-    <a href="#edit"><span>EDIT</span><b>編集</b><p>行番号つきのエディタ、原稿用紙、A4 用紙。書くものに合わせて、ボタン 1 つで切り替え。</p></a>
-    <a href="#manage"><span>MANAGE</span><b>管理</b><p>書いたものは一覧にまとまり、保存のたびに版の履歴が残ります。前の版との違いもひと目で。</p></a>
-    <a href="#share"><span>SHARE</span><b>共有</b><p>「リンクで公開共有」で、そのままの見た目で Web に。公開したあとの更新や変更の履歴も残せます。</p></a>
-  </div>
+  <div class="beta-note"><span class="ic">🧪</span><div><b>まだ実験中のアプリです。</b> 機能や見た目は、みなさんの意見でどんどん変わります。不具合があるかもしれないので、大事な文章はバックアップを取りながら使ってください。</div></div>
+  <div class="hero-shot"><img src="/site/shot-genko.jpg?v=20261121x" width="1800" height="1520" alt="さとるエディタの画面。上にフォルダ、下にテキストの一覧、右に原稿用紙で書いた作文"></div>
 </div></header>
 
 <main class="w">
-<section id="edit">
-  <div class="sec-k">EDIT</div>
-  <h2>書くものに合わせて、画面ごと切り替える。</h2>
-  <p class="sec-lead">ツールバーの「用紙切替」で、同じテキストを 4 つの画面で書けます。どの画面で書いていたかはファイルに覚えておくので、次に開いたときも同じ画面です。切り替えに出す画面は、設定で選べます。</p>
-  <!-- デモ: 同じ文章を 4 つの表示で (タブで切り替え。画像はアプリで撮ったもの) -->
+<section id="features">
+  <div class="sec-k">FEATURES</div>
+  <h2>できること</h2>
+  <p class="sec-lead">同じ文章を、ボタン 1 つで 4 つの画面に切り替えて書けます。</p>
   <div class="demo" id="demo">
     <div class="demo-tabs" role="tablist" aria-label="表示の切り替え">
       <button role="tab" class="m-ed" data-v="editor" aria-selected="true">標準エディタ</button>
@@ -146,170 +152,62 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
       <button role="tab" class="m-a4" data-v="a4" aria-selected="false">A4用紙</button>
     </div>
     <div class="demo-frame" role="tabpanel">
-      <img id="demo-img" src="/site/demo-editor.jpg?v=20261121u" width="1800" height="1520" alt="同じ文章を標準エディタで表示したところ">
+      <img id="demo-img" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="同じ文章を標準エディタで表示したところ">
     </div>
     <p class="demo-cap" id="demo-cap">行番号・改行の印つきの、軽いエディタ。メモやコードにも。</p>
   </div>
 
-  <div class="row">
-    <div class="pic"><img src="/site/shot-editor.jpg?v=20261121u" width="1800" height="1520" loading="lazy" alt="標準エディタの画面。行番号と改行の印が出ている"></div>
-    <div>
-      <h3>標準エディタ</h3>
-      <p>メモも、議事録も、コードも。軽くてすぐ書ける、行番号つきのエディタです。</p>
-      <ul>
-        <li>行番号・桁のものさし・改行や空白の印</li>
-        <li>正規表現の検索と置換、差分の表示</li>
-        <li>ウィンドウの分割、ウィンドウの並べ替え</li>
-        <li>色・文字・キー割り当てを好みに</li>
-      </ul>
-    </div>
+  <div class="cards">
+    <div><b>✍️ 書く画面を切り替え</b><p>ふつうのエディタ・原稿用紙 (縦・横)・A4 用紙。原稿用紙は、ふりがなや段落の下げも自動で。</p></div>
+    <div><b>🗂 一覧で、サッと探す</b><p>書いたテキストはフォルダごとに一覧に。ファイル名・場所・更新の時間がひと目でわかります。</p></div>
+    <div><b>🕘 版の履歴</b><p>保存するたびに版を残します。前とどこが変わったかを見て、前の版に戻すこともできます。</p></div>
+    <div><b>✨ AI アシスト<i class="exp">実験中</i></b><p>右はしのタブを押すと、横から AI の欄が出てきます。校正・要約・続きを書く などを頼めます。</p></div>
+    <div><b>🔗 リンクで公開共有<i class="exp">実験中</i></b><p>文章をインターネットに公開して URL を発行。原稿用紙は原稿用紙のまま。公開前に個人情報がないかも確かめます。</p></div>
+    <div><b>🔊 読み上げ<i class="exp">実験中</i></b><p>書いた文章を声で読んで、推敲に。(Mac 版)</p></div>
   </div>
+  <p class="meta">ほかにも、サーバのファイルの編集・データ暗号化など。使う機能だけをオンにできます。</p>
+</section>
 
-  <div class="row rev">
-    <div class="pic"><img src="/site/shot-genkoH.jpg?v=20261121u" width="1800" height="1520" loading="lazy" alt="横書きの原稿用紙の画面。緑のマス目にふりがな付きで書いている"></div>
-    <div>
-      <h3>原稿用紙 (縦書き・横書き)</h3>
-      <p>作文・読書感想文・小説の下書きに。マス目の上で 1 文字ずつ書けます。</p>
-      <ul>
-        <li>漢字に自動でふりがな (マスにそろえて表示)</li>
-        <li>題名・名前・段落の下げを自動で整える</li>
-        <li>枚数・何列何マスかをいつでも表示</li>
-        <li>原稿用紙のまま PDF や画像に</li>
-      </ul>
-    </div>
-  </div>
+<section id="beta">
+  <div class="sec-k">BETA</div>
+  <h2>β テストについて</h2>
+  <p class="sec-lead">さとるエディタは、作りながら、使ってくれた人といっしょに育てていくアプリです。</p>
+  <ol class="steps">
+    <li><b>まずは使ってみてください。</b> 無料で、Mac でも Windows でも使えます。</li>
+    <li><b>気づいたことを教えてください。</b> 「ここが使いにくい」「こんな機能がほしい」「動かない」など、ひとことで大丈夫です。</li>
+    <li><b>意見をもとに、改善していきます。</b> 新しい版が出たら、アプリが自動で知らせて、そのままアップデートできます。</li>
+  </ol>
+</section>
 
-  <div class="row">
-    <div class="pic"><img src="/site/shot-ai.jpg?v=20261121u" width="2040" height="1520" loading="lazy" alt="右から出した AI アシストの欄。頼みたいことを書く欄が、書いた量に合わせて広がっている"></div>
-    <div>
-      <h3>AI アシスト</h3>
-      <p>画面の右はしのタブを押すと、横からすっと出てきます。書きながら、そのまま頼めます。</p>
-      <ul>
-        <li>校正・要約・読みやすく・翻訳・続きを書く などを「…」から選ぶだけ</li>
-        <li>答えは本文に、打ちこむようにすばやく反映 (⌘Z で戻せる)</li>
-        <li>欄は別のウィンドウに取り出すことも。× で元の場所に戻る</li>
-        <li>ChatGPT・Claude・Gemini や、手元で動かす AI (ローカル LLM) も</li>
-      </ul>
-    </div>
-  </div>
-
+<section id="feedback">
+  <div class="sec-k">FEEDBACK</div>
+  <h2>ご意見・不具合の報告</h2>
   <div class="feat">
-    <div><b>読み上げ</b><p>書いた文章を声で読み上げて推敲。最初はパソコンの標準の声で、VOICEVOX の声もワンクリックで使えます。</p></div>
-    <div><b>A4 用紙</b><p>A4 のレイアウトで書いて、そのまま印刷・PDF に。</p></div>
-    <div><b>データ暗号化</b><p>パスワードをかけて保存。大事なテキストも安心です。</p></div>
-    <div><b>サーバ (SFTP / FTP)</b><p>サーバーのファイルを直接開いて編集・保存。ファイルツリーで辿れます。</p></div>
-    <div><b>スクショ</b><p>見えている画面や原稿用紙全体を、画像にしてすぐ共有。</p></div>
-    <div><b>追加機能</b><p>使う機能だけをオンに。それぞれのメニューから、すぐ設定へ。</p></div>
-  </div>
-</section>
-
-<section id="manage">
-  <div class="sec-k">MANAGE</div>
-  <h2>保存を気にせず書いて、一覧でサッと探す。</h2>
-  <p class="sec-lead">左にテキストの一覧とフォルダ。更新した順に並び、保存のたびに版の履歴が残ります。一覧は上下 2 段・左右 2 列をボタンで切り替えられます。</p>
-  <div class="row">
-    <div class="pic"><img src="/site/shot-library.jpg?v=20261121u" width="1100" height="1000" loading="lazy" alt="テキストの一覧とフォルダ。ファイル名の右に拡張子、原稿用紙の文書にはマス目の印が付いている"></div>
-    <div>
-      <h3>テキスト一覧</h3>
-      <ul>
-        <li>ファイル名と拡張子 (txt・html など)、フォルダ、「5 分前」のような更新の時間がひと目でわかる</li>
-        <li>原稿用紙・A4・エディタの印、公開中のものにはリンクの印</li>
-        <li>好きな場所のフォルダを開いて、そのまま一覧に</li>
-        <li>⇧ や ⌘ でいくつも選んで、まとめて削除・移動</li>
-        <li>右クリックで ピン固定・ロック・複製・移動・版の履歴</li>
-        <li>サムネで並べて見わたすことも</li>
-      </ul>
-    </div>
-  </div>
-  <div class="row rev">
-    <div class="pic"><img src="/site/shot-versions.jpg?v=20261121u" width="1922" height="1176" loading="lazy" alt="版の履歴の画面。前の版との違いが、消したところは赤い取り消し線、足したところは青い下線で出ている"></div>
-    <div>
-      <h3>版の履歴</h3>
-      <p>保存するたびに、その時の中身を版として残します。うっかり消しても、前の版に戻せます。</p>
-      <ul>
-        <li>Word のように、消したところは赤い取り消し線、足したところは青い下線で</li>
-        <li>好きな版を見る・コピーする・その版に戻す</li>
-        <li>残す数は設定で (はじめは 20 個)。開いただけでは増えません</li>
-        <li>Finder でファイルを動かしても、履歴はついてきます</li>
-        <li>一覧と履歴は、パスワードをかけてまるごとバックアップ</li>
-      </ul>
-    </div>
-  </div>
-  <ul class="chips">
-    <li>版の履歴</li><li>違いを Word 風に</li><li>フォルダのツリー</li><li>好きなフォルダを開く</li><li>ピン固定</li><li>ロック</li><li>検索</li><li>サムネ表示</li><li>まとめて削除</li><li>パスワード付きバックアップ</li><li>ふつうのテキストファイルのまま</li>
-  </ul>
-</section>
-
-<section id="share">
-  <div class="sec-k">SHARE</div>
-  <h2>リンク 1 つで、そのままの見た目で公開。</h2>
-  <p class="sec-lead">「公開 &gt; リンクで公開共有」を押すと、文章をインターネット上に公開して URL を発行します。勝手に一覧に載ることはありません。原稿用紙は原稿用紙のまま、エディタはあなたの色と行番号のまま。URL を送るだけで、だれでも読めます。</p>
-  <div class="share-box">
-    <figure style="margin:0"><img src="/site/page-genko.jpg?v=20261121u" loading="lazy" alt="公開した原稿用紙のページ"><figcaption>原稿用紙のまま公開 (docs.satoru.net/r/…)</figcaption></figure>
-    <figure style="margin:0"><img src="/site/page-editor.jpg?v=20261121u" loading="lazy" alt="公開した標準エディタのページ。行番号と、使っているエディタの色"><figcaption>標準エディタは、行番号とエディタの色のまま</figcaption></figure>
-  </div>
-  <div class="row rev" style="margin-top:34px">
-    <div class="pic" style="max-width:420px;justify-self:center"><img src="/site/shot-share.png?v=20261121u" loading="lazy" alt="リンクで公開共有の画面。公開・リンクを知っている人だけ・パスワードを選ぶ"></div>
-    <div>
-      <h3>だれに見せるかを選べる</h3>
-      <ul>
-        <li><b>公開</b> … URL を知っていればだれでも読め、検索にも出ます</li>
-        <li><b>リンクを知っている人だけ</b> … URL を送った人だけ</li>
-        <li><b>パスワード</b> … パスワードを入れた人だけ</li>
-        <li>公開の期限は日時まで細かく。あとから設定を変える・いつでも公開をやめる</li>
-        <li>公開する前に、電話番号や住所などの個人情報が入っていないか確かめる</li>
-        <li>直したらページを更新。変更の履歴と、どこが変わったかも見せられる</li>
-        <li>ページでは、ずんだもんの声で 1 行ずつ読み上げ・テキストや画像でコピー・用紙の切り替え</li>
-        <li>SNS に貼ると、中身が見えるカード画像つき</li>
-      </ul>
-    </div>
-  </div>
-  <div class="row" style="margin-top:34px">
-    <div class="pic" style="max-width:320px;justify-self:center"><img src="/site/shot-privacy.png?v=20261121u" width="520" height="624" loading="lazy" alt="公開の前の確認。個人情報が入っているかもしれません、と名前が見つかったことを知らせている"></div>
-    <div>
-      <h3>うっかり公開を防ぐ</h3>
-      <p>公開する前に、電話番号・住所・メールアドレス・名前・パスワードらしいものが入っていないかを、パソコンの中だけで確かめます。見つかったら、公開する前に知らせます。</p>
-      <ul>
-        <li>「やめて見直す」で、見つかったところを選んだ状態にして戻る</li>
-        <li>確かめた内容は、どこにも送りません</li>
-      </ul>
-    </div>
+    <div><b>X (旧 Twitter)</b><p>ひとことの感想や要望は、こちらへ。</p><a class="dl ghost" href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a></div>
+    <div><b>GitHub</b><p>不具合の報告や、くわしい提案は Issues へ。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit/issues" target="_blank" rel="noopener">Issues を開く</a></div>
+    <div><b>ソースコード</b><p>全ソースを MIT ライセンスで公開しています。だれでも読めて、直して使えます。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub で見る</a></div>
   </div>
 </section>
 
 <section id="download">
   <div class="sec-k">DOWNLOAD</div>
   <h2>ダウンロード (β テスト版)</h2>
-  <p class="sec-lead">いまは β テスト版です。毎日使えるように作っていますが、まだ不具合があるかもしれません。大事な文章は、バックアップも取りながら使ってください。</p>
   <div class="feat">
-    <div><b>Mac 版<em class="badge">Mac App Store 審査中</em></b><p>SatoruEditor-1.0.0-mac.dmg（6.1 MB）<br>macOS 11 以降・Apple シリコン / Intel 両対応</p><a class="dl" href="/SatoruEditor-1.0.0-mac.dmg?v=20261121v" download>⬇ ダウンロード</a></div>
-    <div><b>Windows 版<em class="badge">Microsoft Store 審査中</em></b><p>SatoruEditor-1.0.0-win-x64-setup.exe（2.4 MB）<br>Windows 10 / 11（64 ビット）・管理者の許可は不要</p><a class="dl" href="/SatoruEditor-1.0.0-win-x64-setup.exe?v=20261121u" download>⬇ インストーラー</a></div>
+    <div><b>Mac 版</b><p>SatoruEditor-1.0.1-mac.dmg（7.1 MB）<br>macOS 11 以降・Apple シリコン / Intel</p><a class="dl" href="/SatoruEditor-1.0.1-mac.dmg?v=20261121x" download>⬇ ダウンロード</a></div>
+    <div><b>Windows 版</b><p>SatoruEditor-1.0.0-win-x64-setup.exe（2.4 MB）<br>Windows 10 / 11（64 ビット）・管理者の許可は不要</p><a class="dl" href="/SatoruEditor-1.0.0-win-x64-setup.exe?v=20261121x" download>⬇ インストーラー</a></div>
   </div>
-  <p class="meta">ストアで公開されるまでは、ここから直接ダウンロードできます。</p>
-  <h3 style="margin:28px 0 8px">入れ方</h3>
-  <table>
-    <tr><th>Mac</th><td>ダウンロードした dmg を開き、中のさとるエディタを「アプリケーション」フォルダに入れて起動します。</td></tr>
-    <tr><th>Windows</th><td>ダウンロードした <code>SatoruEditor-1.0.0-win-x64-setup.exe</code> を開き、「インストール」を押します。スタートメニュー（とデスクトップ）にさとるエディタが入ります。消すときは「設定 &gt; アプリ」から。</td></tr>
+  <table style="margin-top:22px">
+    <tr><th>Mac</th><td>dmg を開いて、さとるエディタを「アプリケーション」フォルダに入れて起動します。</td></tr>
+    <tr><th>Windows</th><td>インストーラーを開いて「インストール」を押します。初回に「Windows によって PC が保護されました」と出たら、「詳細情報」→「実行」で起動できます。</td></tr>
   </table>
-  <p class="meta">Windows では、初回に「Windows によって PC が保護されました」と出ることがあります。「詳細情報」→「実行」で起動できます。</p>
-</section>
-
-<section id="feedback">
-  <div class="sec-k">FEEDBACK</div>
-  <h2>ご意見・不具合の報告をお待ちしています。</h2>
-  <p class="sec-lead">β テスト版を使ってみて、気になったところ・ほしい機能・不具合があれば、気軽に教えてください。</p>
-  <div class="feat">
-    <div><b>X (旧 Twitter)</b><p>ひとことの感想や要望は、こちらへ。</p><a class="dl ghost" href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a></div>
-    <div><b>GitHub</b><p>不具合の報告や、くわしい提案は Issues へ。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit/issues" target="_blank" rel="noopener">Issues を開く</a></div>
-    <div><b>ソースコード</b><p>全ソースを MIT ライセンスで公開しています。だれでも読めて、直して使えます。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">github.com/satorunet/satoedit</a></div>
-  </div>
+  <p class="meta">新しい版が出ると、アプリが知らせてくれます (メニューの「アップデートを確認…」からも確かめられます)。</p>
 </section>
 </main>
 
 <footer class="ft"><div class="w ft-in">
   <div class="ft-brand">
-    <div class="ft-logo"><img src="/site/icon.png?v=4" alt="" width="40" height="40"><div><b>さとるエディタ</b><span>v1.0.0 β テスト版 ・ 編集・管理・共有がサクサクできるテキストエディタ ・ Mac / Windows ・ MIT ライセンス</span></div></div>
-    <p>書いて、まとめて、リンクで共有。<br>毎日のメモから作文・原稿まで、これひとつで。</p>
+    <div class="ft-logo"><img src="/site/icon.png?v=4" alt="" width="40" height="40"><div><b>さとるエディタ</b><span>β テスト版 ・ Mac / Windows ・ 無料 ・ MIT ライセンス</span></div></div>
+    <p>書いて、まとめて、リンクで共有。<br>みんなの声で、少しずつ育てていきます。</p>
   </div>
   <nav class="ft-col"><h3>リンク</h3>
     <a href="#download">ダウンロード</a>
@@ -329,12 +227,12 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
     genkoH:["原稿用紙 (横書き)","横書きの原稿用紙 (緑のマス目) にも、ボタン 1 つで。"],
     a4:["A4用紙","A4 の紙の見た目で。そのまま印刷・PDF に。"]};
   var img=document.getElementById("demo-img"),cap=document.getElementById("demo-cap"),tabs=document.querySelectorAll("#demo .demo-tabs button");
-  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261121u"});
+  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261121x"});
   tabs.forEach(function(b){b.addEventListener("click",function(){
     var v=b.getAttribute("data-v");
     tabs.forEach(function(x){x.setAttribute("aria-selected",x===b?"true":"false")});
     img.classList.add("fade");
-    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261121u";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
+    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261121x";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
     img.onload=function(){img.classList.remove("fade")};
   })});
 })();

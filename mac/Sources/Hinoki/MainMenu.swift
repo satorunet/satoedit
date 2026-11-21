@@ -40,6 +40,8 @@ enum MainMenu {
 
         submenu(appName, in: main, [
             item("{0} について", "showAboutHM:", args: [appName]),
+            item("アップデートを確認…", "checkForUpdatesHM:"),
+            item("アップデートを自動で確認", "toggleAutoUpdateHM:"),
             sep(),
             item("設定…", "openSettingsHM:", ","),
             sep(),

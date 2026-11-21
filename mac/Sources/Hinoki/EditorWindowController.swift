@@ -575,7 +575,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
 
     /// 機能のオン・オフと「表示 > フォルダツリー」に合わせて、左のツリーを出し入れする
     /// 左のテキスト一覧を出し入れする (いちばん左に置く)
-    /// 上下に並べるときの入れ物 (上にテキストの一覧、下にフォルダの欄)
+    /// 上下に並べるときの入れ物 (上にフォルダの欄、下にテキストの一覧)
     private lazy var libraryColumn: NSStackView = {
         let v = NSStackView()
         v.orientation = .vertical
@@ -584,11 +584,18 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
         return v
     }()
     private var libraryColumnConstraints: [NSLayoutConstraint] = []
+    /// 上下 2 段のとき、テキストの一覧とフォルダの欄の間に置くバー (区別しやすく)
+    private lazy var libraryDivider: NSView = {
+        let v = LibraryDividerBar()
+        v.translatesAutoresizingMaskIntoConstraints = false
+        v.heightAnchor.constraint(equalToConstant: 3).isActive = true
+        return v
+    }()
     private weak var libraryFitHeight: NSLayoutConstraint?
 
-    /// 左右 (フォルダの欄が左) / 上下 (テキストの一覧が上、フォルダの欄が下) に並べ直す
+    /// 左右 (フォルダの欄が左) / 上下 (フォルダの欄が上、テキストの一覧が下) に並べ直す
     private func arrangeLibraryPanels() {
-        for v in [folderListPanel, libraryPanel, libraryColumn] as [NSView] {
+        for v in [folderListPanel, libraryPanel, libraryDivider, libraryColumn] as [NSView] {
             if let sv = v.superview as? NSStackView { sv.removeArrangedSubview(v) }
             v.removeFromSuperview()
         }
@@ -597,21 +604,23 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
         if TextLibrary.oneColumn {
             // フォルダの欄の幅は一覧に合わせ、高さは 1/3 くらい
             TextLibrary.widthConstraint(of: folderListPanel)?.isActive = false
-            libraryColumn.addArrangedSubview(libraryPanel)
+            // 上にフォルダの欄、下にテキストの一覧
             libraryColumn.addArrangedSubview(folderListPanel)
+            libraryColumn.addArrangedSubview(libraryDivider)   // フォルダとテキストの間の区切りのバー
+            libraryColumn.addArrangedSubview(libraryPanel)
             editorArea.insertArrangedSubview(libraryColumn, at: 0)
-            // 一覧は中身に合わせた高さ (多いときは 2/3 まで)。テキストが少ないときは、そのぶんフォルダの欄が上に来る
-            let fit = libraryPanel.heightAnchor.constraint(equalToConstant: max(90, libraryPanel.contentHeight))
+            // フォルダの欄はフォルダの数に合わせた高さ (多いときは半分まで)。残りは全部テキストの一覧
+            let fit = folderListPanel.heightAnchor.constraint(equalToConstant: max(80, folderListPanel.contentHeight))
             fit.priority = .defaultHigh
             libraryFitHeight = fit
             libraryColumnConstraints = [
                 fit,
-                libraryPanel.heightAnchor.constraint(lessThanOrEqualTo: libraryColumn.heightAnchor, multiplier: 0.67),
-                libraryPanel.heightAnchor.constraint(greaterThanOrEqualToConstant: 90),
+                folderListPanel.heightAnchor.constraint(lessThanOrEqualTo: libraryColumn.heightAnchor, multiplier: 0.5),
+                folderListPanel.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
                 folderListPanel.widthAnchor.constraint(equalTo: libraryPanel.widthAnchor),
             ]
             NSLayoutConstraint.activate(libraryColumnConstraints)
-            libraryPanel.onContentHeightChange = { [weak self] h in self?.libraryFitHeight?.constant = max(90, h) }
+            folderListPanel.onContentHeightChange = { [weak self] h in self?.libraryFitHeight?.constant = max(80, h) }
         } else {
             TextLibrary.widthConstraint(of: folderListPanel)?.isActive = true
             editorArea.insertArrangedSubview(folderListPanel, at: 0)
@@ -2808,4 +2817,16 @@ final class AITabButton: NSButton {
     override func mouseEntered(with event: NSEvent) { NSCursor.pointingHand.set() }
     override func mouseMoved(with event: NSEvent) { NSCursor.pointingHand.set() }
     override func mouseExited(with event: NSEvent) { NSCursor.arrow.set() }
+}
+
+
+/// テキストの一覧とフォルダの欄の間のバー: 細い帯に、上の線
+final class LibraryDividerBar: NSView {
+    override var isFlipped: Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.separatorColor.withAlphaComponent(0.6).setFill()
+        bounds.fill()
+        NSColor.separatorColor.setFill()
+        NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
+    }
 }

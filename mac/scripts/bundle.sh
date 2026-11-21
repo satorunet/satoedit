@@ -7,8 +7,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-VERSION="1.0.0"
-BUILD_NUMBER="1"
+# 版: 上げるときはここを変える (自動アップデートは CFBundleVersion で新旧を比べるので、版と同じにする)
+VERSION="${VERSION:-1.0.1}"
+BUILD_NUMBER="$VERSION"
 BUNDLE_ID="${BUNDLE_ID:-net.satoru.satoruEditor}"
 
 UNIVERSAL=0
@@ -33,6 +34,7 @@ else
     swift build -c release
     BIN=".build/release/Hinoki"
 fi
+BINDIR="$(dirname "$BIN")"
 
 APP="build/さとるエディタ.app"
 rm -rf "$APP"
@@ -41,6 +43,9 @@ cp "$BIN" "$APP/Contents/MacOS/satoruEditor"
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 # 設定で選べる色ちがいのアイコン
 cp -R Resources/Icons "$APP/Contents/Resources/Icons"
+# 自動アップデート (Sparkle) の部品を同梱する
+mkdir -p "$APP/Contents/Frameworks"
+ditto "$BINDIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -55,7 +60,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
     <key>CFBundleVersion</key><string>${BUILD_NUMBER}</string>
-    <key>NSHumanReadableCopyright</key><string>© 2026 さとるエディタ. MIT License.</string>
+    <key>SUFeedURL</key><string>https://raw.githubusercontent.com/satorunet/satoedit/main/mac/appcast.xml</string>
+    <key>SUPublicEDKey</key><string>1dnduvVlAY0o/ykPaaGkwkiXlEiNICxasqTmTupPzDo=</string>
+    <key>SUEnableAutomaticChecks</key><true/>
+    <key>SUEnableSystemProfiling</key><false/>
+    <key>SUAllowsAutomaticUpdates</key><false/>
+    <key>NSHumanReadableCopyright</key><string>© 2026 satoru.net. MIT License.</string>
     <key>LSApplicationCategoryType</key><string>public.app-category.developer-tools</string>
     <key>CFBundleDevelopmentRegion</key><string>ja</string>
     <key>CFBundleLocalizations</key><array><string>ja</string><string>en</string></array>
@@ -109,6 +119,13 @@ if [ -n "$SIGN_ID" ]; then
     # マイク (音声入力) は hardened runtime では許可の印 (entitlements) が要る
     # (開発中は時刻印を付けない。ネットに問い合わせない分すぐ終わる。署名の名前は同じなのでキーチェーンの許可はそのまま使える)
     if [ "$DEV" = 1 ]; then TS="--timestamp=none"; else TS="--timestamp"; fi
+    # Sparkle の中身は内側から順に署名する (Sparkle の説明どおり)
+    SP="$APP/Contents/Frameworks/Sparkle.framework"
+    codesign --force --options runtime $TS -s "$SIGN_ID" "$SP/Versions/B/XPCServices/Installer.xpc"
+    codesign --force --options runtime $TS -s "$SIGN_ID" --preserve-metadata=entitlements "$SP/Versions/B/XPCServices/Downloader.xpc"
+    codesign --force --options runtime $TS -s "$SIGN_ID" "$SP/Versions/B/Autoupdate"
+    codesign --force --options runtime $TS -s "$SIGN_ID" "$SP/Versions/B/Updater.app"
+    codesign --force --options runtime $TS -s "$SIGN_ID" "$SP"
     codesign --force --options runtime $TS --entitlements scripts/entitlements.plist -s "$SIGN_ID" "$APP"
     codesign --verify --strict --verbose=1 "$APP"
     echo "signed: $SIGN_ID"

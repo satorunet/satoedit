@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>さとるエディタ</title>
+    <link>https://github.com/satorunet/satoedit</link>
+    <language>ja</language>
+    <item>
+      <title>さとるエディタ 1.0.1</title>
+      <pubDate>Sat, 21 Nov 2026 13:06:36 +0000</pubDate>
+      <sparkle:version>1.0.1</sparkle:version>
+      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.1</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>さとるエディタ 1.0.1 (β テスト版)</h2>
+<ul>
+<li>自動アップデートに対応 (新しい版が出ると知らせて、そのまま入れ替え)</li>
+<li>テキスト一覧: 上にフォルダ、下にテキストの一覧。フォルダの数に合わせて高さを合わせ、間に区切りのバー</li>
+<li>原稿用紙のタブを閉じたときに落ちることがあったのを直した</li>
+</ul>]]></description>
+      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.1/SatoruEditor-1.0.1-mac.dmg" sparkle:edSignature="D3Qa1ONUkX1DZOb9MNNob8bHTdW3AScJX2VJ5y2wnB1E+ZoGBV2+04XhCKyr2Ua9ahncS/O/XSUJqA9RSa9GDg==" length="7120926" type="application/octet-stream"/>
+    </item>
+  </channel>
+</rss>

@@ -1929,6 +1929,14 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
     private var restoring = false
 
     static let width: CGFloat = 128
+    /// 中身にちょうどよい高さが変わった (上下 2 段のとき、フォルダの数に合わせる)
+    var onContentHeightChange: ((CGFloat) -> Void)?
+    /// フォルダを全部見せるのにちょうどよい高さ (見出し・下のボタン + 行の数ぶん)
+    var contentHeight: CGFloat {
+        let sv = outline.enclosingScrollView
+        let chrome = bounds.height > 0 ? max(0, bounds.height - (sv?.frame.height ?? 0)) : 56
+        return chrome + CGFloat(outline.numberOfRows) * (outline.rowHeight + outline.intercellSpacing.height) + 6
+    }
     private static let dragType = NSPasteboard.PasteboardType("net.satoru.satoruEditor.folderRow")
     private static let expandedKey = "libraryFolderExpanded"
 
@@ -2093,6 +2101,7 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
                     TextLibrary.selectedGroup = "all"
                 }
                 self.restoring = false
+                self.onContentHeightChange?(self.contentHeight)
             }
         }
     }
@@ -2207,8 +2216,8 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         walk(top)
         UserDefaults.standard.set(keys, forKey: Self.expandedKey)
     }
-    func outlineViewItemDidExpand(_ notification: Notification) { saveExpanded() }
-    func outlineViewItemDidCollapse(_ notification: Notification) { saveExpanded() }
+    func outlineViewItemDidExpand(_ notification: Notification) { saveExpanded(); onContentHeightChange?(contentHeight) }
+    func outlineViewItemDidCollapse(_ notification: Notification) { saveExpanded(); onContentHeightChange?(contentHeight) }
 
     // MARK: ドラッグ (自分で作ったフォルダだけ): 線の位置に置くと並べ替え、フォルダの上に置くとその中へ
 

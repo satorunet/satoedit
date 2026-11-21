@@ -20,3 +20,4 @@ windows/test/out/
 *.ips
 *.log
 .env
+mac/tools/
