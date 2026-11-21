@@ -5,7 +5,12 @@ public enum AppPaths {
     public static let configDirName = ".satoruEditor"
     static let oldConfigDirNames = [".sakubunEditor", ".satomaru"] // 新しいものから順に
 
+    #if os(macOS)
     private static var home: URL { FileManager.default.homeDirectoryForCurrentUser }
+    #else
+    // iPhone / iPad 版: アプリの中の置き場所 (ホーム) を使う
+    private static var home: URL { URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true) }
+    #endif
     public static var configDir: URL { home.appendingPathComponent(configDirName, isDirectory: true) }
     public static func file(_ name: String, isDirectory: Bool = false) -> URL {
         configDir.appendingPathComponent(name, isDirectory: isDirectory)

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>さとるエディタ (β テスト版) — みんなの声で育てていくテキストエディタ</title>
+<meta name="description" content="さとるエディタは、書く・まとめる・共有するがサクサクできるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ改善していきます。Mac / Windows 対応、無料、オープンソース (MIT)。">
+<meta property="og:site_name" content="さとるエディタ">
+<meta property="og:title" content="さとるエディタ (β テスト版) — みんなの声で育てていくテキストエディタ">
+<meta property="og:description" content="書く・まとめる・共有するがサクサクできるテキストエディタ。いまは β テスト版で、みんなの意見をもとに改善中。Mac / Windows・無料・オープンソース。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://docs.satoru.net/">
+<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261121x">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="/site/icon.png?v=4">
+<style>
+:root{color-scheme:light;--bg:#fff;--fg:#0f1419;--mut:#536471;--ln:#e5e9eb;--a:#1d9bf0;--a2:#0b7bc4;--card:#f7f9f9;--code:#eef3f6;--shu:#c0392b;--mid:#2f8f57}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.8 system-ui,-apple-system,"Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif}
+a{color:var(--a2)}
+img{max-width:100%;height:auto;display:block}
+.w{max-width:1040px;margin:0 auto;padding:0 16px}
+nav.top{position:sticky;top:0;z-index:5;background:rgba(255,255,255,.88);backdrop-filter:saturate(1.6) blur(10px);border-bottom:1px solid var(--ln)}
+nav.top .w{display:flex;align-items:center;gap:18px;height:54px}
+nav.top .logo{display:flex;align-items:center;gap:9px;font-weight:700;color:var(--fg);text-decoration:none;margin-right:auto}
+nav.top .logo img{width:28px;height:28px}
+nav.top a.l{color:var(--mut);text-decoration:none;font-size:.9rem}
+nav.top a.l:hover{color:var(--fg)}
+nav.top .dl-s{background:var(--a);color:#fff;text-decoration:none;font-weight:700;font-size:.85rem;padding:6px 14px;border-radius:999px}
+@media (max-width:640px){nav.top a.l{display:none}}
+header.hero{padding:56px 0 24px;text-align:center}
+.kicker{display:inline-block;font-size:.8rem;font-weight:700;letter-spacing:.06em;color:var(--a2);background:var(--code);border-radius:999px;padding:3px 14px}
+h1{font-size:clamp(2rem,5.6vw,3.2rem);line-height:1.25;margin:16px 0 14px;letter-spacing:-.01em}
+h1 em{font-style:normal;background:linear-gradient(transparent 62%,#ffe08a 62%)}
+.lead{color:var(--mut);margin:0 auto 26px;max-width:680px;font-size:1.05rem}
+.dls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.dl{display:inline-flex;align-items:center;gap:10px;background:var(--a);color:#fff;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:999px;font-size:1.05rem}
+.dl:hover{filter:brightness(1.08)}
+.dl small{font-weight:400;opacity:.85}
+.dl.ghost{background:var(--bg);color:var(--a2);border:1.5px solid var(--a)}
+.meta{color:var(--mut);font-size:.85rem;margin-top:10px}
+.hero-shot{margin:36px auto 0;max-width:1000px;border-radius:12px;overflow:hidden;border:1px solid var(--ln);box-shadow:0 24px 60px rgba(15,20,25,.18)}
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:44px 0 8px}
+.pillars a{display:block;text-decoration:none;color:inherit;border:1px solid var(--ln);border-radius:14px;padding:18px 20px;background:var(--card)}
+.pillars a:hover{border-color:var(--a)}
+.pillars span{font-size:.75rem;font-weight:700;letter-spacing:.1em;color:var(--a2)}
+.pillars b{display:block;font-size:1.25rem;margin:4px 0}
+.pillars p{margin:0;color:var(--mut);font-size:.92rem;line-height:1.7}
+@media (max-width:760px){.pillars{grid-template-columns:1fr}}
+section{padding:56px 0;border-top:1px solid var(--ln)}
+section h2{font-size:clamp(1.4rem,3.4vw,1.9rem);line-height:1.35;margin:6px 0 10px}
+section h2[id]{scroll-margin-top:70px}
+.sec-k{font-size:.8rem;font-weight:700;letter-spacing:.12em;color:var(--a2)}
+.sec-lead{color:var(--mut);margin:0 0 26px;max-width:720px}
+.row{display:grid;grid-template-columns:1.25fr 1fr;gap:34px;align-items:center;margin:30px 0}
+.row.rev{grid-template-columns:1fr 1.25fr}
+.row.rev .pic{order:2}
+.row .pic img{border-radius:10px;border:1px solid var(--ln);box-shadow:0 12px 32px rgba(15,20,25,.14)}
+.row h3{font-size:1.2rem;margin:0 0 6px}
+.row p{margin:0 0 10px;color:var(--mut)}
+.row ul{margin:0;padding-left:1.2em;color:var(--mut)}
+.row ul li{margin:3px 0}
+@media (max-width:760px){.row,.row.rev{grid-template-columns:1fr}.row.rev .pic{order:0}}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.feat>div{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px 16px}
+.feat b{display:block;margin-bottom:4px}
+.feat p{margin:0;color:var(--mut);font-size:.92rem;line-height:1.7}
+.feat .dl{margin-top:12px;font-size:.92rem;padding:8px 18px}
+.badge{font-style:normal;font-size:.7rem;font-weight:700;color:#b26a00;background:#fff3dc;border:1px solid #f5c26b;border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:1px;white-space:nowrap}
+.demo{margin:8px 0 34px}
+.demo-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.demo-tabs button{font:inherit;font-size:.88rem;font-weight:700;border-radius:999px;padding:5px 16px;border:1.5px solid;background:var(--bg);cursor:pointer;transition:background .15s,color .15s}
+.demo-tabs button[aria-selected="true"].m-ed{background:#334;color:#fff}
+.demo-tabs button[aria-selected="true"].m-gv{background:var(--shu);border-color:var(--shu);color:#fff}
+.demo-tabs button[aria-selected="true"].m-gh{background:var(--mid);border-color:var(--mid);color:#fff}
+.demo-tabs button[aria-selected="true"].m-a4{background:#555;border-color:#555;color:#fff}
+.demo-frame{border-radius:12px;overflow:hidden;border:1px solid var(--ln);box-shadow:0 16px 40px rgba(15,20,25,.16);background:#e9e9e9}
+.demo-frame img{width:100%;transition:opacity .18s}
+.demo-frame img.fade{opacity:.25}
+.demo-cap{color:var(--mut);margin:10px 2px 0;font-size:.95rem}
+.m-ed{color:#334;border-color:#99a}.m-gv{color:var(--shu);border-color:#e3a59d}.m-gh{color:var(--mid);border-color:#93c9a8}.m-a4{color:#555;border-color:#bbb}
+ul.chips{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+ul.chips li{background:var(--card);border:1px solid var(--ln);border-radius:999px;padding:3px 14px;font-size:.88rem;color:var(--mut)}
+code{background:var(--code);border-radius:4px;padding:1px 6px;font-size:.9em}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+td,th{border-bottom:1px solid var(--ln);padding:8px 6px;text-align:left;vertical-align:top}
+th{white-space:nowrap;color:var(--mut);font-weight:600}
+.share-box{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+.share-box img{border-radius:10px;border:1px solid var(--ln);box-shadow:0 10px 28px rgba(15,20,25,.12)}
+.share-box figcaption{font-size:.85rem;color:var(--mut);margin-top:8px}
+@media (max-width:760px){.share-box{grid-template-columns:1fr}}
+.public-cta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:18px 22px;margin-top:26px}
+.public-cta p{margin:0;color:var(--mut)}
+.ft{margin-top:24px;background:linear-gradient(180deg,var(--card),color-mix(in srgb,var(--card) 70%,var(--ln)));border-top:1px solid var(--ln);color:var(--fg)}
+.ft-in{display:grid;grid-template-columns:1.6fr 1fr;gap:36px;padding-top:44px;padding-bottom:34px}
+.ft-logo{display:flex;align-items:center;gap:12px}
+.ft-logo b{font-size:1.15rem;display:block;line-height:1.3}
+.ft-logo span{font-size:.8rem;color:var(--mut)}
+.ft-brand p{color:var(--mut);font-size:.9rem;line-height:1.7;margin:14px 0 16px;max-width:460px}
+.ft-col h3{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:4px 0 12px}
+.ft-col a,.ft-col .ft-store{display:block;color:var(--fg);text-decoration:none;font-size:.9rem;padding:4px 0}
+.ft-col a:hover{color:var(--a)}
+.ft-bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;border-top:1px solid var(--ln);padding-top:16px;padding-bottom:26px;font-size:.8rem;color:var(--mut)}
+.ft-bottom a{color:var(--mut);text-decoration:none;font-weight:700}
+@media (max-width:760px){.ft-in{grid-template-columns:1fr;gap:26px}}
+
+.hero-shot{position:relative}
+.hero-shot .hero-top{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .45s ease}
+.hero-shot .hero-top.on{opacity:1}
+.hero-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(15,20,25,.78);color:#fff;font-weight:700;font-size:.9rem;padding:5px 16px;border-radius:999px;transition:background .3s}
+.beta-note{display:flex;gap:14px;align-items:flex-start;text-align:left;max-width:720px;margin:26px auto 0;background:#fff7ea;border:1px solid #f5c26b;border-radius:14px;padding:14px 18px;color:#6b4a00;font-size:.95rem;line-height:1.7}
+.beta-note b{color:#b26a00}
+.beta-note .ic{font-size:1.4rem;line-height:1}
+.kicker.beta{color:#fff;background:#ff8c1a}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.cards>div{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:16px 18px}
+.cards b{display:block;font-size:1.05rem;margin-bottom:4px}
+.cards p{margin:0;color:var(--mut);font-size:.93rem;line-height:1.75}
+.cards .exp{font-style:normal;font-size:.68rem;font-weight:700;color:#b26a00;background:#fff3dc;border:1px solid #f5c26b;border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:10px;max-width:760px}
+.steps li{counter-increment:s;position:relative;padding:12px 16px 12px 52px;background:var(--card);border:1px solid var(--ln);border-radius:12px;color:var(--mut)}
+.steps li b{color:var(--fg)}
+.steps li::before{content:counter(s);position:absolute;left:16px;top:12px;width:24px;height:24px;border-radius:50%;background:#ff8c1a;color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+</style>
+</head>
+<body>
+<nav class="top"><div class="w">
+  <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタ</a>
+  <a class="l" href="#features">できること</a>
+  <a class="l" href="#beta">β テストについて</a>
+  <a class="l" href="#feedback">ご意見</a>
+  <a class="dl-s" href="#download">ダウンロード</a>
+</div></nav>
+
+<header class="hero"><div class="w">
+  <span class="kicker beta">β テスト版 ・ 実験中</span>
+  <h1>書く・まとめる・共有する。<br>みんなの声で<em>育てていく</em>エディタ。</h1>
+  <p class="lead">さとるエディタは、ふつうのメモから作文・原稿まで、ひとつで書けるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ良くしていきます。</p>
+  <div class="dls">
+    <a class="dl" href="#download">⬇ 無料でダウンロード <small>Mac / Windows</small></a>
+    <a class="dl ghost" href="#feedback">💬 意見を送る</a>
+  </div>
+  <div class="beta-note"><span class="ic">🧪</span><div><b>まだ実験中のアプリです。</b> 機能や見た目は、みんなの意見でどんどん変わります。不具合があるかもしれないので、大事な文章はバックアップを取りながら使ってください。</div></div>
+  <div class="hero-shot" id="hero-shot">
+    <img id="hero-a" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="さとるエディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
+    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="" aria-hidden="true">
+    <span class="hero-label" id="hero-label">標準エディタ</span>
+  </div>
+</div></header>
+
+<main class="w">
+<section id="features">
+  <div class="sec-k">FEATURES</div>
+  <h2>できること</h2>
+  <p class="sec-lead">大きく 4 つ。書く画面を選んで、AI に手伝ってもらって、できたらリンクで共有できます。</p>
+
+  <div class="row">
+    <div class="pic"><img src="/site/shot-editor.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="標準エディタの画面。左にフォルダとテキストの一覧、右に行番号つきのメモ"></div>
+    <div>
+      <h3>1. エディタ表示</h3>
+      <p>メモ・議事録・コードに。軽くてすぐ書ける、行番号つきのエディタです。</p>
+      <ul>
+        <li>行番号・桁のものさし・改行や空白の印</li>
+        <li>書いたテキストは左の一覧にまとまり、サッと探せる</li>
+        <li>保存のたびに版の履歴が残り、前の版に戻せる</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="row rev">
+    <div class="pic"><img src="/site/shot-genko.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="原稿用紙の画面。縦書きのマス目に、ふりがな付きで作文が書かれている"></div>
+    <div>
+      <h3>2. 原稿用紙</h3>
+      <p>作文・読書感想文・小説の下書きに。ボタン 1 つで、同じ文章が原稿用紙になります。</p>
+      <ul>
+        <li>縦書き・横書き、A4 用紙にも切り替え</li>
+        <li>漢字に自動でふりがな</li>
+        <li>題名・名前・段落の下げを自動で整える</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="pic"><img src="/site/shot-ai-proof.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="AI アシストに誤字を直してもらっているところ。直した文章と「置き換える」ボタンが出ている"></div>
+    <div>
+      <h3>3. AI 補正 <i class="badge">実験中</i></h3>
+      <p>右はしのタブを押すと、横から AI の欄が出てきます。「誤字や表記を直して」と頼むと、直した文章を出してくれます。</p>
+      <ul>
+        <li>「置き換える」を押すと本文に反映 (⌘Z で戻せる)</li>
+        <li>校正・要約・読みやすく・翻訳・続きを書く も選ぶだけ</li>
+        <li>作文を書いてもらうことも (<a href="#sample">見本</a>)</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="row rev" id="sample">
+    <div class="pic"><a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="リンクで公開した作文のページ。原稿用紙のまま、ふりがな付きで読める"></a></div>
+    <div>
+      <h3>4. 共有機能 (リンクで公開共有) <i class="badge">実験中</i></h3>
+      <p>文章をインターネットに公開して URL を発行。原稿用紙は原稿用紙のまま、だれでもブラウザで読めます。</p>
+      <ul>
+        <li>公開・リンクを知っている人だけ・パスワード を選べる</li>
+        <li>公開の前に、個人情報が入っていないか確かめる</li>
+        <li>ページでは、読み上げ・コピー・用紙の切り替えも</li>
+      </ul>
+      <p style="margin-top:12px"><a class="dl ghost" href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener">見本の作文ページを開く</a></p>
+      <p class="meta">見本は、AI に書いてもらった作文を公開したものです (画面は試験用の AI で撮影)。</p>
+    </div>
+  </div>
+
+  <h3 style="margin:30px 0 10px">ほかにも</h3>
+  <ul class="chips">
+    <li>版の履歴 (Word 風の差分)</li><li>テキスト一覧・フォルダ</li><li>読み上げ (Mac)</li><li>正規表現の検索・置換</li><li>サーバのファイルを編集</li><li>データ暗号化</li><li>パスワード付きバックアップ</li><li>自動アップデート</li>
+  </ul>
+</section>
+
+<section id="beta">
+  <div class="sec-k">BETA</div>
+  <h2>β テストについて</h2>
+  <p class="sec-lead">さとるエディタは、作りながら、使ってくれた人といっしょに育てていくアプリです。</p>
+  <ol class="steps">
+    <li><b>まずは使ってみてください。</b> 無料で、Mac でも Windows でも使えます。</li>
+    <li><b>気づいたことを教えてください。</b> 「ここが使いにくい」「こんな機能がほしい」「動かない」など、ひとことで大丈夫です。</li>
+    <li><b>意見をもとに、改善していきます。</b> 新しい版が出たら、アプリが自動で知らせて、そのままアップデートできます。</li>
+  </ol>
+</section>
+
+<section id="feedback">
+  <div class="sec-k">FEEDBACK</div>
+  <h2>ご意見・不具合の報告</h2>
+  <div class="feat">
+    <div><b>X (旧 Twitter)</b><p>ひとことの感想や要望は、こちらへ。</p><a class="dl ghost" href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a></div>
+    <div><b>GitHub</b><p>不具合の報告や、くわしい提案は Issues へ。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit/issues" target="_blank" rel="noopener">Issues を開く</a></div>
+    <div><b>ソースコード</b><p>全ソースを MIT ライセンスで公開しています。だれでも読めて、直して使えます。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub で見る</a></div>
+  </div>
+</section>
+
+<section id="download">
+  <div class="sec-k">DOWNLOAD</div>
+  <h2>ダウンロード (β テスト版)</h2>
+  <div class="feat">
+    <div><b>Mac 版</b><p>SatoruEditor-1.0.1-mac.dmg（7.1 MB）<br>macOS 11 以降・Apple シリコン / Intel</p><a class="dl" href="/SatoruEditor-1.0.1-mac.dmg?v=20261121x" download>⬇ ダウンロード</a></div>
+    <div><b>Windows 版</b><p>SatoruEditor-1.0.1-win-x64-setup.exe（2.5 MB）<br>Windows 10 / 11（64 ビット）・管理者の許可は不要</p><a class="dl" href="/SatoruEditor-1.0.1-win-x64-setup.exe?v=20261121y" download>⬇ インストーラー</a></div>
+  </div>
+  <table style="margin-top:22px">
+    <tr><th>Mac</th><td>dmg を開いて、さとるエディタを「アプリケーション」フォルダに入れて起動します。</td></tr>
+    <tr><th>Windows</th><td>インストーラーを開いて「インストール」を押します。初回に「Windows によって PC が保護されました」と出たら、「詳細情報」→「実行」で起動できます。</td></tr>
+  </table>
+  <p class="meta">新しい版が出ると、アプリが知らせてくれます (メニューの「アップデートを確認…」からも確かめられます)。</p>
+</section>
+</main>
+
+<footer class="ft"><div class="w ft-in">
+  <div class="ft-brand">
+    <div class="ft-logo"><img src="/site/icon.png?v=4" alt="" width="40" height="40"><div><b>さとるエディタ</b><span>β テスト版 ・ Mac / Windows ・ 無料 ・ MIT ライセンス</span></div></div>
+    <p>書いて、まとめて、リンクで共有。<br>みんなの声で、少しずつ育てていきます。</p>
+  </div>
+  <nav class="ft-col"><h3>リンク</h3>
+    <a href="#download">ダウンロード</a>
+    <a href="#feedback">ご意見・不具合の報告</a>
+    <a href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a>
+    <a href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub (ソースコード)</a>
+    <a href="https://satoru.net/app/">ほかのアプリ</a>
+  </nav>
+</div>
+<div class="w ft-bottom"><span>© 2026 <a href="https://satoru.net/">satoru.net</a></span><span>Made with care in Japan</span></div>
+</footer>
+<script>
+// トップの画像: 同じ文章を 標準エディタ → 原稿用紙 (縦) → 原稿用紙 (横) → A4 とぱっぱと切り替える
+(function(){
+  var views=[["editor","標準エディタ","#334"],["genko","原稿用紙 (縦書き)","#c0392b"],["genkoH","原稿用紙 (横書き)","#2f8f57"],["a4","A4用紙","#555"]];
+  var a=document.getElementById("hero-a"),b=document.getElementById("hero-b"),label=document.getElementById("hero-label");
+  if(!a||!b)return;
+  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261121x"});
+  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  var n=0;
+  setInterval(function(){
+    n=(n+1)%views.length;var v=views[n];
+    b.src="/site/demo-"+v[0]+".jpg?v=20261121x";
+    var show=function(){b.classList.add("on");label.textContent=v[1];label.style.background=v[2];
+      setTimeout(function(){a.src=b.src;b.classList.remove("on")},500)};
+    if(b.complete)show();else b.onload=show;
+  },2200);
+})();
+// デモのタブ: 押した表示の画像に切り替える (画像は先に読んでおく)
+(function(){
+  var caps={editor:["標準エディタ","行番号・改行の印つきの、軽いエディタ。メモやコードにも。"],
+    genko:["原稿用紙 (縦書き)","同じ文章が、そのまま縦書きの原稿用紙に。ふりがなと、題名・名前・段落の下げも自動で。"],
+    genkoH:["原稿用紙 (横書き)","横書きの原稿用紙 (緑のマス目) にも、ボタン 1 つで。"],
+    a4:["A4用紙","A4 の紙の見た目で。そのまま印刷・PDF に。"]};
+  var img=document.getElementById("demo-img"),cap=document.getElementById("demo-cap"),tabs=document.querySelectorAll("#demo .demo-tabs button");
+  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261121x"});
+  tabs.forEach(function(b){b.addEventListener("click",function(){
+    var v=b.getAttribute("data-v");
+    tabs.forEach(function(x){x.setAttribute("aria-selected",x===b?"true":"false")});
+    img.classList.add("fade");
+    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261121x";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
+    img.onload=function(){img.classList.remove("fade")};
+  })});
+})();
+</script>
+</body></html>

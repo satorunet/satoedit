@@ -22,6 +22,7 @@ export function installMockAPI() {
     encDefaultKind: 'device', aiProvider: 'openai', aiModels: {}, aiCustomBaseURL: 'http://localhost:11434/v1', aiVerified: {},
     folderTreeVisible: false, folderTreeRoot: '', folderTreeWidth: 240, aiVisible: false, diffVisible: false, remotePlaces: {}, remoteTreeVisible: false, remoteTreeWidth: 260, pluginsDisabled: [], pluginSources: {}, pluginStorage: {}, diffWidth: 360, aiWidth: 340, iconColor: 'ai',
     recent: [], carets: {}, lastKeyFileDir: '', windowBounds: null, language: 'auto', collabEnabled: false, collabChatVisible: true, collabPort: 7650, collabName: '', aiApply: 'confirm', keys: {}, hiddenMenu: [], toolbarItems: null, aiPrices: {}, aiYenPerDollar: 150, servers: [], serverEnabled: false, remoteAutoUpload: true,
+    autoUpdateCheck: true, updateSkipVersion: '', updateLastCheck: 0,
   };
   try { Object.assign(prefs, JSON.parse(sessionStorage.getItem('mock-prefs') || '{}')); } catch (e) { /* なし */ }
   const query = new URLSearchParams(location.search);
@@ -35,7 +36,7 @@ export function installMockAPI() {
     on(channel, fn) { (listeners[channel] = listeners[channel] || []).push(fn); },
     emit,
     async init() {
-      return { prefs, theme: themeDef.defaults(), themeProblems: [], userProfiles: [], platform: 'mock', version: '1.0.0', files: [],
+      return { prefs, theme: themeDef.defaults(), themeProblems: [], userProfiles: [], platform: 'mock', version: '1.0.1', files: [],
         secretsAvailable: true, aiPriceOverrides: {}, configDir: '/mock/.satoruEditor', userName: 'user', hostName: 'pc', homeDir: '/mock',
         language: i18n.resolve(prefs.language, navigator.language) };
     },
@@ -177,6 +178,10 @@ export function installMockAPI() {
     async closeWindow() { log('closeWindow'); return true; },
     async quit() { emit('app:request-close'); return true; },
     async about() { return true; },
+    async updateCheck(o) { return (o && o.auto) ? { status: 'off', current: '1.0.1' } : { status: 'latest', current: '1.0.1', version: '1.0.1' }; },
+    async updateDownload() { return { status: 'cancel' }; },
+    async updateCancel() { return true; },
+    async updateInstall() { return { status: 'error', message: 'mock' }; },
     async fileIcon() { return ''; },
     async growWindow(dx) { log('growWindow', dx); return true; },
     async pluginList() { return mock.plugins || []; },

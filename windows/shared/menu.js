@@ -302,6 +302,7 @@ function build(state) {
     ] },
     { label: 'テーマ', submenu: PRESETS.map(t => radio(t.name, 'theme.preset:' + t.name, state.themePreset === t.name)) },
     sep,
+    item('アップデートを確認…', 'app.checkUpdate'),
     item('さとるエディタについて', 'app.about'),
   ] });
   return translate(customize(menus, p, !!state.forSettings));

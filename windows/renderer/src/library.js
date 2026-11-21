@@ -325,7 +325,7 @@ export class TextLibrary {
         if (paths.length) { e.preventDefault(); this.trash(paths); }
       }
     });
-    // 上下 (テキストの一覧が上、フォルダの欄が下) ⇔ 左右 (フォルダの欄が左) の切り替え
+    // 上下 (フォルダの欄が上、テキストの一覧が下) ⇔ 左右 (フォルダの欄が左) の切り替え
     this.layoutButton = h('button', { class: 'icon-button lib-layout', title: t('上下 / 左右に並べ替える'), 'aria-label': t('上下 / 左右に並べ替える'),
       onclick: () => { this.setPref('libraryOneColumn', !this.oneColumn); this.arrange(); } });
     this.listPane = h('div', { class: 'lib-list-pane' },
@@ -351,6 +351,8 @@ export class TextLibrary {
       return r;
     };
     this.column = h('div', { class: 'lib-column' });
+    this.stackDivider = h('div', { class: 'lib-stack-divider', 'aria-hidden': 'true' }); // 上下のときの、フォルダの欄と一覧の間の細い仕切り
+    window.addEventListener('resize', () => this.fitFolders());
     this.folderResizer = resizer(this.folderPane, 'libraryFolderWidth', 60, 420);
     this.listResizer = resizer(() => (this.oneColumn ? this.column : this.listPane), 'libraryListWidth', 110, 640);
     this.arrange();
@@ -368,14 +370,16 @@ export class TextLibrary {
     this.layoutButton.textContent = '';
     this.layoutButton.append(layoutSVG(!one));
     if (one) {
-      // フォルダの欄の幅は一覧に合わせ、高さは 1/3 くらい
+      // 上にフォルダの欄 (高さは中身に合わせる)、下にテキストの一覧 (残りぜんぶ)。Mac 版と同じ
       this.folderPane.style.width = '';
       this.listPane.style.width = '';
       this.column.style.width = (Number(this.prefs.libraryListWidth) || 220) + 'px';
-      this.column.append(this.listPane, this.folderPane);
+      this.column.append(this.folderPane, this.stackDivider, this.listPane);
       this.el.append(this.column, this.listResizer);
+      this.fitFolders();
     } else {
       this.column.style.width = '';
+      this.folderPane.style.height = '';
       this.folderPane.style.width = (Number(this.prefs.libraryFolderWidth) || 140) + 'px';
       this.listPane.style.width = (Number(this.prefs.libraryListWidth) || 220) + 'px';
       this.el.append(this.folderPane, this.folderResizer, this.listPane, this.listResizer);
@@ -388,6 +392,7 @@ export class TextLibrary {
     const now = this.el.dataset.sliding ? this.el.dataset.sliding === 'in' : !this.el.hidden;
     if (on === now) return;
     if (on && this.el.hidden) this.arrange();
+    if (on) requestAnimationFrame(() => this.fitFolders());
     slidePane(this.el, on, true, () => this.app.scheduleRuler());
   }
 
@@ -427,6 +432,22 @@ export class TextLibrary {
     for (const n of this.tree) row('sub:' + n.rel, n.name, this.folderBadge(n.rel), counts[n.rel] || 0, 0, n);
     row('other', t('ほかの場所'), h('span', { class: 'lib-ficon' }, '📄'), other, 0, null);
     list.scrollTop = scroll;
+    this.fitFolders();
+  }
+
+  /// 上下のとき、フォルダの欄の高さを中身 (見出し + 見えているフォルダの行) に合わせる。80px 以上、欄の高さの半分まで
+  fitFolders() {
+    if (!this.oneColumn || !this.folderPane || !this.folderPane.isConnected) return;
+    const pane = this.folderPane;
+    const head = pane.querySelector('.lib-head');
+    const add = pane.querySelector('.lib-add');
+    const addStyle = add ? getComputedStyle(add) : null;
+    const addH = add ? add.offsetHeight + parseFloat(addStyle.marginTop) + parseFloat(addStyle.marginBottom) : 0;
+    const natural = (head ? head.offsetHeight : 0) + this.folderList.scrollHeight + addH;
+    const total = this.column.clientHeight;
+    if (!total || !natural) return; // まだ画面に出ていない
+    const height = Math.round(Math.max(80, Math.min(natural, total * 0.5)));
+    pane.style.height = height + 'px';
   }
 
   toggleExpand(key) {

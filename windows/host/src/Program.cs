@@ -9,7 +9,10 @@ using System.Windows.Forms;
 namespace SatoEdit {
   /// さとるエディタ 軽量版の入口。1 つしか起動しないようにして、2 つめはファイルを 1 つめに渡して終わる
   static class Program {
-    public const string Version = "1.0.0";
+    /// アプリの版 (AssemblyInfo.cs の AssemblyInformationalVersion。package.json の版とそろえる)
+    public static readonly string Version =
+      (System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+        is object[] attrs && attrs.Length > 0 ? ((System.Reflection.AssemblyInformationalVersionAttribute)attrs[0]).InformationalVersion : null) ?? "0.0.0";
     static Mutex mutex;
 
     /// アプリの画面の部品 (renderer・assets) が入っているフォルダ
@@ -38,6 +41,8 @@ namespace SatoEdit {
       Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
       Application.ThreadException += (s, e) => Log.Error("ui", e.Exception);
       AppDomain.CurrentDomain.UnhandledException += (s, e) => Log.Error("app", e.ExceptionObject as Exception);
+      // アップデートを確かめる先を変える (試験用。この PC の JSON ファイルでもよい)
+      Updater.UrlOverride = args.FirstOrDefault(a => a.StartsWith("--update-url="))?.Substring("--update-url=".Length).Trim('"');
       SelfTest.FixturesArg = args.FirstOrDefault(a => a.StartsWith("--fixtures="))?.Substring("--fixtures=".Length).Trim('"');
       if (selftest != null) {
         // 自己点検では、本物のドキュメントと版の記録に触れないよう、点検のフォルダの中を使う
@@ -45,6 +50,7 @@ namespace SatoEdit {
         Environment.SetEnvironmentVariable("SATORU_LIBRARY_DIR", Path.Combine(dir, "library"));
         Environment.SetEnvironmentVariable("SATORU_VERSIONS_DIR", Path.Combine(dir, "history"));
         Versions.Interval = 2;
+        Updater.AutoDisabled = true; // 点検の間は GitHub に問い合わせない
       }
       var form = new MainForm(args, selftest?.Substring("--selftest=".Length).Trim('"'));
       if (first) Listen(form);

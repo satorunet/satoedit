@@ -20,6 +20,7 @@ import { CollabPanel, startHosting, joinShare } from './collab';
 import { TextLibrary } from './library';
 import { ShareLink } from './sharelink';
 import { VersionHistory } from './versions';
+import { checkForUpdates, scheduleAutoCheck } from './updater';
 import { installMockAPI } from './mock-api';
 import { installHostAPI } from './host';
 import { pathUtil } from './util';
@@ -1170,6 +1171,7 @@ const commands = {
   },
   'app.quit': () => api.quit(),
   'app.about': () => api.about(),
+  'app.checkUpdate': () => checkForUpdates(app, { manual: true }),
   'app.language': async lang => {
     app.prefs.language = lang;
     await api.setPref('language', lang);
@@ -1408,7 +1410,8 @@ async function start() {
   api.on('collab:message', (id, msg) => { if (app.collab) app.collab.message(id, msg); });
   api.on('collab:close', (id, info) => { if (app.collab) app.collab.closed(id, info); });
   api.on('open-files', files => { (async () => { for (const f of files) await app.openPath(f); })(); });
-  api.on('app:request-close', async () => {
+  /// 閉じてよいか (保存していない文書を 1 つずつ確かめる)。キャンセルなら false。アップデートで閉じるときにも使う
+  app.confirmClose = async () => {
     for (const tab of app.tabs.slice()) {
       if (!tab.isDirty()) { app.rememberCaret(tab); if (tab.path) await api.versionFlush(tab.path); continue; }
       app.activate(tab);
@@ -1416,11 +1419,15 @@ async function start() {
         title: t('「{name}」の変更を保存しますか？', { name: tab.name }), body: t('保存しないと、変更は失われます。'),
         buttons: [{ label: t('保存する'), value: 'save', primary: true }, { label: t('保存しない'), value: 'discard' }, { label: t('キャンセル'), value: 'cancel', cancel: true }],
       });
-      if (answer === 'cancel' || answer === undefined) return;
-      if (answer === 'save' && !(await app.save(tab))) return;
+      if (answer === 'cancel' || answer === undefined) return false;
+      if (answer === 'save' && !(await app.save(tab))) return false;
     }
-    api.closeWindow();
+    return true;
+  };
+  api.on('app:request-close', async () => {
+    if (await app.confirmClose()) api.closeWindow();
   });
+  app.checkForUpdates = opts => checkForUpdates(app, opts); // 自己点検用
 
   app.newTab();
   app.applyPrefs();
@@ -1443,6 +1450,7 @@ async function start() {
   if (app.prefs.folderTreeEnabled && app.prefs.folderTreeRoot) app.tree.setRoot(app.prefs.folderTreeRoot);
   if (init.grepRoot) app.find.grepDialog(init.grepRoot);
   document.body.classList.add('ready');
+  scheduleAutoCheck(app); // 新しい版が出ていないか (設定「アップデートを自動で確認」。1 日に 1 回まで)
 }
 
 start().catch(e => {

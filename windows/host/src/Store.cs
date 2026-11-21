@@ -52,7 +52,8 @@ namespace SatoEdit {
   ""librarySelectedGroup"": ""all"", ""libraryFolderExpanded"": [], ""libraryListWidth"": 220, ""libraryFolderWidth"": 140, ""libraryOneColumn"": true,
   ""paperCandidates"": null,
   ""versionHistory"": true, ""versionHistoryMax"": 20,
-  ""shareEnabled"": true, ""sharedLinks"": [], ""shareVisibility"": ""unlisted"", ""shareDays"": 30, ""shareKeepHistory"": true, ""sharePrivacyCheckOff"": false
+  ""shareEnabled"": true, ""sharedLinks"": [], ""shareVisibility"": ""unlisted"", ""shareDays"": 30, ""shareKeepHistory"": true, ""sharePrivacyCheckOff"": false,
+  ""autoUpdateCheck"": true, ""updateSkipVersion"": """", ""updateLastCheck"": 0
 }";
     public static readonly JObj PrefDefaults = (JObj)Json.Parse(PrefDefaultsJson);
 
@@ -60,7 +61,7 @@ namespace SatoEdit {
     public static readonly HashSet<string> KeepOnReset = new HashSet<string> {
       "recent", "carets", "windowBounds", "lastKeyFileDir", "servers", "remotePlaces", "folderTreeRoot",
       "libraryFiles", "librarySeeded", "libraryPinned", "libraryModes", "libraryFolderIcons", "libraryFolderOrder", "sharedLinks",
-      "aiVerified", "aiPrices", "pluginsDisabled", "pluginSources", "pluginStorage", "collabName", "toolbarItems",
+      "aiVerified", "aiPrices", "pluginsDisabled", "pluginSources", "pluginStorage", "collabName", "toolbarItems", "updateLastCheck",
     };
 
     /// すべての設定を最初の状態に戻す (自分のデータは残す)。色・フォントとファイルタイプ別の設定も消す

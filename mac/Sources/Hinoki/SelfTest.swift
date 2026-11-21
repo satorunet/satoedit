@@ -271,6 +271,27 @@ enum SelfTest {
                     if ProcessInfo.processInfo.environment["SATORU_TEST_GENKO"] != nil { ed.applyPaperMode(.genko) }
                     tv.setSelectedRange(NSRange(location: 0, length: 0))
                     ed.runAI("校正して", kind: .ask, shown: "校正して")
+                } else if mode == "publishsample" {
+                    // サイト用: いま開いた作文を、原稿用紙のまま公開する (SATORU_PUBLISH_TITLE が題名)。答えは <file>.published.json
+                    ed.applyPaperMode(.genko)
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        ShareLink.publishForTest(text: tv.string, title: ProcessInfo.processInfo.environment["SATORU_PUBLISH_TITLE"] ?? "",
+                                                 mode: "genko", visibility: "unlisted", file: url) { data in
+                            try? (data ?? Data()).write(to: url.appendingPathExtension("published.json"))
+                        }
+                    }
+                } else if mode == "aiessay" {
+                    // サイト用: 原稿用紙で、偽の AI に作文を書いてもらう (本物のキーと設定には触れない)
+                    Keychain.serviceOverrideForTesting = "satoru-selftest"
+                    AISettings.baseURLOverrideForTesting[AISettings.provider] = ProcessInfo.processInfo.environment["SATORU_TEST_AI"] ?? ""
+                    AISettings.readyOverrideForTesting = true
+                    ed.applyPaperMode(.genko)
+                    tv.setSelectedRange(NSRange(location: (tv.string as NSString).length, length: 0))
+                    ed.revealAIPanel()
+                    let ask = ProcessInfo.processInfo.environment["SATORU_TEST_AI_TEXT"] ?? "作文を書いて"
+                    let kind: AIPanel.ApplyKind = ProcessInfo.processInfo.environment["SATORU_TEST_AI_KIND"] == "ask" ? .ask : .insert
+                    if kind == .ask { tv.setSelectedRange(NSRange(location: 0, length: 0)) }
+                    ed.runAI(ask, kind: kind, shown: ask)
                 } else if mode == "typein" {
                     // AI の答えを入れたときの「打っている」演出: 途中 (0.4 秒) と終わったあと (撮るのは最後) を見る
                     ed.applyPaperMode(.genko)
@@ -313,7 +334,7 @@ enum SelfTest {
                     // カーソルを 6 行目へ (差分の欄の同じ行にも帯が出るはず)
                     tv.goTo(line: 6)
                 }
-                DispatchQueue.main.asyncAfter(deadline: .now() + (mode == "collab" ? 6.0 : mode == "a4shot" || mode == "genkoshot" || mode == "typein" ? 4.0 : mode == "newtext" || mode == "libopen" ? 5.0 : mode == "versions" || mode == "prune" ? 10.0 : mode == "versionsui" ? 9.0 : 2.0)) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + (mode == "collab" ? 6.0 : mode == "a4shot" || mode == "genkoshot" || mode == "typein" ? 4.0 : mode == "newtext" || mode == "libopen" ? 5.0 : mode == "versions" || mode == "prune" ? 10.0 : mode == "versionsui" ? 9.0 : mode == "aiessay" || mode == "publishsample" ? 7.0 : 2.0)) {
                     if let w = ed.window, let v = w.contentView?.superview ?? w.contentView,
                        let rep = v.bitmapImageRepForCachingDisplay(in: v.bounds) {
                         v.cacheDisplay(in: v.bounds, to: rep)

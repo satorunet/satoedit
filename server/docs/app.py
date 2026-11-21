@@ -247,6 +247,7 @@ def svg_sheet(columns, ruby, sheet, total, horizontal, cellmap=None):
     gx = LEFT + (CENTER / 2 if horizontal else 0)
     gw = GRID_W - (CENTER if horizontal else 0)
     a, b = P(gx, y0), P(gx + gw, y1)
+    frame_a, frame_b = a, b   # 用紙の枠 (下の小さな表示の位置に使う。a, b は後で字のマスに使い回す)
     out.append('<rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" stroke-width="0.6"/>' % (min(a[0], b[0]), min(a[1], b[1]), abs(a[0] - b[0]), abs(a[1] - b[1])))
     out.append('</g>')
     font = 'font-family="Hiragino Mincho ProN, Yu Mincho, YuMincho, serif"'
@@ -295,8 +296,8 @@ def svg_sheet(columns, ruby, sheet, total, horizontal, cellmap=None):
                 out.append('<text x="%.2f" y="%.2f" font-size="%.2f" fill="%s"%s>%s</text>' % (cx, cy, rsize, RUBY_INK, vmode, esc(ch)))
     out.append('</g>')
     # 用紙の下の小さな表示
-    fx0, fy0 = (min(a[0], b[0]), max(a[1], b[1]))
-    fx1 = max(a[0], b[0])
+    fx0, fy0 = (min(frame_a[0], frame_b[0]), max(frame_a[1], frame_b[1]))
+    fx1 = max(frame_a[0], frame_b[0])
     out.append('<text x="%.2f" y="%.2f" font-size="2.6" fill="%s" font-family="sans-serif">20 × 20</text>' % (fx0, fy0 + 4.5, line))
     out.append('<text x="%.2f" y="%.2f" font-size="2.6" fill="%s" font-family="sans-serif" text-anchor="end">No. %d / %d</text>' % (fx1, fy0 + 4.5, line, sheet + 1, total))
     out.append('</svg>')
@@ -677,7 +678,7 @@ PAGE_CSS = """
 @media (prefers-color-scheme:dark){:root{--bg:#1d1c1a;--muted:#a9a296}}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",serif}
 header{max-width:900px;margin:0 auto;padding:24px 16px 8px;color:var(--muted);font:13px/1.6 -apple-system,"Hiragino Sans",sans-serif;display:flex;gap:12px;flex-wrap:wrap;align-items:baseline}
-header h1{font:600 20px/1.4 "Hiragino Sans",sans-serif;color:inherit;margin:0;flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+header h1{font:600 20px/1.4 "Hiragino Sans",sans-serif;color:inherit;margin:0;flex:1 1 100%;min-width:0;overflow-wrap:anywhere}
 @media (prefers-color-scheme:dark){header h1{color:#eee}}
 header a{color:var(--muted)}
 .paper{background:var(--paper);box-shadow:0 2px 10px rgba(0,0,0,.18);border-radius:4px}

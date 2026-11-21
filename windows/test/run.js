@@ -719,6 +719,26 @@ test('個人情報の点検: 電話・メール・郵便番号・パスワード
   assert.ok(tel.sample.includes('＊'));
   assert.deepStrictEqual(privacy.scan('今日はいい天気です。'), []);
 });
+test('版: package.json・本体 (AssemblyInfo)・exe の manifest がそろっている', () => {
+  const ver = require('../package.json').version;
+  const read = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
+  const info = read('host/src/AssemblyInfo.cs');
+  assert.ok(/^\d+\.\d+\.\d+$/.test(ver), ver);
+  assert.ok(info.includes(`AssemblyInformationalVersion("${ver}")`), 'AssemblyInformationalVersion');
+  assert.ok(info.includes(`AssemblyVersion("${ver}.0")`), 'AssemblyVersion');
+  assert.ok(info.includes(`AssemblyFileVersion("${ver}.0")`), 'AssemblyFileVersion');
+  for (const f of ['host/app.manifest', 'installer/app.manifest']) assert.ok(read(f).includes(`assemblyIdentity version="${ver}.0"`), f);
+});
+
+test('アップデート: 設定の既定 (自動で確認はオン)・メニューの項目', () => {
+  const store = fs.readFileSync(path.join(__dirname, '..', 'host', 'src', 'Store.cs'), 'utf8');
+  assert.ok(store.includes('""autoUpdateCheck"": true'));
+  assert.ok(store.includes('""updateSkipVersion"": """"'));
+  const menu = require('../shared/menu');
+  const ids = menu.flatten(menu.build({ prefs: {} })).map(m => m.id);
+  assert.ok(ids.includes('app.checkUpdate'));
+});
+
 test('横書きの原稿用紙: 縦書きの用紙を回した形 (A4 縦・真ん中の余白なし・緑の線)', () => {
   assert.strictEqual(genko.point(10, 20, true).join(','), '20,287');
   const xs = Array.from({ length: 20 }, (_, k) => genko.columnXOf(k, true));

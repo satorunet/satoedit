@@ -378,6 +378,22 @@ enum ShareLink {
         }.resume()
     }
 
+    /// 動作確認・サイト用: 公開の画面を出さずに、アプリと同じ中身 (原稿用紙の並び・ふりがな・画像) で公開する。
+    /// 自分の「公開したリンク」の一覧には入れない。答え (id・url・token) を JSON で返す
+    static func publishForTest(text: String, title: String, mode: String, visibility: String, file: URL?,
+                               completion: @escaping (Data?) -> Void) {
+        var req = URLRequest(url: URL(string: base + "/api/share")!)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 30
+        var body: [String: Any] = ["text": text, "title": title, "mode": mode, "visibility": visibility, "days": 0, "keepHistory": true]
+        if mode == "genko" || mode == "genkoH" { body["layout"] = genkoLayout(text, horizontal: mode == "genkoH") }
+        if mode == "editor" { body["theme"] = editorTheme() }
+        if let img = shareImage(file: file) { body["image"] = img }
+        req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: req) { data, _, _ in DispatchQueue.main.async { completion(data) } }.resume()
+    }
+
     /// 作文: アプリで原稿用紙に並べたとおり (自動整形・禁則・ふりがな) をサーバに渡す。サーバは同じ寸法でそのまま描く
     static func genkoLayout(_ text: String, horizontal: Bool) -> [String: Any] {
         let auto = !horizontal && UserDefaults.standard.bool(forKey: "genkoAutoFormat")

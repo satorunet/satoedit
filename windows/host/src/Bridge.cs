@@ -26,6 +26,7 @@ namespace SatoEdit {
       RegisterPlugins();
       RegisterLocalLLM();
       RegisterLibrary();
+      RegisterUpdate();
     }
 
     /// UI のスレッドですぐ答えるもの

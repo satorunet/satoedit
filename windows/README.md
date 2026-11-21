@@ -33,7 +33,7 @@ Mac 版の機能は、Windows 版にもひととおり入っています。
 
 ## 使い方
 
-`satoruEditor-1.0.0-win-x64.zip` を好きな場所に展開して、`satoruEditor.exe` をダブルクリックします。インストールは要りません。
+`satoruEditor-1.0.1-win-x64-lite.zip` を好きな場所に展開して、`satoruEditor.exe` をダブルクリックします。インストールは要りません。
 
 署名をしていないので、初回は「Windows によって PC が保護されました」と出ることがあります。「詳細情報」→「実行」で起動できます。
 

@@ -54,6 +54,10 @@ function generalPane(app) {
       h('div', { class: 'form-row' }, h('label', {}, t('新規ファイルの改行コード')), select('defaultLineEnding', menuDef.LINE_ENDINGS)),
       check(t('上書き保存の前にバックアップ (ファイル名.bak) を作る'), 'backupOnSave'),
       check(t('保存するとき行末の空白を削除する'), 'trimTrailingOnSave')),
+    box(t('アップデート'),
+      check(t('アップデートを自動で確認'), 'autoUpdateCheck'),
+      h('div', { class: 'dim' }, t('起動したときに、新しい版が出ていないかを GitHub で確かめます (1 日に 1 回まで)。')),
+      h('div', { class: 'form-row' }, h('button', { class: 'update-check-now', onclick: () => app.run('app.checkUpdate') }, t('アップデートを確認…')))),
     h('div', { class: 'dim' }, t('設定ファイルの場所: {dir}', { dir: app.init.configDir || '' })));
 }
 

@@ -400,6 +400,7 @@ namespace SatoEdit {
 await Step("furigana", async () => await Js("window.api.furigana('先週の金曜日、学校の遠足で美味しいお寿司を食べました').then(r => r.map(x => x.reading))"));
       await RunLibrarySteps(work);
       await RunMacParitySteps();
+      await RunUpdateSteps(work);
       await Step("closeFlow", async () => {
         await Js("(() => { for (let i = 0; i < 3; i++) { const b = document.querySelector('.modal-buttons button'); if (b) b.click(); } })()");
         await Wait(300);
@@ -415,6 +416,136 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
       });
     }
   
+    /// 思ったとおりでなければエラーに数える
+    void Expect(bool ok, string what) { if (!ok) errors.Add("期待と違う: " + what); }
+
+    /// アップデート: 新しい版を見つける・最新のとき・とばした版・インストーラーを取ってくる・知らせる画面・設定とメニュー。
+    /// GitHub には問い合わせず、点検のフォルダに置いた JSON (releases/latest と同じ形) とファイルを使う
+    async Task RunUpdateSteps(string work) {
+      var upd = Path.Combine(work, "update");
+      Directory.CreateDirectory(upd);
+      var payload = new byte[256 * 1024];
+      new Random(7).NextBytes(payload);
+      payload[0] = (byte)'M'; payload[1] = (byte)'Z';
+      var fake = Path.Combine(upd, "fake-setup.exe");
+      File.WriteAllBytes(fake, payload);
+      string Release(string tag, long size, params string[] names) => Json.Pretty(new JObj {
+        { "tag_name", tag }, { "name", tag }, { "draft", false }, { "prerelease", false },
+        { "html_url", "https://github.com/satorunet/satoedit/releases/tag/" + tag },
+        { "assets", names.Select(n => (object)new JObj { { "name", n }, { "size", (double)size }, { "browser_download_url", new Uri(fake).AbsoluteUri } }).ToList() },
+      });
+      var newer = Path.Combine(upd, "newer.json");
+      File.WriteAllText(newer, Release("v9.9.9", payload.Length, "satoruEditor-9.9.9-mac.dmg", "SatoruEditor-9.9.9-win-x64-setup.exe"));
+      var same = Path.Combine(upd, "same.json");
+      File.WriteAllText(same, Release("v" + Program.Version, payload.Length, "SatoruEditor-" + Program.Version + "-win-x64-setup.exe"));
+      var older = Path.Combine(upd, "older.json");
+      File.WriteAllText(older, Release("v0.9.0", payload.Length, "SatoruEditor-0.9.0-win-x64-setup.exe"));
+      var badSize = Path.Combine(upd, "badsize.json");
+      File.WriteAllText(badSize, Release("v9.9.9", payload.Length + 10, "SatoruEditor-9.9.9-win-x64-setup.exe"));
+
+      await Step("updateCheck", async () => {
+        var n = await Updater.Check(newer, Program.Version);
+        var s = await Updater.Check(same, Program.Version);
+        var o = await Updater.Check(older, Program.Version);
+        var missing = await Updater.Check(Path.Combine(upd, "none.json"), Program.Version);
+        Expect(n.Str("status") == "update" && n.Str("version") == "9.9.9", "新しい版を見つける " + Json.Stringify(n));
+        Expect(n.Obj("asset")?.Str("name") == "SatoruEditor-9.9.9-win-x64-setup.exe", "Windows 用のファイルを選ぶ");
+        Expect(s.Str("status") == "latest" && o.Str("status") == "latest", "同じ版・古い版なら最新");
+        Expect(missing.Str("status") == "error", "読めなければエラー");
+        Expect(Program.Version == typeof(Program).Assembly.GetName().Version.ToString(3), "版 " + Program.Version);
+        return new JObj { { "current", Program.Version }, { "newer", n.Str("status") + ":" + n.Str("version") }, { "same", s.Str("status") }, { "older", o.Str("status") }, { "missing", missing.Str("status") }, { "url", Updater.DefaultURL } };
+      });
+      await Step("updateSkip", async () => {
+        await Task.Yield();
+        var skipped = UpdateInfo.Decide(await Updater.Check(newer, Program.Version), true, "9.9.9").Str("status");
+        var other = UpdateInfo.Decide(await Updater.Check(newer, Program.Version), true, "9.9.8").Str("status");
+        var manual = UpdateInfo.Decide(await Updater.Check(newer, Program.Version), false, "9.9.9").Str("status");
+        double now = 1.8e12, h = 3600 * 1000.0;
+        var gates = string.Join(",", UpdateInfo.AutoGate(false, 0, now), UpdateInfo.AutoGate(true, now - h, now), UpdateInfo.AutoGate(true, now - 25 * h, now));
+        Expect(skipped == "skipped" && other == "update" && manual == "update", "とばした版 " + skipped + "/" + other + "/" + manual);
+        Expect(gates == "off,notyet,go", "自動で確かめる間隔 " + gates);
+        // 本体の呼び出し口: 自己点検の間は自動の確認をしない
+        var auto = await Js("window.api.updateCheck({ auto: true }).then(r => r.status)");
+        Expect(auto as string == "off", "点検中の自動の確認 " + auto);
+        return new JObj { { "skipped", skipped }, { "otherSkip", other }, { "manual", manual }, { "gates", gates }, { "autoDuringSelftest", auto } };
+      });
+      await Step("updateDownload", async () => {
+        var asset = (await Updater.Check(newer, Program.Version)).Obj("asset");
+        long reported = 0;
+        var file = await Updater.Download(asset, (got, total) => reported = got, System.Threading.CancellationToken.None);
+        var same2 = File.ReadAllBytes(file).SequenceEqual(payload);
+        string bad = "";
+        try { await Updater.Download((await Updater.Check(badSize, Program.Version)).Obj("asset"), null, System.Threading.CancellationToken.None); } catch (Exception e) { bad = e.Message; }
+        // 画面からの呼び出し (進み具合が届く)
+        var viaUI = await Js("(async () => { let n = 0; const off = window.api.on('update:progress', () => { n++; }); const r = await window.api.updateDownload(" + Json.Stringify(asset) + "); off(); return { status: r.status, name: (r.path || '').split('\\\\').pop(), progress: n }; })()") as JObj;
+        Expect(File.Exists(file) && same2 && reported == payload.Length, "ダウンロードした中身と大きさ");
+        Expect(Path.GetDirectoryName(file).StartsWith(Path.GetTempPath().TrimEnd('\\'), StringComparison.OrdinalIgnoreCase), "一時フォルダに置く " + file);
+        Expect(bad.Contains("大きさ"), "大きさが違えばエラー: " + bad);
+        Expect(viaUI?.Str("status") == "ok" && viaUI.Num("progress") > 0, "画面からのダウンロード " + Json.Stringify(viaUI));
+        Expect(!File.Exists(file + ".part"), "途中のファイルを残さない");
+        var args = Updater.InstallerArgs(Updater.InstallDir, 1234) + " | " + Updater.InstallerArgs(Path.GetTempPath(), 1234);
+        Expect(args == "/update /wait-pid=1234 | ", "インストーラーに渡す引数 " + args);
+        try { File.Delete(file); } catch { }
+        return new JObj { { "file", Path.GetFileName(file) }, { "bytes", (double)payload.Length }, { "same", same2 }, { "badSize", bad }, { "ui", viaUI }, { "installerArgs", args } };
+      });
+      var keepSkip = Store.Prefs["updateSkipVersion"];
+      try {
+        await Step("updateDialog", async () => {
+          Updater.UrlOverride = newer;
+          await Js("(() => { window.__upd = __app.checkForUpdates({ manual: true }); return true; })()");
+          await Wait(1200);
+          var shown = await Js("({ title: (Array.from(document.querySelectorAll('.update-dialog .modal-title')).pop() || {}).textContent || '', text: (document.querySelector('.update-dialog .modal-body') || {}).innerText || '',"
+            + " buttons: Array.from(document.querySelectorAll('.update-dialog .modal-buttons button')).map(b => b.textContent), notes: !!document.querySelector('.update-dialog a.update-notes') })") as JObj;
+          await Shot("11-update");
+          // 「この版はとばす」→ 覚える
+          await Js("(() => { const b = Array.from(document.querySelectorAll('.update-dialog .modal-buttons button')).pop(); b.click(); return true; })()");
+          var answer = await Js("window.__upd.then(r => r && r.answer)");
+          await Wait(400);
+          var remembered = Store.Prefs.Str("updateSkipVersion");
+          // もう一度: 「あとで」
+          await Js("(() => { window.__upd = __app.checkForUpdates({ manual: true }); return true; })()");
+          await Wait(1200);
+          await Js("(() => { const b = document.querySelectorAll('.update-dialog .modal-buttons button')[1]; b.click(); return true; })()");
+          var later = await Js("window.__upd.then(r => r && r.answer)");
+          // 最新のとき
+          Updater.UrlOverride = same;
+          await Js("(() => { window.__upd = __app.checkForUpdates({ manual: true }); return true; })()");
+          await Wait(1200);
+          var latest = await Js("(Array.from(document.querySelectorAll('.modal-body')).pop() || {}).innerText || ''") as string;
+          await Shot("12-update-latest");
+          await Js("(() => { const b = Array.from(document.querySelectorAll('.modal-buttons button')).pop(); if (b) b.click(); return true; })()");
+          await Js("window.__upd.then(r => r && r.status)");
+          var title = shown?.Str("title") ?? "";
+          Expect(title == "新しい版があります" || title == "A New Version Is Available", "知らせる画面の題 " + title);
+          Expect((shown?.Str("text") ?? "").Contains("9.9.9") && (shown?.Str("text") ?? "").Contains(Program.Version), "新しい版と今の版を書く");
+          Expect((shown?.Arr("buttons")?.Count ?? 0) == 3 && shown.Bool("notes"), "ボタン 3 つとリリースノート");
+          Expect(answer as string == "skip" && remembered == "9.9.9", "とばした版を覚える " + answer + " " + remembered);
+          Expect(later as string == "later", "あとで " + later);
+          Expect(latest.Contains("最新の版です") || latest.Contains("latest version"), "最新の版です: " + latest);
+          return new JObj { { "dialog", shown }, { "answer", answer }, { "remembered", remembered }, { "later", later }, { "latest", latest } };
+        });
+      } finally {
+        Updater.UrlOverride = null;
+        Store.Prefs["updateSkipVersion"] = keepSkip;
+        Store.SavePrefsNow();
+        await Js("(() => { __app.prefs.updateSkipVersion = " + Json.Stringify(keepSkip) + "; for (let i = 0; i < 3; i++) { const b = Array.from(document.querySelectorAll('.modal-buttons button')).pop(); if (b) b.click(); } return true; })()");
+      }
+      await Step("updateSettings", async () => {
+        var menuHas = MenuTexts().Any(x => x == "アップデートを確認…" || x == "Check for Updates…");
+        await Js("(() => { __app.run('settings.open:general'); return true; })()");
+        await Wait(800);
+        var r = await Js("(() => { const box = Array.from(document.querySelectorAll('.check-row')).find(l => /アップデートを自動で確認|Check for updates automatically/.test(l.textContent));"
+          + " return { found: !!box, checked: !!(box && box.querySelector('input').checked), pref: __app.prefs.autoUpdateCheck }; })()") as JObj;
+        await Shot("13-update-settings");
+        await Js("(() => { for (let i = 0; i < 3; i++) { const b = Array.from(document.querySelectorAll('.modal-buttons button')).pop(); if (b) b.click(); } return true; })()");
+        await Wait(300);
+        Expect(menuHas, "メニュー「アップデートを確認…」");
+        Expect(r != null && r.Bool("found") && r.Bool("checked") == r.Bool("pref"), "設定「アップデートを自動で確認」 " + Json.Stringify(r));
+        Expect(Store.PrefDefaults.Bool("autoUpdateCheck"), "既定はオン");
+        return new JObj { { "menu", menuHas }, { "settings", r } };
+      });
+    }
+
     /// メニューの項目の字をすべて (子メニューも)
     List<string> MenuTexts() {
       var texts = new List<string>();
@@ -438,10 +569,23 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
         out.stacked = el.classList.contains('stacked');
         const order = () => Array.from(el.querySelectorAll('.lib-list-pane, .lib-folder-pane')).map(e => e.className.includes('list') ? 'list' : 'folders').join(',');
         out.stackedOrder = order();
+        await wait(100);
         const lr = el.querySelector('.lib-list-pane').getBoundingClientRect(), fr = el.querySelector('.lib-folder-pane').getBoundingClientRect();
-        out.folderShare = Math.round(fr.height / (lr.height + fr.height) * 100);
-        if (!out.stacked || out.stackedOrder !== 'list,folders' || !(fr.top >= lr.bottom - 1)) bad.push('上下: 一覧が上・フォルダが下になっていない ' + out.stackedOrder);
-        if (out.folderShare < 25 || out.folderShare > 40) bad.push('フォルダの欄の高さが 1/3 くらいでない: ' + out.folderShare);
+        const col = el.querySelector('.lib-column').getBoundingClientRect(), dv = el.querySelector('.lib-stack-divider');
+        out.folderShare = Math.round(fr.height / col.height * 100);
+        if (!out.stacked || out.stackedOrder !== 'folders,list' || !(lr.top >= fr.bottom - 1)) bad.push('上下: フォルダが上・一覧が下になっていない ' + out.stackedOrder);
+        // フォルダの欄の高さは中身 (見出し + 見えている行) に合わせる。80px 以上・半分まで。一覧は残りぜんぶ
+        const fp = el.querySelector('.lib-folder-pane'), natural = fp.querySelector('.lib-head').offsetHeight + fp.querySelector('.lib-folders').scrollHeight;
+        out.folderHeight = Math.round(fr.height); out.folderNatural = natural;
+        if (fr.height < 79 || fr.height > col.height * 0.5 + 1) bad.push('フォルダの欄の高さが 80px〜半分に入っていない: ' + Math.round(fr.height) + ' / ' + Math.round(col.height));
+        if (fr.height < Math.min(natural, col.height * 0.5) - 1) bad.push('フォルダの欄が中身より低い: ' + Math.round(fr.height) + ' < ' + natural);
+        if (Math.abs(lr.bottom - col.bottom) > 2) bad.push('一覧が残りの高さを使っていない');
+        const dr = dv && dv.isConnected ? dv.getBoundingClientRect() : null;
+        out.divider = dr ? Math.round(dr.height) : 0;
+        if (!dr || dr.height < 2 || dr.height > 5 || dr.top < fr.bottom - 1 || dr.bottom > lr.top + 1) bad.push('フォルダの欄と一覧の間に仕切りがない');
+        // 開け閉めで高さが変わる
+        const h0 = fr.height; const sub = (lib.tree || []).find(n => n.children && n.children.length);
+        if (sub) { lib.toggleExpand('sub:' + sub.rel); await wait(100); out.folderHeightToggled = Math.round(fp.getBoundingClientRect().height); lib.toggleExpand('sub:' + sub.rel); await wait(100); }
         el.querySelector('.lib-layout').click(); await wait(100);
         out.sideOrder = order(); out.side = !el.classList.contains('stacked') && __app.prefs.libraryOneColumn === false;
         const lr2 = el.querySelector('.lib-list-pane').getBoundingClientRect(), fr2 = el.querySelector('.lib-folder-pane').getBoundingClientRect();

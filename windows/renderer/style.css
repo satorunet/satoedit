@@ -533,10 +533,11 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 .lib-ftag { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 9.5px; }
 .lib-rname { flex: 0 1 auto; min-width: 0; }
 .lib-ext { margin-left: auto; padding-left: 6px; flex: 0 0 auto; font: 500 9px ui-monospace, Consolas, monospace; color: var(--chrome-dim); }
-/* 上下に並べる: 上にテキストの一覧、下にフォルダの欄 (高さ 1/3 くらい) */
+/* 上下に並べる: 上にフォルダの欄 (高さは中身に合わせる。80px 以上・半分まで。library.js の fitFolders)、下にテキストの一覧 (残りぜんぶ) */
 .lib-column { display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
-#library-pane.stacked .lib-list-pane { flex: 1 1 auto; min-height: 80px; }
-#library-pane.stacked .lib-folder-pane { flex: 0 0 33%; border-top: 1px solid var(--chrome-border); }
+#library-pane.stacked .lib-folder-pane { flex: 0 0 auto; min-height: 80px; max-height: 50%; }
+#library-pane.stacked .lib-list-pane { flex: 1 1 0; min-height: 0; }
+.lib-stack-divider { flex: 0 0 3px; height: 3px; background: color-mix(in srgb, var(--chrome-border) 60%, transparent); border-top: 1px solid var(--chrome-border); }
 .lib-empty { padding: 10px; color: var(--chrome-dim); }
 .lib-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
 .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }

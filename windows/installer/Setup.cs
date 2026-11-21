@@ -1,6 +1,9 @@
 // さとるエディタ (Windows) のインストーラー / アンインストーラー
 //   satoruEditorSetup.exe                 画面を出して入れる
 //   satoruEditorSetup.exe /S              画面を出さずに入れる (確認用)
+//   satoruEditorSetup.exe /update [/wait-pid=N] [/S]
+//                                         アップデート: アプリ (プロセス N) が閉じるのを待ち、今の入れ方 (デスクトップのショートカットの有無) のまま
+//                                         確かめずに入れ替えて、さとるエディタを起動し直す。/S なら進み具合の小窓も出さない (起動もしない)
 //   uninstall.exe /uninstall [/S]         消す (入れた先に置く。「設定 > アプリ」からも呼ばれる)
 // 入れる先: %LOCALAPPDATA%\Programs\satoruEditor (管理者の許可は要らない)。設定 (%USERPROFILE%\.satoruEditor) は消さない
 using System;
@@ -55,6 +58,17 @@ namespace SatoEditSetup
                     Process.Start(new ProcessStartInfo(tmp, "/uninstall-from \"" + Path.GetDirectoryName(self) + "\"" + (silent ? " /S" : "")) { UseShellExecute = false });
                     return 0;
                 }
+                if (args.Any(a => a.Equals("/update", StringComparison.OrdinalIgnoreCase)))
+                {
+                    var pidArg = args.FirstOrDefault(a => a.StartsWith("/wait-pid=", StringComparison.OrdinalIgnoreCase));
+                    if (pidArg != null && int.TryParse(pidArg.Substring("/wait-pid=".Length), out var pid)) WaitForExit(pid, 60000);
+                    bool desktop = File.Exists(DesktopLink) || !File.Exists(StartMenuLink); // 前に入れたときの選び方を引き継ぐ
+                    if (silent) { Install(desktop, false, null); return 0; }
+                    Application.EnableVisualStyles();
+                    Application.SetCompatibleTextRenderingDefault(false);
+                    Application.Run(new UpdateForm(desktop));
+                    return 0;
+                }
                 if (silent) { Install(true, false, null); return 0; }
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
@@ -66,6 +80,16 @@ namespace SatoEditSetup
                 if (!silent) MessageBox.Show(T("うまくいきませんでした:\n", "Something went wrong:\n") + e.Message, Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return 2;
             }
+        }
+
+        /// アップデートを始めたアプリが、自分で閉じ終わるのを待つ (保存の確かめは済んでいる)
+        static void WaitForExit(int pid, int ms)
+        {
+            try
+            {
+                using (var p = Process.GetProcessById(pid)) p.WaitForExit(ms);
+            }
+            catch { } // もう閉じている
         }
 
         /// 動いているさとるエディタを閉じる (ファイルを差し替えるため)
@@ -246,6 +270,56 @@ namespace SatoEditSetup
         }
 
         static void TryDelete(string f) { try { if (File.Exists(f)) File.Delete(f); } catch { } }
+
+        /// アップデートの間だけ出す小窓 (確かめることは無い。終わったら、さとるエディタを起動して閉じる)
+        sealed class UpdateForm : Form
+        {
+            readonly Label status = new Label { AutoSize = true, ForeColor = SystemColors.GrayText };
+
+            public UpdateForm(bool desktop)
+            {
+                Text = Name;
+                Font = new Font(Ja ? "Yu Gothic UI" : "Segoe UI", 9.5f);
+                FormBorderStyle = FormBorderStyle.FixedDialog;
+                MaximizeBox = MinimizeBox = false;
+                ControlBox = false;
+                StartPosition = FormStartPosition.CenterScreen;
+                AutoSize = true;
+                AutoSizeMode = AutoSizeMode.GrowAndShrink;
+                Padding = new Padding(20);
+                try { Icon = Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location); } catch { }
+                var title = new Label { AutoSize = true, Text = T(AppName + " を " + Version + " に更新しています…", "Updating " + AppNameEn + " to " + Version + "…"), Font = new Font(Font.FontFamily, 11f, FontStyle.Bold) };
+                var bar = new ProgressBar { Style = ProgressBarStyle.Marquee, Width = 360, Height = 16, MarqueeAnimationSpeed = 30 };
+                var stack = new TableLayoutPanel { AutoSize = true, ColumnCount = 1, Dock = DockStyle.Fill };
+                foreach (Control c in new Control[] { title, bar, status })
+                {
+                    c.Margin = new Padding(0, 4, 0, 4);
+                    stack.Controls.Add(c);
+                }
+                Controls.Add(stack);
+                Shown += (s, e) =>
+                {
+                    var t = new Thread(() =>
+                    {
+                        try
+                        {
+                            Install(desktop, true, msg => BeginInvoke((Action)(() => status.Text = msg)));
+                            BeginInvoke((Action)Close);
+                        }
+                        catch (Exception ex)
+                        {
+                            BeginInvoke((Action)(() =>
+                            {
+                                MessageBox.Show(this, T("更新できませんでした:\n", "The update failed:\n") + ex.Message, Name, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                Close();
+                            }));
+                        }
+                    }) { IsBackground = true };
+                    t.SetApartmentState(ApartmentState.STA); // ショートカットを作る COM のため
+                    t.Start();
+                };
+            }
+        }
 
         /// インストールの画面 (1 枚だけ)
         sealed class SetupForm : Form

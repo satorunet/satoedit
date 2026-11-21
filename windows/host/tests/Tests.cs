@@ -190,6 +190,43 @@ static class Tests {
       Ok(System.Text.RegularExpressions.Regex.IsMatch(code, "^[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}$"), code);
       Eq(CollabCipher.Normalize(code).Length, 16);
     });
+    Test("アップデート: 版の比べ方 (x.y.z の数で。v は付いていてもよい)", () => {
+      Eq(UpdateInfo.Compare("v1.0.1", "1.0.0"), 1);
+      Eq(UpdateInfo.Compare("1.0.0", "1.0.0"), 0);
+      Eq(UpdateInfo.Compare("1.0.9", "1.0.10"), -1);
+      Eq(UpdateInfo.Compare("2.0", "1.9.9"), 1);
+      Eq(UpdateInfo.Compare("1.2.0-beta", "1.2.0"), 0);
+      Eq(UpdateInfo.Compare("abc", "0.0.1"), -1);
+      Eq(UpdateInfo.Normalize("v3"), "3.0.0");
+    });
+    Test("アップデート: GitHub の releases/latest を読み、Windows 用のインストーラーを選ぶ", () => {
+      string Rel(string tag, params string[] names) => "{\"tag_name\":\"" + tag + "\",\"html_url\":\"https://github.com/satorunet/satoedit/releases/tag/" + tag + "\",\"draft\":false,\"prerelease\":false,\"assets\":["
+        + string.Join(",", names.Select(n => "{\"name\":\"" + n + "\",\"size\":1234,\"browser_download_url\":\"https://example.com/" + n + "\"}")) + "]}";
+      var r = UpdateInfo.Parse(Json.Parse(Rel("v1.0.1", "satoruEditor-1.0.1-mac.dmg", "SatoruEditor-1.0.1-win-x64-setup.exe")), "1.0.0");
+      Eq(r.Str("status"), "update");
+      Eq(r.Str("version"), "1.0.1");
+      Eq(r.Obj("asset").Str("name"), "SatoruEditor-1.0.1-win-x64-setup.exe");
+      Eq(r.Obj("asset").Num("size"), 1234.0);
+      Eq(r.Str("notes"), "https://github.com/satorunet/satoedit/releases/tag/v1.0.1");
+      Eq(UpdateInfo.Parse(Json.Parse(Rel("v1.0.1", "SatoruEditor-1.0.1-win-x64-setup.exe")), "1.0.1").Str("status"), "latest");
+      Eq(UpdateInfo.Parse(Json.Parse(Rel("v0.9.0", "SatoruEditor-0.9.0-win-x64-setup.exe")), "1.0.1").Str("status"), "latest");
+      Eq(UpdateInfo.Parse(Json.Parse(Rel("v1.1.0", "satoruEditor-1.1.0-mac.dmg")), "1.0.1").Str("status"), "noasset");
+      Eq(UpdateInfo.Parse(Json.Parse("{\"message\":\"Not Found\"}"), "1.0.1").Str("status"), "error");
+      Eq(UpdateInfo.Parse(Json.Parse(Rel("v2.0.0", "SatoruEditor-2.0.0-win-x64-setup.exe").Replace("\"prerelease\":false", "\"prerelease\":true")), "1.0.1").Str("status"), "latest");
+    });
+    Test("アップデート: とばした版・自動で確かめる間隔", () => {
+      JObj New() => UpdateInfo.Parse(Json.Parse("{\"tag_name\":\"v1.2.0\",\"assets\":[{\"name\":\"SatoruEditor-1.2.0-win-x64-setup.exe\",\"size\":5,\"browser_download_url\":\"https://x/y\"}]}"), "1.0.1");
+      Eq(UpdateInfo.Decide(New(), true, "1.2.0").Str("status"), "skipped");
+      Eq(UpdateInfo.Decide(New(), true, "v1.2.0").Str("status"), "skipped");
+      Eq(UpdateInfo.Decide(New(), true, "1.1.0").Str("status"), "update");
+      Eq(UpdateInfo.Decide(New(), false, "1.2.0").Str("status"), "update");
+      double h = 3600 * 1000.0, now = 1.8e12;
+      Eq(UpdateInfo.AutoGate(false, 0, now), "off");
+      Eq(UpdateInfo.AutoGate(true, 0, now), "go");
+      Eq(UpdateInfo.AutoGate(true, now - 2 * h, now), "notyet");
+      Eq(UpdateInfo.AutoGate(true, now - 25 * h, now), "go");
+      Eq(UpdateInfo.AutoGate(true, now + 5 * h, now), "go"); // 時計が戻ったとき
+    });
     foreach (var extra in Extra.All) Test(extra.Key, extra.Value);
     Console.WriteLine($"\n{passed} 件成功, {failed} 件失敗");
     return failed == 0 ? 0 : 1;

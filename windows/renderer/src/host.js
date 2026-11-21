@@ -77,7 +77,7 @@ export function installHostAPI() {
   let locale = navigator.language || 'ja';
   let theme = themeDef.defaults();
   let menuState = {};
-  let version = '1.0.0';
+  let version = '1.0.1';
   let priceOverrides = {};
   let menuTimer = null;
 
@@ -420,6 +420,8 @@ export function installHostAPI() {
     'libraryGetMode', 'librarySetMode', 'librarySetLocked', 'libraryDuplicate', 'libraryMove', 'libraryFolderPath', 'libraryReadText', 'libraryRemoveEmpty',
     'libraryRemovePlaceholder', 'librarySame', 'versionNoteSaved', 'versionNoteOpened', 'versionFlush', 'versionList', 'versionContent', 'versionRepath',
     'versionForget', 'versionPruneAll', 'versionReveal', 'backupExport', 'backupOpen', 'backupRestore', 'http',
+    // アップデート (GitHub Releases)
+    'updateCheck', 'updateDownload', 'updateCancel', 'updateInstall',
   ];
   const api = {};
   for (const name of passthrough) api[name] = (...args) => call(name, ...args);

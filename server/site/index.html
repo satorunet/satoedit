@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>さとるエディタ (β テスト版) — みんなの声で育てていくテキストエディタ</title>
+<title>さとるエディタβ — みんなで育てるテキストエディタ</title>
 <meta name="description" content="さとるエディタは、書く・まとめる・共有するがサクサクできるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ改善していきます。Mac / Windows 対応、無料、オープンソース (MIT)。">
 <meta property="og:site_name" content="さとるエディタ">
-<meta property="og:title" content="さとるエディタ (β テスト版) — みんなの声で育てていくテキストエディタ">
+<meta property="og:title" content="さとるエディタβ — みんなで育てるテキストエディタ">
 <meta property="og:description" content="書く・まとめる・共有するがサクサクできるテキストエディタ。いまは β テスト版で、みんなの意見をもとに改善中。Mac / Windows・無料・オープンソース。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://docs.satoru.net/">
-<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261121x">
+<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261122e">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/site/icon.png?v=4">
@@ -103,6 +103,10 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .ft-bottom a{color:var(--mut);text-decoration:none;font-weight:700}
 @media (max-width:760px){.ft-in{grid-template-columns:1fr;gap:26px}}
 
+.hero-shot{position:relative}
+.hero-shot .hero-top{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .45s ease}
+.hero-shot .hero-top.on{opacity:1}
+.hero-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(15,20,25,.78);color:#fff;font-weight:700;font-size:.9rem;padding:5px 16px;border-radius:999px;transition:background .3s}
 .beta-note{display:flex;gap:14px;align-items:flex-start;text-align:left;max-width:720px;margin:26px auto 0;background:#fff7ea;border:1px solid #f5c26b;border-radius:14px;padding:14px 18px;color:#6b4a00;font-size:.95rem;line-height:1.7}
 .beta-note b{color:#b26a00}
 .beta-note .ic{font-size:1.4rem;line-height:1}
@@ -116,91 +120,69 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .steps li{counter-increment:s;position:relative;padding:12px 16px 12px 52px;background:var(--card);border:1px solid var(--ln);border-radius:12px;color:var(--mut)}
 .steps li b{color:var(--fg)}
 .steps li::before{content:counter(s);position:absolute;left:16px;top:12px;width:24px;height:24px;border-radius:50%;background:#ff8c1a;color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+.four{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.four>div{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;overflow:hidden}
+.four img{border-radius:8px;border:1px solid var(--ln);margin-bottom:10px}
+.four b{display:block;font-size:1.1rem;margin-bottom:2px}
+.four p{margin:0;color:var(--mut);font-size:.93rem;line-height:1.7}
+@media (max-width:760px){.four{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <nav class="top"><div class="w">
-  <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタ</a>
+  <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタβ</a>
   <a class="l" href="#features">できること</a>
-  <a class="l" href="#beta">β テストについて</a>
   <a class="l" href="#feedback">ご意見</a>
   <a class="dl-s" href="#download">ダウンロード</a>
 </div></nav>
 
 <header class="hero"><div class="w">
   <span class="kicker beta">β テスト版 ・ 実験中</span>
-  <h1>書く・まとめる・共有する。<br>みんなの声で<em>育てていく</em>エディタ。</h1>
-  <p class="lead">さとるエディタは、ふつうのメモから作文・原稿まで、ひとつで書けるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ良くしていきます。</p>
+  <h1>みんなで<em>育てる</em>エディタ。</h1>
+  <p class="lead">メモから AI 作文まで、サクサク書けるテキストエディタ。いまは β テスト版です。</p>
   <div class="dls">
     <a class="dl" href="#download">⬇ 無料でダウンロード <small>Mac / Windows</small></a>
     <a class="dl ghost" href="#feedback">💬 意見を送る</a>
   </div>
-  <div class="beta-note"><span class="ic">🧪</span><div><b>まだ実験中のアプリです。</b> 機能や見た目は、みなさんの意見でどんどん変わります。不具合があるかもしれないので、大事な文章はバックアップを取りながら使ってください。</div></div>
-  <div class="hero-shot"><img src="/site/shot-genko.jpg?v=20261121x" width="1800" height="1520" alt="さとるエディタの画面。上にフォルダ、下にテキストの一覧、右に原稿用紙で書いた作文"></div>
+  <div class="beta-note"><span class="ic">🧪</span><div><b>実験中です。</b> みんなの意見で、どんどん変わります。</div></div>
+  <div class="hero-shot" id="hero-shot">
+    <img id="hero-a" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="さとるエディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
+    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="" aria-hidden="true">
+    <span class="hero-label" id="hero-label">標準エディタ</span>
+  </div>
 </div></header>
 
 <main class="w">
 <section id="features">
   <div class="sec-k">FEATURES</div>
   <h2>できること</h2>
-  <p class="sec-lead">同じ文章を、ボタン 1 つで 4 つの画面に切り替えて書けます。</p>
-  <div class="demo" id="demo">
-    <div class="demo-tabs" role="tablist" aria-label="表示の切り替え">
-      <button role="tab" class="m-ed" data-v="editor" aria-selected="true">標準エディタ</button>
-      <button role="tab" class="m-gv" data-v="genko" aria-selected="false">原稿用紙 (縦書き)</button>
-      <button role="tab" class="m-gh" data-v="genkoH" aria-selected="false">原稿用紙 (横書き)</button>
-      <button role="tab" class="m-a4" data-v="a4" aria-selected="false">A4用紙</button>
-    </div>
-    <div class="demo-frame" role="tabpanel">
-      <img id="demo-img" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="同じ文章を標準エディタで表示したところ">
-    </div>
-    <p class="demo-cap" id="demo-cap">行番号・改行の印つきの、軽いエディタ。メモやコードにも。</p>
+  <div class="four">
+    <div><img src="/site/shot-editor.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="標準エディタの画面"><b>エディタ表示</b><p>行番号つきの軽いエディタ。書いたものは一覧にまとまり、版の履歴も残ります。</p></div>
+    <div><img src="/site/shot-genko.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="原稿用紙の画面"><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
+    <div><img src="/site/shot-ai-proof.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="AI に誤字を直してもらっている画面"><b>AI 補正 <i class="badge">実験中</i></b><p>誤字直し・要約・続きを書く などを、横から出る欄で頼めます。</p></div>
+    <div><a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="公開した作文のページ"></a><b>共有機能 <i class="badge">実験中</i></b><p>URL ひとつで、そのままの見た目で公開。<a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener">見本を見る</a></p></div>
   </div>
-
-  <div class="cards">
-    <div><b>✍️ 書く画面を切り替え</b><p>ふつうのエディタ・原稿用紙 (縦・横)・A4 用紙。原稿用紙は、ふりがなや段落の下げも自動で。</p></div>
-    <div><b>🗂 一覧で、サッと探す</b><p>書いたテキストはフォルダごとに一覧に。ファイル名・場所・更新の時間がひと目でわかります。</p></div>
-    <div><b>🕘 版の履歴</b><p>保存するたびに版を残します。前とどこが変わったかを見て、前の版に戻すこともできます。</p></div>
-    <div><b>✨ AI アシスト<i class="exp">実験中</i></b><p>右はしのタブを押すと、横から AI の欄が出てきます。校正・要約・続きを書く などを頼めます。</p></div>
-    <div><b>🔗 リンクで公開共有<i class="exp">実験中</i></b><p>文章をインターネットに公開して URL を発行。原稿用紙は原稿用紙のまま。公開前に個人情報がないかも確かめます。</p></div>
-    <div><b>🔊 読み上げ<i class="exp">実験中</i></b><p>書いた文章を声で読んで、推敲に。(Mac 版)</p></div>
-  </div>
-  <p class="meta">ほかにも、サーバのファイルの編集・データ暗号化など。使う機能だけをオンにできます。</p>
-</section>
-
-<section id="beta">
-  <div class="sec-k">BETA</div>
-  <h2>β テストについて</h2>
-  <p class="sec-lead">さとるエディタは、作りながら、使ってくれた人といっしょに育てていくアプリです。</p>
-  <ol class="steps">
-    <li><b>まずは使ってみてください。</b> 無料で、Mac でも Windows でも使えます。</li>
-    <li><b>気づいたことを教えてください。</b> 「ここが使いにくい」「こんな機能がほしい」「動かない」など、ひとことで大丈夫です。</li>
-    <li><b>意見をもとに、改善していきます。</b> 新しい版が出たら、アプリが自動で知らせて、そのままアップデートできます。</li>
-  </ol>
 </section>
 
 <section id="feedback">
-  <div class="sec-k">FEEDBACK</div>
-  <h2>ご意見・不具合の報告</h2>
-  <div class="feat">
-    <div><b>X (旧 Twitter)</b><p>ひとことの感想や要望は、こちらへ。</p><a class="dl ghost" href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a></div>
-    <div><b>GitHub</b><p>不具合の報告や、くわしい提案は Issues へ。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit/issues" target="_blank" rel="noopener">Issues を開く</a></div>
-    <div><b>ソースコード</b><p>全ソースを MIT ライセンスで公開しています。だれでも読めて、直して使えます。</p><a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub で見る</a></div>
+  <div class="sec-k">BETA</div>
+  <h2>ご意見募集中</h2>
+  <p class="sec-lead">使ってみて気づいたことを、ひとことで教えてください。意見をもとに改善して、新しい版はアプリに自動で届きます。</p>
+  <div class="dls" style="justify-content:flex-start">
+    <a class="dl ghost" href="https://x.com/satorunet" target="_blank" rel="noopener">X で送る (@satorunet)</a>
+    <a class="dl ghost" href="https://github.com/satorunet/satoedit/issues" target="_blank" rel="noopener">GitHub の Issues</a>
+    <a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">ソースコード (MIT)</a>
   </div>
 </section>
 
 <section id="download">
   <div class="sec-k">DOWNLOAD</div>
-  <h2>ダウンロード (β テスト版)</h2>
+  <h2>ダウンロード (無料)</h2>
   <div class="feat">
-    <div><b>Mac 版</b><p>SatoruEditor-1.0.1-mac.dmg（7.1 MB）<br>macOS 11 以降・Apple シリコン / Intel</p><a class="dl" href="/SatoruEditor-1.0.1-mac.dmg?v=20261121x" download>⬇ ダウンロード</a></div>
-    <div><b>Windows 版</b><p>SatoruEditor-1.0.0-win-x64-setup.exe（2.4 MB）<br>Windows 10 / 11（64 ビット）・管理者の許可は不要</p><a class="dl" href="/SatoruEditor-1.0.0-win-x64-setup.exe?v=20261121x" download>⬇ インストーラー</a></div>
+    <div><b>Mac 版</b><p>macOS 11 以降 (Apple シリコン / Intel)</p><a class="dl" href="/SatoruEditor-1.0.1-mac.dmg?v=20261121x" download>⬇ ダウンロード (7.1 MB)</a></div>
+    <div><b>Windows 版</b><p>Windows 10 / 11 (64 ビット)</p><a class="dl" href="/SatoruEditor-1.0.1-win-x64-setup.exe?v=20261121y" download>⬇ インストーラー (2.5 MB)</a></div>
   </div>
-  <table style="margin-top:22px">
-    <tr><th>Mac</th><td>dmg を開いて、さとるエディタを「アプリケーション」フォルダに入れて起動します。</td></tr>
-    <tr><th>Windows</th><td>インストーラーを開いて「インストール」を押します。初回に「Windows によって PC が保護されました」と出たら、「詳細情報」→「実行」で起動できます。</td></tr>
-  </table>
-  <p class="meta">新しい版が出ると、アプリが知らせてくれます (メニューの「アップデートを確認…」からも確かめられます)。</p>
+  <p class="meta">Windows で「PC が保護されました」と出たら、「詳細情報」→「実行」で起動できます。</p>
 </section>
 </main>
 
@@ -220,6 +202,22 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 <div class="w ft-bottom"><span>© 2026 <a href="https://satoru.net/">satoru.net</a></span><span>Made with care in Japan</span></div>
 </footer>
 <script>
+// トップの画像: 同じ文章を 標準エディタ → 原稿用紙 (縦) → 原稿用紙 (横) → A4 とぱっぱと切り替える
+(function(){
+  var views=[["editor","標準エディタ","#334"],["genko","原稿用紙 (縦書き)","#c0392b"],["genkoH","原稿用紙 (横書き)","#2f8f57"],["a4","A4用紙","#555"]];
+  var a=document.getElementById("hero-a"),b=document.getElementById("hero-b"),label=document.getElementById("hero-label");
+  if(!a||!b)return;
+  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261121x"});
+  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+  var n=0;
+  setInterval(function(){
+    n=(n+1)%views.length;var v=views[n];
+    b.src="/site/demo-"+v[0]+".jpg?v=20261121x";
+    var show=function(){b.classList.add("on");label.textContent=v[1];label.style.background=v[2];
+      setTimeout(function(){a.src=b.src;b.classList.remove("on")},500)};
+    if(b.complete)show();else b.onload=show;
+  },2200);
+})();
 // デモのタブ: 押した表示の画像に切り替える (画像は先に読んでおく)
 (function(){
   var caps={editor:["標準エディタ","行番号・改行の印つきの、軽いエディタ。メモやコードにも。"],
