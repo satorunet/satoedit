@@ -1,0 +1,15 @@
+/Users/satorunet/Hinoki/windows/host/tests/bin/Release/net8.0/tests
+/Users/satorunet/Hinoki/windows/host/tests/bin/Release/net8.0/tests.deps.json
+/Users/satorunet/Hinoki/windows/host/tests/bin/Release/net8.0/tests.runtimeconfig.json
+/Users/satorunet/Hinoki/windows/host/tests/bin/Release/net8.0/tests.dll
+/Users/satorunet/Hinoki/windows/host/tests/bin/Release/net8.0/tests.pdb
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.GeneratedMSBuildEditorConfig.editorconfig
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.AssemblyInfoInputs.cache
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.AssemblyInfo.cs
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.csproj.CoreCompileInputs.cache
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.sourcelink.json
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.dll
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/refint/tests.dll
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.pdb
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/tests.genruntimeconfig.cache
+/Users/satorunet/Hinoki/windows/host/tests/obj/Release/net8.0/ref/tests.dll

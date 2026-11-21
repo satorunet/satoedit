@@ -6,3 +6,17 @@ xcuserdata/
 DerivedData/
 .DS_Store
 icon.png
+
+# Windows 版
+windows/node_modules/
+windows/build/
+windows/.tools/
+windows/renderer/dist/
+windows/host/bin/
+windows/host/obj/
+windows/installer/bin/
+windows/installer/obj/
+windows/test/out/
+*.ips
+*.log
+.env

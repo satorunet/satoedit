@@ -1,0 +1,25 @@
+[Unit]
+Description=さとるエディタのリンク公開 (docs.satoru.net, 127.0.0.1:3720)
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 -s /opt/satoru-docs/app.py
+# カード画像に使う Pillow は /usr/local の中にある
+Environment=PYTHONPATH=/usr/local/lib64/python3.12/site-packages
+Environment=PORT=3720
+Environment=BASE_URL=https://docs.satoru.net
+Environment=TZ=Asia/Tokyo
+# 管理画面のパスワードの印 (ADMIN_PASSWORD_HASH=塩$印)。root だけが読めるファイル。パスワードそのものはサーバに置かない
+EnvironmentFile=-/etc/satoru-docs.env
+# 専用の使い捨てユーザーで動かし、書けるのはデータの置き場 (/var/lib/satoru-docs) だけ
+DynamicUser=yes
+StateDirectory=satoru-docs
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+NoNewPrivileges=yes
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

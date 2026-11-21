@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 本体の部品のうち、Windows に依らないもの (JSON・文字コード・暗号・zip・grep・共同編集の暗号) を Mac で試す: ~/.dotnet/dotnet run -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <InvariantGlobalization>false</InvariantGlobalization>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../src/shared/**/*.cs" />
+    <Compile Include="*.cs" />
+  </ItemGroup>
+</Project>
