@@ -184,7 +184,6 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 <nav class="top"><div class="w">
   <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタβ</a>
   <a class="l" href="#features">できること</a>
-  <a class="l memo-tab" href="#memos">みんなのメモ</a>
   <a class="l" href="#feedback">ご意見</a>
   <a class="dl-s" href="#download">ダウンロード</a>
 </div></nav>
@@ -231,14 +230,6 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   </div>
 </section>
 
-<section id="memos">
-  <div class="sec-k">MEMOS</div>
-  <h2>みんなのメモ</h2>
-  <p class="sec-lead">さとるエディタで書いて、「みんなのメモに掲載 OK」にして公開してくれたテキスト・作文です。</p>
-  <div class="memos" id="memo-list"><p class="memo-empty">読み込み中…</p></div>
-  <p><a class="memo-more" href="/memos">みんなのメモをもっと見る →</a></p>
-</section>
-
 <section id="feedback">
   <div class="sec-k">BETA</div>
   <h2>ご意見募集中</h2>
@@ -268,7 +259,6 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   </div>
   <nav class="ft-col"><h3>リンク</h3>
     <a href="#download">ダウンロード</a>
-    <a href="/memos">みんなのメモ</a>
     <a href="#feedback">ご意見・不具合の報告</a>
     <a href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a>
     <a href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub (ソースコード)</a>
@@ -373,17 +363,6 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   function show(h){box.classList.toggle("h",h);tabs.forEach(function(t){t.setAttribute("aria-selected",String((t.dataset.k==="h")===h))})}
   var timer=setInterval(function(){show(!box.classList.contains("h"))},3000);
   tabs.forEach(function(t){t.addEventListener("click",function(){clearInterval(timer);show(t.dataset.k==="h")})});
-})();
-// みんなのメモ: 作者が「みんなのメモに掲載 OK」にしたものを新しい順に 6 件
-(function(){
-  var box=document.getElementById("memo-list");if(!box)return;
-  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-  fetch("/api/memos").then(function(r){return r.ok?r.json():[]}).then(function(list){
-    if(!list.length){box.innerHTML='<p class="memo-empty">まだありません。公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>';return}
-    box.innerHTML=list.slice(0,8).map(function(m){
-      return '<a class="memo" href="'+esc(m.url)+'" target="_blank" rel="noopener">'+(m.thumb?'<img class="memo-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy">':'')+'<b>'+esc(m.title)+'</b></a>';
-    }).join("");
-  }).catch(function(){box.innerHTML='<p class="memo-empty">読み込めませんでした。</p>'});
 })();
 </script>
 </body></html>
