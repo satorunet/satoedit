@@ -722,6 +722,8 @@ header a{color:var(--muted)}
 background-image:repeating-linear-gradient(to right,var(--gfg) 0 1px,transparent 1px 1ch),repeating-linear-gradient(to right,var(--gfg) 0 1px,transparent 1px 5ch),repeating-linear-gradient(to right,var(--gfg) 0 1px,transparent 1px 10ch);
 background-size:100% 4px,100% 7px,100% 10px;background-position:left bottom;background-repeat:no-repeat;opacity:.75}
 .ruler span{position:absolute;top:0;margin-left:3px;font:11px/1.4 -apple-system,"Hiragino Sans",sans-serif;color:var(--gfg)}
+.crumb{margin:14px 16px -4px;font:13px/1.6 -apple-system,"Hiragino Sans",sans-serif;color:var(--muted,#888);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.crumb a{color:inherit;text-decoration:none;font-weight:700}.crumb a:hover{text-decoration:underline}
 .copy{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;padding:0;border-radius:8px;align-self:center;border:1px solid rgba(128,128,128,.45);background:var(--paper);color:var(--ink);cursor:pointer}
 .copy:hover{filter:brightness(.97)}
 .copywrap{position:relative;display:inline-flex}
@@ -978,6 +980,9 @@ def page(doc, i, rev=None, links=True, view=None):
     has_shot = rev is None and full.get("visibility") != "password" and os.path.exists(shot_path(i))
     shot_item = '<button type="button" role="menuitem" data-k="image">画像としてコピー</button>' if has_shot else ''
     shot_url = "/r/%s/shot.png?v=%d" % (i, int(full.get("updated") or full.get("created") or 0))
+    # 「みんなのメモ」に載っているものは、一覧へ戻れるパンくずを付ける
+    crumb = ('<nav class="crumb" aria-label="パンくず"><a href="/memos">みんなのメモ</a> › %s</nav>' % html.escape(full.get("title") or "無題")) \
+        if full.get("listed") and full.get("visibility") == "public" else ""
     # 読み上げ (ずんだもん): 最新の版で、パスワード制でないときだけ。版ごとに URL を変える (古い声を使わないように)
     tts_base = ("/r/%s/tts/%d/" % (i, int(full.get("updated") or full.get("created") or 0))) if rev is None and full.get("visibility") != "password" else ""   # コピーボタン用 (</script> で切れないように)
     return f"""<!doctype html>
@@ -992,7 +997,7 @@ def page(doc, i, rev=None, links=True, view=None):
 {'' if public else '<meta name="robots" content="noindex">'}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic&display=swap" rel="stylesheet">
 <style>{PAGE_CSS}</style></head>
-<body><header><h1>{esc(title)}</h1><span>{esc(created)}</span>{txt_link}{switcher}<button class="copy speak" type="button" id="speak" title="読み上げ (ずんだもん)" aria-label="読み上げ" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></button><button class="copy" type="button" id="copylink" title="リンクをコピー" aria-label="リンクをコピー"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><span class="copywrap"><button class="copy" type="button" id="copy" title="コピー" aria-label="コピー" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="copymenu" id="copymenu" role="menu" hidden><button type="button" role="menuitem" data-k="text">テキストとしてコピー</button>{shot_item}</span></span></header>
+<body>{crumb}<header><h1>{esc(title)}</h1><span>{esc(created)}</span>{txt_link}{switcher}<button class="copy speak" type="button" id="speak" title="読み上げ (ずんだもん)" aria-label="読み上げ" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></button><button class="copy" type="button" id="copylink" title="リンクをコピー" aria-label="リンクをコピー"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><span class="copywrap"><button class="copy" type="button" id="copy" title="コピー" aria-label="コピー" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="copymenu" id="copymenu" role="menu" hidden><button type="button" role="menuitem" data-k="text">テキストとしてコピー</button>{shot_item}</span></span></header>
 {'<p class="oldrev">これは第%d版 (前の版) です。<a href="/r/%s">最新の版を見る</a></p>' % (rev, esc(i)) if rev else ''}
 {body}
 {history_html(full, i, rev, links)}
