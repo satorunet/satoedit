@@ -163,6 +163,9 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .memos{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin:14px 0 8px}
 .memo{display:block;background:var(--card,#fff);border:1px solid var(--ln);border-radius:12px;padding:14px 16px;color:inherit;text-decoration:none;transition:box-shadow .15s,transform .15s}
 .memo:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-1px)}
+.memo{padding:0 0 14px;overflow:hidden}.memo b,.memo span,.memo small{margin-left:16px;margin-right:16px}
+.memo-thumb{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;background:#eee;border-bottom:1px solid var(--ln);margin-bottom:10px}
+.memo span{display:block}
 .memo b{display:block;font-size:1rem;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .memo span{font-size:.75rem;color:var(--mut)}
 .memo small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--mut);font-size:.85rem;margin-top:6px;line-height:1.5}
@@ -371,7 +374,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   fetch("/api/memos").then(function(r){return r.ok?r.json():[]}).then(function(list){
     if(!list.length){box.innerHTML='<p class="memo-empty">まだありません。公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>';return}
     box.innerHTML=list.slice(0,6).map(function(m){
-      return '<a class="memo" href="'+esc(m.url)+'" target="_blank" rel="noopener"><b>'+esc(m.title)+'</b><span>'+esc(m.date)+' ・ '+esc(m.kind)+'</span><small>'+esc(m.snippet)+'</small></a>';
+      return '<a class="memo" href="'+esc(m.url)+'" target="_blank" rel="noopener">'+(m.thumb?'<img class="memo-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy">':'')+'<b>'+esc(m.title)+'</b><span>'+esc(m.date)+' ・ '+esc(m.kind)+'</span><small>'+esc(m.snippet)+'</small></a>';
     }).join("");
   }).catch(function(){box.innerHTML='<p class="memo-empty">読み込めませんでした。</p>'});
 })();

@@ -1163,7 +1163,10 @@ def memo_items(limit=60):
     for at, i, doc in STORE.listed_list(limit):
         snippet = re.sub(r"\s+", " ", doc.get("text", "")).strip()[:120]
         kind = "原稿用紙" if doc.get("mode") in ("genko", "genkoH") else "エディタ" if doc.get("mode") == "editor" else "テキスト"
-        out.append({"id": i, "url": "/r/" + i, "title": doc.get("title") or "無題", "snippet": snippet, "kind": kind,
+        # サムネ: 公開したときにアプリが撮った、実際の見た目の画像 (なければ SNS 用のカード画像)
+        v = int(doc.get("updated") or doc.get("created") or 0)
+        thumb = ("/r/%s/shot.png?v=%d" % (i, v)) if os.path.exists(shot_path(i)) else ("/r/%s/og.png?v=%d" % (i, v))
+        out.append({"id": i, "url": "/r/" + i, "title": doc.get("title") or "無題", "snippet": snippet, "kind": kind, "thumb": thumb,
                     "at": int(at), "date": time.strftime("%Y/%m/%d %H:%M", time.localtime(at))})
     return out
 
@@ -1172,13 +1175,16 @@ def memos_page():
     esc = html.escape
     rows = []
     for m in memo_items(100):
-        rows.append(f'<a class="row" href="{esc(m["url"])}"><b>{esc(m["title"])}</b><span>{esc(m["date"])} ・ {esc(m["kind"])}</span><small>{esc(m["snippet"])}</small></a>')
+        rows.append(f'<a class="row" href="{esc(m["url"])}"><img src="{esc(m["thumb"])}" alt="" loading="lazy"><div><b>{esc(m["title"])}</b><span>{esc(m["date"])} ・ {esc(m["kind"])}</span><small>{esc(m["snippet"])}</small></div></a>')
     body = "".join(rows) or '<p class="empty">まだありません。さとるエディタで公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>'
     return f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>みんなのメモ — さとるエディタβ</title><meta name="description" content="さとるエディタで書いて、みんなのメモに載せてくれたテキスト・作文">
 <style>body{{margin:0;font-family:-apple-system,"Hiragino Sans",sans-serif;background:#efe9dc;color:#222}}
 main{{max-width:760px;margin:0 auto;padding:28px 16px 48px}}h1{{font-size:22px}}
-.row{{display:block;background:#fffdf7;border-radius:8px;padding:12px 16px;margin:10px 0;color:inherit;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.1)}}
+.row{{display:flex;gap:14px;align-items:center;background:#fffdf7;border-radius:8px;padding:10px 12px;margin:10px 0;color:inherit;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.1)}}
+.row img{{width:150px;height:100px;object-fit:cover;object-position:top;border-radius:6px;border:1px solid rgba(0,0,0,.08);flex:none;background:#eee}}
+.row div{{min-width:0;flex:1}}
+@media (max-width:520px){{.row img{{width:96px;height:72px}}}}
 .row:hover{{box-shadow:0 2px 10px rgba(0,0,0,.18)}}
 .row b{{display:block;font-size:16px}}.row span{{color:#888;font-size:12px}}.row small{{display:block;color:#555;margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
 .empty{{color:#888}}a.home{{color:#666}}footer{{text-align:center;color:#888;font-size:12px;padding:0 16px 32px}}footer a{{color:inherit}}</style></head>
@@ -1205,7 +1211,7 @@ def live_stamp(doc):
 
 
 # 見ている人のページ: 作者が公開をやめたらすぐ「公開終了」に、書き換えたら自動で新しい中身に (数秒ごとに問い合わせる)
-LIVE_JS = """<script>(function(){
+LIVE_JS = """<script data-live>(function(){
   var id=__ID__,stamp=__STAMP__,reload=__RELOAD__,gone=false,busy=false;
   try{var u=new URL(location.href);if(u.searchParams.has("u")){u.searchParams.delete("u");history.replaceState(null,"",u.pathname+u.search+u.hash)}}catch(e){}
   function check(){
@@ -1214,14 +1220,31 @@ LIVE_JS = """<script>(function(){
       if(r.status===404||r.status===410){gone=true;showGone();return null}
       return r.ok?r.json():null;
     }).then(function(o){
-      if(o&&o.v&&o.v!==stamp&&reload){
-        // 同じ版のために 2 回は読み直さない (古い写しが返ってきても、くり返さない)
-        var k="satoru-live-"+id,last=null;try{last=sessionStorage.getItem(k)}catch(e){}
-        if(last===o.v)return;
-        try{sessionStorage.setItem(k,o.v)}catch(e){}
-        var u=new URL(location.href);u.searchParams.set("u",o.v);location.replace(u.toString());
-      }
+      if(o&&o.v&&o.v!==stamp&&reload)return swap(o.v);
     }).catch(function(){}).then(function(){busy=false});
+  }
+  // 新しい中身を取ってきて、ページを読み直さずに差し替える (読んでいた場所はそのまま)
+  function swap(v){
+    var u=new URL(location.href);u.searchParams.delete("u");u.searchParams.set("u",v);
+    return fetch(u.toString(),{cache:"no-store"}).then(function(r){return r.ok?r.text():null}).then(function(h){
+      if(!h)return;
+      var d=new DOMParser().parseFromString(h,"text/html"),y=window.scrollY;
+      document.title=d.title;
+      document.querySelectorAll("head style").forEach(function(s){s.remove()});
+      d.querySelectorAll("head style").forEach(function(s){document.head.appendChild(s.cloneNode(true))});
+      document.body.innerHTML=d.body.innerHTML;
+      // 中の script は、差し替えたあとにもう一度動かす (この見張り役は、今のものをそのまま使う)
+      document.body.querySelectorAll("script").forEach(function(old){
+        if(old.hasAttribute("data-live")){old.remove();return}
+        var s=document.createElement("script");s.textContent=old.textContent;old.replaceWith(s);
+      });
+      window.scrollTo(0,y);stamp=v;note();
+    }).catch(function(){location.reload()});
+  }
+  function note(){
+    var n=document.createElement("div");n.textContent="最新の内容に更新しました";
+    n.style.cssText="position:fixed;left:50%;top:14px;transform:translateX(-50%);background:rgba(20,20,20,.82);color:#fff;font:13px/1 -apple-system,sans-serif;padding:9px 16px;border-radius:999px;z-index:9999;transition:opacity .4s";
+    document.body.appendChild(n);setTimeout(function(){n.style.opacity="0"},2200);setTimeout(function(){n.remove()},2800);
   }
   function showGone(){
     var st=document.createElement("style");st.textContent=__CSS__;document.head.appendChild(st);
