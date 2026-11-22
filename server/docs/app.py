@@ -1124,6 +1124,7 @@ def page(doc, i, rev=None, links=True, view=None):
 }})();
 </script>
 <footer><a href="https://docs.satoru.net/" style="color:inherit">さとるエディタ</a> で公開{'<br><span class="credit">読み上げ VOICEVOX:ずんだもん</span>' if tts_base else ''}</footer>
+{live_js(i, full, reload=rev is None and full.get("visibility") != "password") if links else ''}
 </body></html>"""
 
 
@@ -1141,28 +1142,85 @@ input{{font-size:16px;padding:8px 10px;border:1px solid #bbb;border-radius:6px;w
 <input type="password" name="password" autofocus autocomplete="off"><button>読む</button></form></body></html>"""
 
 
-def list_page():
+def memo_items(limit=60):
+    """「みんなのメモ」の 1 件ずつ (題名・日時・はじめの文・表示の種類)"""
+    out = []
+    for at, i, doc in STORE.listed_list(limit):
+        snippet = re.sub(r"\s+", " ", doc.get("text", "")).strip()[:120]
+        kind = "原稿用紙" if doc.get("mode") in ("genko", "genkoH") else "エディタ" if doc.get("mode") == "editor" else "テキスト"
+        out.append({"id": i, "url": "/r/" + i, "title": doc.get("title") or "無題", "snippet": snippet, "kind": kind,
+                    "at": int(at), "date": time.strftime("%Y/%m/%d %H:%M", time.localtime(at))})
+    return out
+
+
+def memos_page():
     esc = html.escape
     rows = []
-    for created, i, doc in public_list():
-        t = time.strftime("%Y/%m/%d %H:%M", time.localtime(created))
-        snippet = re.sub(r"\s+", " ", doc.get("text", ""))[:80]
-        kind = "原稿用紙" if doc.get("mode") in ("genko", "genkoH") else "エディタ" if doc.get("mode") == "editor" else "テキスト"
-        rows.append(f'<a class="row" href="/r/{esc(i)}"><b>{esc(doc.get("title") or "無題")}</b><span>{esc(t)} ・ {kind}</span><small>{esc(snippet)}</small></a>')
-    body = "".join(rows) or '<p class="empty">まだ公開されたものはありません。</p>'
+    for m in memo_items(100):
+        rows.append(f'<a class="row" href="{esc(m["url"])}"><b>{esc(m["title"])}</b><span>{esc(m["date"])} ・ {esc(m["kind"])}</span><small>{esc(m["snippet"])}</small></a>')
+    body = "".join(rows) or '<p class="empty">まだありません。さとるエディタで公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>'
     return f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>みんなの公開 — さとるエディタ</title><meta name="description" content="さとるエディタで公開されたテキスト・作文">
+<title>みんなのメモ — さとるエディタβ</title><meta name="description" content="さとるエディタで書いて、みんなのメモに載せてくれたテキスト・作文">
 <style>body{{margin:0;font-family:-apple-system,"Hiragino Sans",sans-serif;background:#efe9dc;color:#222}}
 main{{max-width:760px;margin:0 auto;padding:28px 16px 48px}}h1{{font-size:22px}}
 .row{{display:block;background:#fffdf7;border-radius:8px;padding:12px 16px;margin:10px 0;color:inherit;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.1)}}
+.row:hover{{box-shadow:0 2px 10px rgba(0,0,0,.18)}}
 .row b{{display:block;font-size:16px}}.row span{{color:#888;font-size:12px}}.row small{{display:block;color:#555;margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
-.empty{{color:#888}}a.home{{color:#666}}</style></head>
-<body><main><h1>みんなの公開</h1><p><a class="home" href="https://docs.satoru.net/">さとるエディタ</a> で「公開」にしたテキスト・作文です。</p>{body}</main></body></html>"""
+.empty{{color:#888}}a.home{{color:#666}}footer{{text-align:center;color:#888;font-size:12px;padding:0 16px 32px}}footer a{{color:inherit}}</style></head>
+<body><main><h1>みんなのメモ</h1><p><a class="home" href="https://docs.satoru.net/">さとるエディタ</a> で書いて、「みんなのメモに掲載 OK」にしてくれたものです。</p>{body}</main>
+<footer><a href="https://docs.satoru.net/">さとるエディタβ</a></footer></body></html>"""
 
 
+# 公開をやめた・期限が切れたページ (見ている途中で消えたときも、この中身に差し替える)
+GONE_BODY = """<main class="gone"><h1>このページは公開を終了しました</h1><p>作者が公開をやめたか、公開の期限が切れました。</p></main>
+<footer class="gone-foot"><a href="https://docs.satoru.net/">さとるエディタ</a> で書いて、リンクで公開共有できます。<br><a class="gone-app" href="https://docs.satoru.net/">さとるエディタβ を見てみる →</a></footer>"""
+GONE_CSS = """.gone{text-align:center;padding:80px 16px 24px;color:#555;font-family:-apple-system,"Hiragino Sans",sans-serif}
+.gone h1{font-size:22px}.gone-foot{text-align:center;color:#888;font:13px/1.9 -apple-system,"Hiragino Sans",sans-serif;padding:8px 16px 40px}
+.gone-foot a{color:#2b6cb0}.gone-app{display:inline-block;margin-top:10px;padding:8px 16px;border-radius:999px;background:#2b6cb0;color:#fff!important;text-decoration:none;font-weight:600}"""
 NOT_FOUND = """<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>見つかりません — さとるエディタ</title><style>body{font-family:-apple-system,"Hiragino Sans",sans-serif;text-align:center;padding:80px 16px;color:#555;background:#f6f3ec}</style></head>
-<body><h1>見つかりません</h1><p>このページは削除されたか、公開の期限が切れました。</p></body></html>"""
+<meta name="robots" content="noindex"><title>公開終了 — さとるエディタ</title><style>body{margin:0;background:#f6f3ec}""" + GONE_CSS + """</style></head>
+<body>""" + GONE_BODY + """</body></html>"""
+
+
+def live_stamp(doc):
+    """中身・設定が変わると変わる印 (見ている人のページが、変わったことに気づくため)"""
+    t = int((doc.get("updated") or doc.get("created") or 0) * 1000)
+    h = hashlib.md5(("%s|%s|%s" % (doc.get("title", ""), doc.get("visibility", ""), doc.get("expires"))).encode("utf-8")).hexdigest()[:8]
+    return "%d-%s" % (t, h)
+
+
+# 見ている人のページ: 作者が公開をやめたらすぐ「公開終了」に、書き換えたら自動で新しい中身に (数秒ごとに問い合わせる)
+LIVE_JS = """<script>(function(){
+  var id=__ID__,stamp=__STAMP__,reload=__RELOAD__,gone=false,busy=false;
+  try{var u=new URL(location.href);if(u.searchParams.has("u")){u.searchParams.delete("u");history.replaceState(null,"",u.pathname+u.search+u.hash)}}catch(e){}
+  function check(){
+    if(gone||busy||document.hidden)return;busy=true;
+    fetch("/r/"+id+"/state.json?t="+Date.now(),{cache:"no-store"}).then(function(r){
+      if(r.status===404||r.status===410){gone=true;showGone();return null}
+      return r.ok?r.json():null;
+    }).then(function(o){
+      if(o&&o.v&&o.v!==stamp&&reload){
+        // 同じ版のために 2 回は読み直さない (古い写しが返ってきても、くり返さない)
+        var k="satoru-live-"+id,last=null;try{last=sessionStorage.getItem(k)}catch(e){}
+        if(last===o.v)return;
+        try{sessionStorage.setItem(k,o.v)}catch(e){}
+        var u=new URL(location.href);u.searchParams.set("u",o.v);location.replace(u.toString());
+      }
+    }).catch(function(){}).then(function(){busy=false});
+  }
+  function showGone(){
+    var st=document.createElement("style");st.textContent=__CSS__;document.head.appendChild(st);
+    document.body.innerHTML=__BODY__;document.title="公開終了 — さとるエディタ";window.scrollTo(0,0);
+  }
+  setInterval(check,5000);
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)check()});
+})();</script>"""
+
+
+def live_js(i, doc, reload=True):
+    return (LIVE_JS.replace("__ID__", json.dumps(i)).replace("__STAMP__", json.dumps(live_stamp(doc)))
+            .replace("__RELOAD__", "true" if reload else "false")
+            .replace("__CSS__", json.dumps(GONE_CSS).replace("</", "<\\/")).replace("__BODY__", json.dumps(GONE_BODY).replace("</", "<\\/")))
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -1227,6 +1285,16 @@ class Handler(BaseHTTPRequestHandler):
             except Exception:
                 return self.send(503, "", "text/plain")
             return self.send(200, wav, "audio/wav", {"Cache-Control": "public, max-age=86400"})
+        if p in ("/memos", "/memos/"):   # みんなのメモ (作者が掲載 OK にしたものだけ)
+            return self.send(200, memos_page(), "text/html; charset=utf-8", {"Cache-Control": "public, max-age=60"})
+        if p == "/api/memos":   # サイトのトップに並べる用
+            return self.send(200, json.dumps(memo_items(30), ensure_ascii=False), "application/json; charset=utf-8", {"Cache-Control": "public, max-age=60"})
+        m = re.match(r"^/r/([A-Za-z0-9]{6,16})/state\.json$", p)
+        if m:   # 見ている人のページが数秒ごとに聞く: まだ公開中か、中身が変わったか
+            doc = load(m.group(1))
+            if not doc:
+                return self.send(404, json.dumps({"gone": True}), "application/json; charset=utf-8", {"Cache-Control": "no-store"})
+            return self.send(200, json.dumps({"v": live_stamp(doc)}), "application/json; charset=utf-8", {"Cache-Control": "no-store"})
         m = re.match(r"^/r/([A-Za-z0-9]{6,16})/shot\.png$", p)
         if m:
             doc = load(m.group(1))
@@ -1456,7 +1524,8 @@ class Handler(BaseHTTPRequestHandler):
         doc = {"title": title, "text": text, "mode": mode, "created": now, "visibility": vis, "layout": layout,
                "theme": clean_theme(o.get("theme")) if mode == "editor" else None,
                "expires": custom if custom else (now + days * 86400 if days else None), "token": token,
-               "keepHistory": o.get("keepHistory") is not False}
+               "keepHistory": o.get("keepHistory") is not False,
+               "listed": bool(o.get("listed")) and vis == "public"}   # 「みんなのメモ」に載せてよい (「公開」のものだけ)
         if vis == "password":
             salt = secrets.token_hex(16)
             doc["pw_salt"] = salt
@@ -1531,6 +1600,10 @@ class Handler(BaseHTTPRequestHandler):
                 days = 0
             doc["expires"] = time.time() + days * 86400 if days else None
         # 変更履歴: 残さない設定にしたら、今ある履歴も消す。clearHistory で今ある履歴だけ消す
+        if "listed" in o:
+            doc["listed"] = bool(o.get("listed"))
+        if doc.get("visibility") != "public":
+            doc["listed"] = False   # 「公開」のものだけ載せる
         if "keepHistory" in o:
             doc["keepHistory"] = o.get("keepHistory") is not False
             if not doc["keepHistory"]:
@@ -1562,6 +1635,7 @@ class Handler(BaseHTTPRequestHandler):
             save_shot(i, o)
         self.json_out(200, {"id": i, "url": "%s/r/%s" % (BASE_URL, i), "expires": doc.get("expires"),
                             "visibility": doc.get("visibility"), "keepHistory": doc.get("keepHistory", True),
+                            "listed": bool(doc.get("listed")),
                             "historyCount": len(doc.get("history") or [])})
 
     def do_DELETE(self):

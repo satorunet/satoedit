@@ -77,7 +77,7 @@ export function installHostAPI() {
   let locale = navigator.language || 'ja';
   let theme = themeDef.defaults();
   let menuState = {};
-  let version = '1.0.1';
+  let version = '1.0.2';
   let priceOverrides = {};
   let menuTimer = null;
 
@@ -416,7 +416,7 @@ export function installHostAPI() {
     'collabHost', 'collabJoin', 'collabSend', 'collabClose', 'collabStop', 'attention', 'editCommand', 'setTitle', 'closeWindow', 'quit', 'fileIcon', 'growWindow',
     'pluginToken', 'pluginReply', 'readClipboard', 'makeKey', 'readFile', 'writeFile',
     // テキスト一覧・版の履歴・バックアップ・リンクで公開 (docs.satoru.net への送信)
-    'libraryInfo', 'libraryItems', 'libraryTree', 'libraryCreateFolder', 'libraryRenameFolder', 'libraryMoveFolder', 'libraryTrash', 'libraryCreateBlank',
+    'libraryInfo', 'libraryItems', 'libraryTree', 'librarySetRoot', 'libraryScan', 'libraryRead', 'beep', 'libraryCreateFolder', 'libraryRenameFolder', 'libraryMoveFolder', 'libraryTrash', 'libraryCreateBlank',
     'libraryGetMode', 'librarySetMode', 'librarySetLocked', 'libraryDuplicate', 'libraryMove', 'libraryFolderPath', 'libraryReadText', 'libraryRemoveEmpty',
     'libraryRemovePlaceholder', 'librarySame', 'versionNoteSaved', 'versionNoteOpened', 'versionFlush', 'versionList', 'versionContent', 'versionRepath',
     'versionForget', 'versionPruneAll', 'versionReveal', 'backupExport', 'backupOpen', 'backupRestore', 'http',

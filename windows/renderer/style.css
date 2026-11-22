@@ -516,12 +516,11 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 .lib-ficon { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 4px; font-size: 11px; }
 .lib-ficon.tinted { background: color-mix(in srgb, var(--fc) 30%, transparent); }
 .lib-femoji { font-size: 11px; line-height: 1; }
-.lib-fname { flex: 1; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
+.lib-fname { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11.5px; }
 .lib-count { color: var(--chrome-dim); font-size: 10px; font-variant-numeric: tabular-nums; }
-.lib-add { margin: 4px 6px 6px; align-self: flex-start; background: transparent; border: none; color: var(--chrome-dim); padding: 2px 4px; }
 .lib-search { margin: 4px 6px; }
 .lib-list { flex: 1; overflow: auto; outline: none; padding: 2px; }
-.lib-row { padding: 3px 8px 4px; border-bottom: 1px solid color-mix(in srgb, var(--chrome-border) 60%, transparent); border-radius: 5px; }
+.lib-row { position: relative; padding: 3px 8px 4px; border-bottom: 1px solid color-mix(in srgb, var(--chrome-border) 60%, transparent); border-radius: 5px; }
 .lib-row:hover { background: var(--chrome-hover); }
 .lib-row.current { background: color-mix(in srgb, var(--chrome-fg) 14%, transparent); }
 .lib-rtitle { display: flex; align-items: center; gap: 3px; font-weight: 600; font-size: 11.5px; white-space: nowrap; overflow: hidden; }
@@ -535,9 +534,51 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 .lib-ext { margin-left: auto; padding-left: 6px; flex: 0 0 auto; font: 500 9px ui-monospace, Consolas, monospace; color: var(--chrome-dim); }
 /* 上下に並べる: 上にフォルダの欄 (高さは中身に合わせる。80px 以上・半分まで。library.js の fitFolders)、下にテキストの一覧 (残りぜんぶ) */
 .lib-column { display: flex; flex-direction: column; min-height: 0; flex: 0 0 auto; }
-#library-pane.stacked .lib-folder-pane { flex: 0 0 auto; min-height: 80px; max-height: 50%; }
+#library-pane.stacked .lib-folder-pane { flex: 0 0 auto; min-height: 50px; max-height: 50%; }
+#library-pane.stacked .lib-folder-pane.lib-animate-height { transition: height .2s ease; }
 #library-pane.stacked .lib-list-pane { flex: 1 1 0; min-height: 0; }
-.lib-stack-divider { flex: 0 0 3px; height: 3px; background: color-mix(in srgb, var(--chrome-border) 60%, transparent); border-top: 1px solid var(--chrome-border); }
+.lib-stack-divider { flex: 0 0 20px; height: 20px; box-sizing: border-box; display: flex; align-items: center; padding: 0 8px; cursor: row-resize; overflow: hidden;
+  background: color-mix(in srgb, var(--chrome-fg) 4.5%, transparent); border-top: 1px solid color-mix(in srgb, var(--chrome-fg) 20%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--chrome-fg) 8%, transparent); }
+.lib-divider-label { display: flex; align-items: center; gap: 3px; min-width: 0; max-width: 100%; overflow: hidden; white-space: nowrap; font-size: 10px; font-weight: 600; color: var(--chrome-dim); }
+.lib-divider-label .lib-ficon { width: 13px; height: 13px; font-size: 9px; }
+.lib-divider-label .lib-ficon svg { width: 12px; height: 12px; }
+.lib-divider-text { overflow: hidden; text-overflow: ellipsis; }
+/* 一覧の上のボタンの並び: 一覧より少し濃い地と、下に細い線 */
+.lib-list-pane > .lib-head { background: color-mix(in srgb, var(--chrome-fg) 7.5%, transparent); border-bottom: 1px solid color-mix(in srgb, var(--chrome-fg) 8%, transparent); }
+.lib-storage { display: inline-flex; align-items: center; gap: 3px; max-width: 60%; min-height: 0; padding: 1px 4px; border: none; background: transparent; color: var(--chrome-dim); font-size: 11px; }
+.lib-storage:hover { background: var(--chrome-hover); }
+.lib-storage-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-storage-arrow { font-size: 9px; }
+.popup-remove { flex: 0 0 auto; margin: 0 -12px 0 10px; padding: 0 4px; border-radius: 8px; color: var(--chrome-dim); font-size: 10px; }
+.popup-item:hover .popup-remove { color: inherit; }
+.popup-remove:hover { background: color-mix(in srgb, currentColor 25%, transparent); }
+/* 新しく作ったもの: 小さな点と、上からすべり込む動き */
+.lib-new-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: 0 0 auto; }
+.lib-row > .lib-new-dot { position: absolute; left: 2px; top: 9px; }
+.lib-frow .lib-new-dot { margin-left: 3px; }
+@keyframes lib-slide-in { from { max-height: 0; opacity: 0; transform: translateY(-70%); } to { max-height: 60px; opacity: 1; transform: none; } }
+.lib-slide-in { animation: lib-slide-in .35s ease-out; overflow: hidden; }
+/* 空のときのしるし */
+.lib-empty-state { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 24px 8px 8px; color: var(--chrome-dim); text-align: center; }
+.lib-empty-icon { color: color-mix(in srgb, var(--chrome-fg) 35%, transparent); display: inline-flex; }
+.lib-empty-icon svg { stroke-width: 1.2; }
+.lib-empty-caption { font-size: 9px; font-weight: 600; letter-spacing: 1.2px; color: color-mix(in srgb, var(--chrome-fg) 40%, transparent); margin-bottom: 6px; }
+.lib-hint { font-size: 11px; color: var(--chrome-dim); text-align: center; }
+.lib-hint-link { color: var(--accent); text-decoration: underline; cursor: pointer; }
+.lib-folder-hint { padding: 10px 8px 4px; }
+@keyframes lib-hop { 0% { transform: none; } 18% { transform: translateY(-5px); } 36% { transform: none; } 50% { transform: translateY(-2.5px); } 64%, 100% { transform: none; } }
+.lib-hop { animation: lib-hop .75s infinite; color: var(--accent); }
+/* 読み込み中 */
+.lib-loading { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px 6px; font-size: 11px; color: var(--chrome-dim); }
+.lib-loading[hidden] { display: none; }
+.lib-spinner { width: 12px; height: 12px; border-radius: 50%; border: 2px solid color-mix(in srgb, var(--chrome-fg) 20%, transparent); border-top-color: var(--chrome-dim); animation: lib-spin .8s linear infinite; }
+@keyframes lib-spin { to { transform: rotate(360deg); } }
+.lib-trash.drop-hot { color: #ff3b30; background: color-mix(in srgb, #ff3b30 15%, transparent); }
+.lib-names { margin-top: 10px; font-size: 11px; text-align: left; max-width: 100%; }
+.lib-names > div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lib-place .check-row { display: flex; }
+@media (prefers-reduced-motion: reduce) { .lib-slide-in, .lib-hop { animation: none; } }
 .lib-empty { padding: 10px; color: var(--chrome-dim); }
 .lib-swatch { display: inline-block; width: 10px; height: 10px; border-radius: 50%; vertical-align: middle; }
 .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; }
@@ -596,3 +637,22 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 #ai-tab[hidden] { display: none; }
 #ai-tab svg { stroke: currentColor; flex: 0 0 auto; }
 #ai-tab svg path { fill: currentColor; fill-opacity: .3; }
+/* 公開の期間・期日の小窓 */
+.period-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.period-unit { display: inline-flex; align-items: center; gap: 2px; }
+.period-field { width: 54px; text-align: right; }
+.stepper { display: inline-flex; flex-direction: column; }
+.stepper button { min-height: 0; height: 11px; width: 16px; padding: 0; font-size: 7px; line-height: 1; border-radius: 2px; }
+.calendar { margin: 8px auto 4px; width: 238px; }
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.cal-title { font-weight: 600; }
+.cal-nav { min-height: 0; padding: 0 8px; }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-wd { font-size: 10px; color: var(--chrome-dim); }
+.cal-day { min-height: 0; height: 26px; padding: 0; border: none; background: transparent; border-radius: 13px; }
+.cal-day:hover:not(:disabled) { background: var(--chrome-hover); }
+.cal-day.today { font-weight: 700; }
+.cal-day.picked { background: var(--accent); color: var(--accent-fg); }
+.cal-day:disabled { opacity: 0.35; }
+.date-time-row { justify-content: center; }
+.share-form .share-listed { padding-left: 24px; font-size: 11.5px; }

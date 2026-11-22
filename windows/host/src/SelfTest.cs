@@ -94,7 +94,7 @@ namespace SatoEdit {
 
     async Task RunSteps() {
       // テキスト一覧の覚えごとは、点検の前のものに戻す (点検で開いたファイルを一覧に残さない)
-      var keep = new[] { "libraryFiles", "libraryPinned", "sharedLinks", "libraryFolderOrder", "libraryFolderIcons", "librarySelectedGroup", "libraryFolderExpanded", "lastPaperMode", "genkoHorizontal", "librarySeeded", "libraryVisible" };
+      var keep = new[] { "libraryFiles", "libraryPinned", "sharedLinks", "libraryFolderOrder", "libraryFolderIcons", "librarySelectedGroup", "libraryFolderExpanded", "lastPaperMode", "genkoHorizontal", "librarySeeded", "libraryVisible", "libraryCustomFolder", "libraryCustomRecent", "libraryExternalFolders", "libraryFolderPaneHeight", "libraryModes" };
       var saved = keep.ToDictionary(k => k, k => Json.Stringify(Store.Prefs[k]));
       try { await RunStepsInner(); } finally {
         foreach (var kv in saved) { Store.Prefs[kv.Key] = Json.Parse(kv.Value); }
@@ -582,7 +582,7 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
         if (Math.abs(lr.bottom - col.bottom) > 2) bad.push('一覧が残りの高さを使っていない');
         const dr = dv && dv.isConnected ? dv.getBoundingClientRect() : null;
         out.divider = dr ? Math.round(dr.height) : 0;
-        if (!dr || dr.height < 2 || dr.height > 5 || dr.top < fr.bottom - 1 || dr.bottom > lr.top + 1) bad.push('フォルダの欄と一覧の間に仕切りがない');
+        if (!dr || dr.height < 18 || dr.height > 22 || dr.top < fr.bottom - 1 || dr.bottom > lr.top + 1) bad.push('フォルダの欄と一覧の間に仕切りがない');
         // 開け閉めで高さが変わる
         const h0 = fr.height; const sub = (lib.tree || []).find(n => n.children && n.children.length);
         if (sub) { lib.toggleExpand('sub:' + sub.rel); await wait(100); out.folderHeightToggled = Math.round(fp.getBoundingClientRect().height); lib.toggleExpand('sub:' + sub.rel); await wait(100); }
@@ -849,6 +849,136 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
         await Js("(() => { const b = Array.from(document.querySelectorAll('.modal-buttons button')).find(x => x.textContent.includes('見直す') || x.textContent.includes('Review')); if (b) b.click(); })()");
         await Wait(500);
         return new JObj { { "asked", title }, { "selected", await Js("__app.active.editor.view.state.selection.ranges.map(r => __app.active.editor.view.state.sliceDoc(r.from, r.to))") } };
+      });
+      // テキスト一覧の新しい動き: 空のときのしるし・新しいしるし・区切りのバー・任意フォルダ・開いたフォルダ・公開共有中・名前の変更・削除で空のテキストに・公開の期限
+      var customDir = Path.Combine(work, "custom-root");
+      var extDir = Path.Combine(work, "ext-folder");
+      Directory.CreateDirectory(Path.Combine(customDir, "子フォルダ"));
+      File.WriteAllText(Path.Combine(customDir, "任意.txt"), "任意フォルダのテキスト", new UTF8Encoding(false));
+      File.WriteAllText(Path.Combine(customDir, "子フォルダ", "中.txt"), "中のテキスト", new UTF8Encoding(false));
+      Directory.CreateDirectory(Path.Combine(extDir, "下"));
+      File.WriteAllText(Path.Combine(extDir, "下", "外.txt"), "開いたフォルダのテキスト", new UTF8Encoding(false));
+      await Js("(() => { __app.prefs.libraryVisible = true; __app.applyLibrary(); __app.library.arrange(); })()");
+      await Wait(500);
+      await Step("libraryEmptyAndNew", async () => await Js(@"(async () => { const lib = __app.library, api = window.api; const out = {};
+        const fail = m => { throw new Error('libraryEmptyAndNew: ' + m + ' ' + JSON.stringify(out)); };
+        const wait = ms => new Promise(r => setTimeout(r, ms));
+        await api.libraryCreateFolder('空のフォルダ', ''); await lib.reload(); lib.select('sub:空のフォルダ'); await wait(200);
+        const es = document.querySelector('.lib-list .lib-empty-state');
+        out.empty = es ? es.innerText.replace(/\s+/g, ' ') : null;
+        if (!es || !out.empty.includes('NO DATA')) fail('empty state');
+        const link = es.querySelector('.lib-hint-link'); out.hint = link && link.textContent;
+        link.dispatchEvent(new MouseEvent('mouseenter')); out.hop = lib.newTextButton.classList.contains('lib-hop');
+        link.dispatchEvent(new MouseEvent('mouseleave')); out.hopStop = !lib.newTextButton.classList.contains('lib-hop');
+        if (!out.hop || !out.hopStop) fail('hop');
+        out.divider = lib.dividerLabel.textContent; if (!out.divider.includes('空のフォルダ')) fail('divider');
+        out.zeroShown = Array.from(document.querySelectorAll('.lib-count')).some(c => c.textContent === '0'); if (out.zeroShown) fail('zero count');
+        out.folderDot = !!document.querySelector('.lib-frow[data-key=""sub:空のフォルダ""] .lib-new-dot'); if (!out.folderDot) fail('folder dot');
+        lib.query = 'zzzqqqxxx'; lib.renderList(); out.noMatch = (document.querySelector('.lib-empty-state') || {}).innerText; lib.query = ''; lib.renderList();
+        if (!String(out.noMatch).includes('NO MATCH')) fail('no match');
+        return out; })()"));
+      await Shot("14-library-empty");
+      await Step("libraryNewMark", async () => await Js(@"(async () => { const lib = __app.library; const out = {};
+        const fail = m => { throw new Error('libraryNewMark: ' + m + ' ' + JSON.stringify(out)); };
+        const wait = ms => new Promise(r => setTimeout(r, ms));
+        await lib.createBlank(); await wait(400);
+        out.dot = !!document.querySelector('.lib-row .lib-new-dot'); if (!out.dot) fail('file dot');
+        out.blankPath = __app.active.path;
+        out.trashButton = !!document.querySelector('.lib-list-pane .lib-head .lib-trash');
+        out.folderHead = !!document.querySelector('.lib-folder-pane .lib-head .lib-newfolder') && !document.querySelector('.lib-add');
+        out.storage = lib.storageButton.textContent;
+        return out; })()"));
+      await Shot("14-library-new");
+      await Step("libraryDeleteOpen", async () => {
+        // 開いているテキストのフォルダを削除: タブは閉じずに空の新しいテキストになる
+        var before = await Js("__app.tabs.length");
+        await Js("(() => { __app.library.trashFolders(['空のフォルダ']); })()");
+        await Wait(500);
+        var title = await Js("(document.querySelector('.modal-title') || {}).textContent || ''");
+        await Js("(() => { const b = document.querySelector('.modal-buttons button.primary'); if (b) b.click(); })()");
+        await Wait(1500);
+        var after = await Js("({ tabs: __app.tabs.length, path: __app.active.path, text: __app.active.getText(), folder: !!__app.library.findRel('空のフォルダ') })") as JObj;
+        if (after == null || after["path"] != null || after.Bool("folder") || Convert.ToInt32(after["tabs"]) != Convert.ToInt32(before)) errors.Add("libraryDeleteOpen: " + Json.Stringify(after));
+        return new JObj { { "asked", title }, { "after", after } };
+      });
+      await Step("libraryCustomRoot", async () => await Js(@"(async () => { const lib = __app.library; const out = {};
+        const fail = m => { throw new Error('libraryCustomRoot: ' + m + ' ' + JSON.stringify(out)); };
+        const local = lib.root;
+        await lib.useCustom(" + Q(customDir) + @");
+        out.root = lib.root; out.name = lib.rootName; out.storage = lib.storageButton.textContent;
+        out.tree = lib.tree.map(n => n.rel).join(',');
+        out.items = lib.items.map(i => (i.group === null ? '?' : i.group) + '/' + i.name).filter(x => !x.startsWith('?')).sort().join(',');
+        out.recent = (__app.prefs.libraryCustomRecent || []).length;
+        out.rootRow = (document.querySelector('.lib-frow[data-key=""root""] .lib-fname') || {}).textContent;
+        if (out.name !== 'custom-root' || out.tree !== '子フォルダ' || out.items !== '/任意.txt,子フォルダ/中.txt' || out.rootRow !== 'custom-root') fail('custom');
+        lib.select('sub:子フォルダ'); out.divider = lib.dividerLabel.textContent;
+        await lib.useLocal(); out.back = lib.root === local && !lib.customName;
+        if (!out.back) fail('back to local');
+        // 開いたほかの場所のフォルダ (中のフォルダもたどれる)
+        lib.setPref('libraryExternalFolders', [" + Q(extDir) + @"]); await lib.reload();
+        lib.select('ext:' + " + Q(extDir) + @"); await new Promise(r => setTimeout(r, 200));
+        out.ext = lib.rows.map(r => r.name).join(','); out.extTree = lib.extTree.map(n => n.name + ':' + n.children.map(c => c.name).join('|')).join(',');
+        if (out.ext !== '外.txt' || out.extTree !== 'ext-folder:下') fail('external');
+        await lib.removeExternalFolder(" + Q(extDir) + @"); out.extGone = lib.extTree.length === 0;
+        return out; })()"));
+      await Step("libraryRenameShared", async () => await Js(@"(async () => { const lib = __app.library, api = window.api, s = __app.share; const out = {};
+        const fail = m => { throw new Error('libraryRenameShared: ' + m + ' ' + JSON.stringify(out)); };
+        const file = " + Q(Path.Combine(lib, "改名前.txt")) + @";
+        await api.writeFile({ path: file, text: '名前を変える', encoding: 'utf8', lineEnding: 'crlf', mode: 'genko', versionNow: true });
+        await new Promise(r => setTimeout(r, 500));
+        lib.setPinned(true, file);
+        // 公開共有中 (リンクで公開しているものがあるときだけ出る)
+        s.records = [{ id: 'selftest-x', url: 'https://docs.satoru.net/r/selftest-x', token: 'x', title: 't', visibility: 'unlisted', created: 0, path: file }].concat(s.records);
+        await lib.reload(); out.sharedRow = !!document.querySelector('.lib-frow[data-key=""shared""]');
+        await __app.openPath(file, { browse: true });
+        const to = await lib.renameTo(file, '改名後');
+        out.to = to && to.split('\\').pop(); out.tab = __app.active.path === to; out.pinned = lib.isPinned(to);
+        out.mode = await api.libraryGetMode(to); out.versions = (await api.versionList(to)).length; out.record = !!s.recordFor(to);
+        lib.select('shared'); out.sharedRows = lib.rows.map(r => r.name).join(',');
+        const dup = await api.libraryDuplicate(to, '{name} のコピー', '{name} のコピー {n}');
+        const again = await lib.renameTo(dup.path, '改名後.txt'); out.exists = (document.querySelector('.modal-title') || {}).textContent; out.again = again;
+        const b = document.querySelector('.modal-buttons button'); if (b) b.click();
+        s.records = s.records.filter(r => r.id !== 'selftest-x');
+        lib.setPinned(false, to); lib.select('all');
+        if (out.to !== '改名後.txt' || !out.tab || !out.pinned || out.mode !== 'genko' || !out.versions || !out.record || !out.sharedRow || out.sharedRows !== '改名後.txt' || again !== null) fail('rename');
+        return out; })()".Replace("const again = await lib.renameTo(dup.path, '改名後.txt');", "const pending = lib.renameTo(dup.path, '改名後.txt'); await new Promise(r => setTimeout(r, 400));").Replace("out.again = again;", "").Replace("const b = document.querySelector('.modal-buttons button'); if (b) b.click();", "const b = document.querySelector('.modal-buttons button'); if (b) b.click(); const again = await pending; out.again = again;")));
+      await Step("shareExpiry", async () => await Js(@"(() => { const s = __app.share; const out = {};
+        const now = new Date(2026, 10, 22, 10, 0, 0).getTime();
+        out.today = s.expiryFor(-3, now) === new Date(2026, 10, 22, 23, 59, 59).getTime();
+        out.tomorrow = s.expiryFor(-4, now) === new Date(2026, 10, 23, 23, 59, 59).getTime();
+        out.period = s.expiryFor(-2, now, { period: 3 * 86400 + 4 * 3600 }) === now + (3 * 86400 + 4 * 3600) * 1000;
+        out.date = s.expiryFor(-1, now, { date: now + 5000 }) === now + 5000;
+        out.days = s.expiryFor(7, now) === null;
+        out.text = s.periodText(3 * 86400 + 4 * 3600);
+        out.order = s.dayChoices.map(c => c[0]).join(',');
+        if (!out.today || !out.tomorrow || !out.period || !out.date || !out.days || out.order !== '-3,-4,1,3,7,30,365,0,-2,-1') throw new Error('shareExpiry ' + JSON.stringify(out));
+        return out; })()"));
+      await Step("shareExpiryForm", async () => {
+        await Js("(() => { window.__form = __app.share.form({ title: '点検' }); })()");
+        await Wait(500);
+        var opts = await Js("Array.from(document.querySelectorAll('.share-form select option')).map(o => o.textContent)");
+        // 「みんなのメモ」に掲載: 「公開」を選んでいるときだけ出る
+        var listed = await Js("(() => { const f = document.querySelector('.share-form'); const row = f.querySelector('.share-listed'); const r = f.querySelectorAll('input[type=radio]');"
+          + " r[1].click(); const a = row.hidden; r[0].click(); const b = row.hidden; r[1].click(); return { hiddenUnlisted: a, shownPublic: !b }; })()") as JObj;
+        if (listed == null || !listed.Bool("hiddenUnlisted") || !listed.Bool("shownPublic")) errors.Add("shareListed: " + Json.Stringify(listed));
+        // 期間を指定… を選ぶと小窓が出る。やめると前の選び方に戻る
+        await Js("(() => { const sel = document.querySelector('.share-form select'); sel.value = '-2'; sel.dispatchEvent(new Event('change')); })()");
+        await Wait(500);
+        var periodTitle = await Js("(Array.from(document.querySelectorAll('.modal-title')).pop() || {}).textContent");
+        var fields = await Js("document.querySelectorAll('.period-dialog .period-field').length");
+        await Shot("15-share-period");
+        await Js("(() => { const b = Array.from(document.querySelectorAll('.period-dialog .modal-buttons button')).pop(); b.click(); })()");
+        await Wait(300);
+        var back = await Js("document.querySelector('.share-form select').value");
+        await Js("(() => { const sel = document.querySelector('.share-form select'); sel.value = '-1'; sel.dispatchEvent(new Event('change')); })()");
+        await Wait(500);
+        var days = await Js("document.querySelectorAll('.date-dialog .cal-day').length");
+        await Js("(() => { const b = Array.from(document.querySelectorAll('.date-dialog .modal-buttons button')).pop(); b.click(); })()");
+        await Wait(300);
+        await Js("(() => { const b = Array.from(document.querySelectorAll('.modal-buttons button')).pop(); b.click(); })()");
+        await Wait(300);
+        if (Convert.ToInt32(fields) != 4 || Convert.ToInt32(days) < 28 || !(back is string bs && bs != "-2" && bs != "-1")) errors.Add("shareExpiryForm: " + fields + " " + days + " " + back);
+        return new JObj { { "options", opts }, { "listed", listed }, { "period", periodTitle }, { "fields", fields }, { "back", back }, { "calendarDays", days } };
       });
       if (Environment.GetEnvironmentVariable("SATOEDIT_NO_NET") == null) {
         await Step("shareServer", async () => await Js(@"(async () => { const s = __app.share; const out = {};

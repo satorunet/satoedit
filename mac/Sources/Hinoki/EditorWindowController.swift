@@ -588,10 +588,12 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     private lazy var libraryDivider: NSView = {
         let v = LibraryDividerBar()
         v.translatesAutoresizingMaskIntoConstraints = false
-        v.heightAnchor.constraint(equalToConstant: 3).isActive = true
         return v
     }()
     private weak var libraryFitHeight: NSLayoutConstraint?
+    private weak var libraryAutoCap: NSLayoutConstraint?
+    /// 上下 2 段のとき、フォルダの欄の高さ (区切りのバーで変えたとき)
+    static let folderPaneHeightKey = "libraryFolderPaneHeight"
 
     /// 左右 (フォルダの欄が左) / 上下 (フォルダの欄が上、テキストの一覧が下) に並べ直す
     private func arrangeLibraryPanels() {
@@ -604,23 +606,56 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
         if TextLibrary.oneColumn {
             // フォルダの欄の幅は一覧に合わせ、高さは 1/3 くらい
             TextLibrary.widthConstraint(of: folderListPanel)?.isActive = false
+            TextLibrary.setResizeLink(folderListPanel, to: libraryPanel)   // フォルダの欄の右端をつかんでも、幅を変えられる
             // 上にフォルダの欄、下にテキストの一覧
             libraryColumn.addArrangedSubview(folderListPanel)
             libraryColumn.addArrangedSubview(libraryDivider)   // フォルダとテキストの間の区切りのバー
             libraryColumn.addArrangedSubview(libraryPanel)
             editorArea.insertArrangedSubview(libraryColumn, at: 0)
             // フォルダの欄はフォルダの数に合わせた高さ (多いときは半分まで)。残りは全部テキストの一覧
-            let fit = folderListPanel.heightAnchor.constraint(equalToConstant: max(80, folderListPanel.contentHeight))
-            fit.priority = .defaultHigh
+            // 区切りのバーをつかんで動かすと、その高さを覚える (ダブルクリックで、フォルダの数に合わせた高さに戻す)
+            let manual = UserDefaults.standard.object(forKey: Self.folderPaneHeightKey) as? Double
+            let fit = folderListPanel.heightAnchor.constraint(equalToConstant: manual.map { CGFloat($0) } ?? max(80, folderListPanel.contentHeight))
+            // ウインドウの高さを変える力 (510) より弱くする: ウインドウはいつでも縮められ、フォルダの欄はそれに合わせて縮む
+            fit.priority = NSLayoutConstraint.Priority(499)
             libraryFitHeight = fit
+            let autoCap = folderListPanel.heightAnchor.constraint(lessThanOrEqualTo: libraryColumn.heightAnchor, multiplier: 0.5)
+            libraryAutoCap = autoCap
             libraryColumnConstraints = [
                 fit,
-                folderListPanel.heightAnchor.constraint(lessThanOrEqualTo: libraryColumn.heightAnchor, multiplier: 0.5),
-                folderListPanel.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
+                folderListPanel.heightAnchor.constraint(lessThanOrEqualTo: libraryColumn.heightAnchor, multiplier: 0.5),   // 半分まで (入りきらないフォルダは中でスクロール)
+                folderListPanel.heightAnchor.constraint(greaterThanOrEqualToConstant: 50),
                 folderListPanel.widthAnchor.constraint(equalTo: libraryPanel.widthAnchor),
             ]
             NSLayoutConstraint.activate(libraryColumnConstraints)
-            folderListPanel.onContentHeightChange = { [weak self] h in self?.libraryFitHeight?.constant = max(80, h) }
+            autoCap.isActive = manual == nil
+            folderListPanel.onContentHeightChange = { [weak self] h in
+                guard UserDefaults.standard.object(forKey: Self.folderPaneHeightKey) == nil else { return }
+                self?.libraryFitHeight?.constant = max(80, h)
+            }
+            if let bar = libraryDivider as? LibraryDividerBar {
+                var start: CGFloat = 0
+                bar.onDragBegan = { [weak self] in start = self?.folderListPanel.frame.height ?? 0 }
+                bar.onDrag = { [weak self] dy in
+                    guard let self = self else { return }
+                    let maxH = self.libraryColumn.frame.height * 0.5
+                    let h = min(maxH, max(50, start + dy))
+                    self.libraryAutoCap?.isActive = false
+                    self.libraryFitHeight?.constant = h
+                    UserDefaults.standard.set(Double(h), forKey: Self.folderPaneHeightKey)
+                }
+                bar.onDoubleClick = { [weak self] in
+                    guard let self = self else { return }
+                    UserDefaults.standard.removeObject(forKey: Self.folderPaneHeightKey)
+                    self.libraryAutoCap?.isActive = true
+                    NSAnimationContext.runAnimationGroup { c in
+                        c.duration = 0.2
+                        c.allowsImplicitAnimation = true
+                        self.libraryFitHeight?.constant = max(80, self.folderListPanel.contentHeight)
+                        self.libraryColumn.layoutSubtreeIfNeeded()
+                    }
+                }
+            }
         } else {
             TextLibrary.widthConstraint(of: folderListPanel)?.isActive = true
             editorArea.insertArrangedSubview(folderListPanel, at: 0)
@@ -2823,10 +2858,115 @@ final class AITabButton: NSButton {
 /// テキストの一覧とフォルダの欄の間のバー: 細い帯に、上の線
 final class LibraryDividerBar: NSView {
     override var isFlipped: Bool { true }
+    /// つかんで上下に動かす (dy: 下へ動かした量) / ダブルクリック
+    var onDragBegan: (() -> Void)?
+    var onDrag: ((CGFloat) -> Void)?
+    var onDoubleClick: (() -> Void)?
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .resizeUpDown) }
+    override func mouseDown(with event: NSEvent) {
+        if event.clickCount == 2 { onDoubleClick?(); return }
+        let y0 = event.locationInWindow.y
+        onDragBegan?()
+        while let e = window?.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) {
+            if e.type == .leftMouseUp { break }
+            onDrag?(y0 - e.locationInWindow.y)
+        }
+    }
+    /// 選んでいるフォルダの名前 (下のテキストがどのフォルダのものかわかるように)
+    private let label = NSTextField(labelWithString: "")
+    private lazy var height = heightAnchor.constraint(equalToConstant: 20)
+
+    override init(frame: NSRect) {
+        super.init(frame: frame)
+        label.font = .systemFont(ofSize: 10, weight: .semibold)
+        label.textColor = .secondaryLabelColor
+        label.lineBreakMode = .byTruncatingMiddle
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            height,
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -8),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor, constant: 0.5),
+        ])
+        NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: TextLibrary.selectionDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(refresh), name: TextLibrary.didChange, object: nil)
+        refresh()
+    }
+    required init?(coder: NSCoder) { fatalError() }
+
+    @objc private func refresh() {
+        let key = TextLibrary.selectedGroup
+        var symbol = "folder", text: String
+        parentName = ""
+        if key == "all" { symbol = "tray.full"; text = L("すべて") }
+        else if key == "root" { text = TextLibrary.rootName }
+        else if key == "other" { text = L("ほかの場所") }
+        else if key == "shared" { text = L("公開共有中") }
+        else if key.hasPrefix("sub:") {
+            let rel = String(key.dropFirst(4))
+            symbol = TextLibrary.folderIcon(rel).symbol
+            // 深いときは、ひとつ上の親と自分の名前だけ (長くなって崩れないように)
+            let parts = rel.split(separator: "/").map(String.init)
+            text = parts.last ?? rel
+            if parts.count > 1 { parentName = parts[parts.count - 2] }
+        } else if key.hasPrefix("ext:") { text = (String(key.dropFirst(4)) as NSString).lastPathComponent }
+        else if let keys = TextLibrary.multiKeys(key) { symbol = "folder.fill"; text = L("{0} 個のフォルダ", keys.count) }
+        else { text = "" }
+        iconSymbol = symbol
+        currentName = text
+        label.toolTip = L("下のテキストは「{0}」の中のものです", parentName.isEmpty ? text : parentName + " › " + text)
+        fit()
+    }
+
+    private var iconSymbol = "folder", currentName = "", parentName = ""
+    private var lastWidth: CGFloat = -1
+
+    /// 「親 › 自分」の文字。入りきらないときは親を「..」で縮め、自分の名前を残す
+    private func make(_ parent: String?) -> NSAttributedString {
+        let t = NSMutableAttributedString()
+        if let img = NSImage(systemSymbolName: iconSymbol, accessibilityDescription: nil) {
+            let a = NSTextAttachment()
+            a.image = img.withSymbolConfiguration(.init(pointSize: 9, weight: .regular))
+            t.append(NSAttributedString(attachment: a))
+            t.append(NSAttributedString(string: " "))
+        }
+        if let p = parent { t.append(NSAttributedString(string: p + " › ")) }
+        t.append(NSAttributedString(string: currentName))
+        let tail = NSMutableParagraphStyle()
+        tail.lineBreakMode = .byTruncatingTail
+        t.addAttributes([.font: label.font!, .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: tail],
+                        range: NSRange(location: 0, length: t.length))
+        return t
+    }
+    private func fit() {
+        let room = bounds.width - 16
+        guard !parentName.isEmpty, room > 0 else { label.attributedStringValue = make(nil); return }
+        let full = make(parentName)
+        if full.size().width + 4 <= room { label.attributedStringValue = full; return }
+        // 親の名前を後ろから縮めていく (いちばん短くて「..」だけ)
+        var p = parentName
+        while !p.isEmpty {
+            p.removeLast()
+            let a = make(p + "..")
+            if a.size().width + 4 <= room { label.attributedStringValue = a; return }
+        }
+        let dots = make("..")
+        label.attributedStringValue = dots.size().width + 4 <= room ? dots : make(nil)
+    }
+    override func layout() {
+        super.layout()
+        if bounds.width != lastWidth { lastWidth = bounds.width; fit() }
+    }
+
     override func draw(_ dirtyRect: NSRect) {
-        NSColor.separatorColor.withAlphaComponent(0.6).setFill()
+        // 薄い地に、上下の細い線 (上のフォルダの欄との境目をはっきり)
+        NSColor.labelColor.withAlphaComponent(0.045).setFill()
         bounds.fill()
-        NSColor.separatorColor.setFill()
+        NSColor.labelColor.withAlphaComponent(0.2).setFill()   // 上の線 (はっきり)
         NSRect(x: 0, y: 0, width: bounds.width, height: 1).fill()
+        NSColor.labelColor.withAlphaComponent(0.08).setFill()  // 下の線 (うすく)
+        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
     }
 }

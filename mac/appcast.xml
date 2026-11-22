@@ -5,19 +5,24 @@
     <link>https://github.com/satorunet/satoedit</link>
     <language>ja</language>
     <item>
-      <title>さとるエディタ 1.0.1</title>
-      <pubDate>Sat, 21 Nov 2026 13:06:36 +0000</pubDate>
-      <sparkle:version>1.0.1</sparkle:version>
-      <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
+      <title>さとるエディタ 1.0.2</title>
+      <pubDate>Sun, 22 Nov 2026 02:37:17 +0000</pubDate>
+      <sparkle:version>1.0.2</sparkle:version>
+      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.1</sparkle:fullReleaseNotesLink>
-      <description><![CDATA[<h2>さとるエディタ 1.0.1 (β テスト版)</h2>
+      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.2</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>さとるエディタ 1.0.2 (β)</h2>
 <ul>
-<li>自動アップデートに対応 (新しい版が出ると知らせて、そのまま入れ替え)</li>
-<li>テキスト一覧: 上にフォルダ、下にテキストの一覧。フォルダの数に合わせて高さを合わせ、間に区切りのバー</li>
-<li>原稿用紙のタブを閉じたときに落ちることがあったのを直した</li>
+<li>テキスト一覧: ファイルやフォルダをドラッグで移動、ゴミ箱ボタン、Delete キーで削除</li>
+<li>置き場所を ▼ で切り替え (ローカル / iCloud / 任意フォルダ)</li>
+<li>新しく作ったファイル・フォルダに目じるし、空のフォルダの案内</li>
+<li>フォルダとテキストの境目をドラッグで高さ調整、選んでいるフォルダ名を表示</li>
+<li>ファイル &gt; 名前を変更…</li>
+<li>公開の期限: 今日まで・明日まで・3 日、期間や期日を自由に指定</li>
+<li>公開するとき「みんなのメモ」に載せられるように</li>
+<li>フォルダの読み込みを速く</li>
 </ul>]]></description>
-      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.1/SatoruEditor-1.0.1-mac.dmg" sparkle:edSignature="D3Qa1ONUkX1DZOb9MNNob8bHTdW3AScJX2VJ5y2wnB1E+ZoGBV2+04XhCKyr2Ua9ahncS/O/XSUJqA9RSa9GDg==" length="7120926" type="application/octet-stream"/>
+      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.2/SatoruEditor-1.0.2-mac.dmg" sparkle:edSignature="vdaKKYg/WwBLFw57PiAIe0ueiDoj0ysQf1muzdWqzMZudZXpdS0b0phN9RKSTqam/Q6knPifVcAXz82P4EQSCg==" length="7309735" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>

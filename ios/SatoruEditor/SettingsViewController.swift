@@ -1,18 +1,20 @@
 import UIKit
 import HinokiCore
 
-/// 設定: 言語・書く画面の見た目・AI・公開
+/// 設定: 言語・保存場所・書く画面の見た目・AI・公開
 final class SettingsViewController: UITableViewController {
     private enum Row {
-        case language, font, size, lineNumbers, furigana, autoFormat, ai, links, privacy, folder, version
+        case language, location, font, size, lineNumbers, furigana, autoFormat, ai, links, privacy, folder, version
     }
-    private let sections: [(String?, [Row])] = [
+    private static let placeSection = "保存場所"
+    private var sections: [(String?, [Row])] { [
         (nil, [.language]),
+        (Self.placeSection, [.location]),
         ("書く", [.font, .size, .lineNumbers, .furigana, .autoFormat]),
         ("AI アシスト", [.ai]),
         ("リンクで公開共有", [.links, .privacy]),
         ("このバージョン", [.folder, .version]),
-    ]
+    ] }
 
     init() { super.init(style: .insetGrouped) }
     required init?(coder: NSCoder) { fatalError() }
@@ -20,6 +22,7 @@ final class SettingsViewController: UITableViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         title = L("設定")
+        NotificationCenter.default.addObserver(tableView!, selector: #selector(UITableView.reloadData), name: Library.didChange, object: nil)
         navigationItem.rightBarButtonItem = UIBarButtonItem(title: L("完了"), style: .done, target: self, action: #selector(close))
     }
 
@@ -35,7 +38,19 @@ final class SettingsViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, numberOfRowsInSection s: Int) -> Int { sections[s].1.count }
 
     override func tableView(_ tableView: UITableView, titleForFooterInSection s: Int) -> String? {
-        s == sections.count - 1 ? L("ファイル App の「このiPhone内」>「さとるエディタ」にあります。") : nil
+        if sections[s].0 == Self.placeSection {
+            switch LibraryLocation.iCloud {
+            case .available:
+                return LibraryLocation.isICloud
+                    ? L("Mac のさとるエディタと同じテキストが見られます。ファイル App では iCloud Drive の「さとるエディタ」にあります。一覧の上のタブで「ローカル」に切り替えられます。")
+                    : L("一覧の上のタブで iCloud に切り替えられます。")
+            case .unavailable: return L("iCloud が使えないので、この iPhone の中に保存しています。iPhone の設定で iCloud にサインインし、iCloud Drive をオンにすると、Mac と同じテキストが見られます。")
+            case .checking: return nil
+            }
+        }
+        guard s == sections.count - 1 else { return nil }
+        return LibraryLocation.isICloud ? L("ファイル App の「iCloud Drive」>「さとるエディタ」にあります。")
+            : L("ファイル App の「このiPhone内」>「さとるエディタ」にあります。")
     }
 
     private func toggle(_ title: String, _ on: Bool, _ action: @escaping (Bool) -> Void) -> UITableViewCell {
@@ -52,13 +67,19 @@ final class SettingsViewController: UITableViewController {
 
     override func tableView(_ tableView: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
         let row = sections[ip.section].1[ip.row]
-        let c = UITableViewCell(style: .value1, reuseIdentifier: nil)
+        let c = UITableViewCell(style: row == .location ? .subtitle : .value1, reuseIdentifier: nil)
         switch row {
         case .language:
             c.textLabel?.text = L("言語") + " / Language"
             let v = UserDefaults.standard.string(forKey: "language") ?? "auto"
             c.detailTextLabel?.text = v == "ja" ? "日本語" : v == "en" ? "English" : L("自動 (iPhone の設定に合わせる)")
             c.accessoryType = .disclosureIndicator
+        case .location:
+            c.textLabel?.text = L("いまの場所")
+            c.detailTextLabel?.text = LibraryLocation.displayName
+            c.detailTextLabel?.numberOfLines = 0
+            c.imageView?.image = UIImage(systemName: LibraryLocation.isICloud ? "icloud" : "iphone")
+            c.selectionStyle = .none
         case .font:
             c.textLabel?.text = L("文字の形")
             c.detailTextLabel?.text = ["mincho": L("明朝"), "mono": L("等幅")][Prefs.fontStyle] ?? L("ゴシック")

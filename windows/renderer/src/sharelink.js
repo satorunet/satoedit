@@ -56,13 +56,39 @@ function sha256(str) {
 }
 export const contentHash = (text, mode) => sha256(mode + '\u0000' + text);
 
-const DAY_CHOICES = [[1, '1 日'], [7, '7 日'], [30, '30 日'], [365, '1 年'], [0, '期限なし'], [-1, '日時を指定…']];
+/// 公開の期限の選び方 (Mac 版と同じ順)。-3 = 今日まで、-4 = 明日まで (その日の 23:59:59 まで)、-2 = 期間を指定 (何日・何時間・何分・何秒)、-1 = 期日を指定 (カレンダーで、いつまで)
+export const DAY_CHOICES = [[-3, '今日まで'], [-4, '明日まで'], [1, '1 日'], [3, '3 日'], [7, '7 日'], [30, '30 日'], [365, '1 年'], [0, '期限なし'], [-2, '期間を指定…'], [-1, '期日を指定…']];
 const KINDS = ['public', 'unlisted', 'password'];
 const pad = n => String(n).padStart(2, '0');
-const localInput = ms => { const d = new Date(ms); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+/// 2026/11/22 13:05:09
+const stampSec = ms => { const d = new Date(ms); return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; };
+
+/// 選んだ期限の日時 (ミリ秒)。日数で決めるもの (1 日・7 日…)・期限なしは null (サーバが日数で決める)。
+/// period: 「期間を指定」の秒 (公開するときから数える)、date: 「期日を指定」の日時 (ミリ秒)
+export function expiryFor(choice, now = Date.now(), { period = 0, date = null } = {}) {
+  if (choice === -1) return date;
+  if (choice === -2) return now + period * 1000;
+  if (choice === -3 || choice === -4) {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    d.setDate(d.getDate() + (choice === -3 ? 1 : 2));
+    return d.getTime() - 1000; // その日の 23:59:59
+  }
+  return null;
+}
+/// 「3 日 4 時間 5 分」のような書き方 (0 のところは出さない)
+export function periodText(sec) {
+  const n = Math.floor(sec);
+  const parts = [[Math.floor(n / 86400), '日'], [Math.floor(n % 86400 / 3600), '時間'], [Math.floor(n % 3600 / 60), '分'], [n % 60, '秒']].filter(p => p[0] > 0).map(p => p[0] + ' ' + t(p[1]));
+  return parts.length ? parts.join(' ') : t('0 秒');
+}
 
 export class ShareLink {
-  constructor(app) { this.app = app; this.api = app.api; this.asked = new Set(); }
+  constructor(app) {
+    this.app = app; this.api = app.api; this.asked = new Set();
+    // 自己点検から使う
+    this.expiryFor = expiryFor; this.periodText = periodText; this.dayChoices = DAY_CHOICES;
+  }
 
   get records() { return Array.isArray(this.app.prefs.sharedLinks) ? this.app.prefs.sharedLinks : []; }
   set records(list) { this.app.prefs.sharedLinks = list; this.api.setPref('sharedLinks', list); this.app.pushMenuState(); if (this.app.library) this.app.library.changed(); }
@@ -235,24 +261,46 @@ export class ShareLink {
     let visibility = editing ? editing.visibility : (prefs.shareVisibility || 'unlisted');
     const labels = [t('公開 (だれでも読める・検索にも出る)'), t('リンクを知っている人だけ'), t('パスワードを知っている人だけ')];
     const password = h('input', { type: 'password', placeholder: editing && editing.visibility === 'password' ? t('変えないときは空のまま') : t('パスワード (4 文字以上)'), style: { width: '220px' } });
+    // 「公開」のときだけ: サイトの「みんなのメモ」の一覧に載せてよいか (はじめは載せない)
+    const listed = h('input', { type: 'checkbox', checked: !!(editing && editing.listed) });
+    const listedRow = h('label', { class: 'check-row indent share-listed' }, listed, t('「みんなのメモ」に掲載 OK (サイトの一覧に載ります)'));
     const radios = KINDS.map((k, i) => {
       const r = h('input', { type: 'radio', name: 'share-vis', value: k, checked: k === visibility });
       r.addEventListener('change', () => { visibility = k; if (!editing) this.app.setPref('shareVisibility', k); refresh(); });
       return h('label', { class: 'check-row' }, r, labels[i]);
     });
+    radios.splice(1, 0, listedRow);
     const days = h('select', {});
     if (editing) days.append(h('option', { value: 'keep' }, editing.expiresMs ? t('変えない ({when} まで)', { when: stamp(editing.expiresMs) }) : t('変えない (期限なし)')));
     for (const [n, label] of DAY_CHOICES) days.append(h('option', { value: String(n) }, t(label)));
     days.value = editing ? 'keep' : String(DAY_CHOICES.some(c => c[0] === prefs.shareDays) ? prefs.shareDays : 30);
-    const when = h('input', { type: 'datetime-local', value: localInput(editing && editing.expiresMs > Date.now() ? editing.expiresMs : Date.now() + 7 * 86400000), min: localInput(Date.now() + 5 * 60000) });
+    // 期間 (秒) と期日 (ミリ秒): 「期間を指定…」「期日を指定…」で決めたもの
+    let period = 0, date = editing && editing.expiresMs > Date.now() ? editing.expiresMs : Date.now() + 7 * 86400000;
+    let last = days.value;
     const history = h('input', { type: 'checkbox', checked: editing ? editing.keepHistory !== false : prefs.shareKeepHistory !== false });
     const clear = h('input', { type: 'checkbox' });
     const clearRow = h('label', { class: 'check-row', hidden: !editing }, clear, t('今ある変更履歴を消す'));
-    days.addEventListener('change', () => { if (!editing && Number(days.value) >= 0) this.app.setPref('shareDays', Number(days.value)); refresh(); });
+    days.addEventListener('change', async () => {
+      const opt = days.selectedOptions[0];
+      if (days.value === '-2') {
+        const sec = await askPeriod(period);
+        if (sec === null) { days.value = last; return; }   // やめたら前の選び方に戻す
+        period = sec;
+        opt.textContent = t('期間: {what}', { what: periodText(sec) });
+      } else if (days.value === '-1') {
+        const d = await askDate(date);
+        if (d === null) { days.value = last; return; }
+        date = d;
+        opt.textContent = t('期日: {when} まで', { when: stampSec(d) });
+      }
+      last = days.value;
+      if (!editing && Number(days.value) >= 0) this.app.setPref('shareDays', Number(days.value));
+      refresh();
+    });
     history.addEventListener('change', () => { if (!editing) this.app.setPref('shareKeepHistory', history.checked); if (history.checked) clear.checked = false; refresh(); });
     const refresh = () => {
       password.disabled = visibility !== 'password';
-      when.disabled = days.value !== '-1';
+      listedRow.hidden = visibility !== 'public';
       // 残さない設定にすると、今ある履歴も消える
       if (!history.checked) clear.checked = true;
       clear.disabled = !history.checked;
@@ -263,7 +311,7 @@ export class ShareLink {
       h('div', { class: 'form-row' }, h('label', {}, t('題名')), titleField),
       ...radios,
       h('div', { class: 'form-row indent' }, password),
-      h('div', { class: 'form-row' }, h('label', {}, t('公開の期限')), days, when),
+      h('div', { class: 'form-row' }, h('label', {}, t('公開の期限')), days),
       h('label', { class: 'check-row' }, history, t('変更履歴を残す (更新したとき、前の内容もページから見られる)')),
       clearRow,
       h('div', { class: 'dim small top-gap' }, t('公開をやめる・設定を変えるには、メニューの「公開」から。')));
@@ -272,17 +320,18 @@ export class ShareLink {
       buttons: [{ label: editing ? t('変更する') : t('公開する'), value: true, primary: true, validate: async () => {
         const needPw = visibility === 'password' && (!editing || editing.visibility !== 'password' || password.value);
         if (needPw && Array.from(password.value).length < 4) { await alertBox(t('パスワードは 4 文字以上にしてください'), ''); return false; }
-        if (days.value === '-1' && !(new Date(when.value).getTime() > Date.now())) { await alertBox(t('期限の日時を選んでください'), ''); return false; }
+        if (days.value === '-1' && !(date > Date.now())) { await alertBox(t('今より後の日時を選んでください'), ''); return false; }
         return true;
       } }, { label: t('キャンセル'), value: false, cancel: true }],
     });
     if (!ok) return null;
     const keep = days.value === 'keep';
     const n = keep ? null : Number(days.value);
+    const until = n === null ? null : expiryFor(n, Date.now(), { period, date });
     return {
       title: titleField.value, visibility, password: password.value,
-      days: n === null ? null : Math.max(0, n), expiresAt: n === -1 ? new Date(when.value).getTime() / 1000 : null, keepExpiry: keep,
-      keepHistory: history.checked, clearHistory: !!editing && clear.checked,
+      days: n === null ? null : Math.max(0, n), expiresAt: until ? Math.floor(until / 1000) : null, keepExpiry: keep,
+      keepHistory: history.checked, clearHistory: !!editing && clear.checked, listed: visibility === 'public' && listed.checked,
     };
   }
 
@@ -349,9 +398,9 @@ export class ShareLink {
         : res.code === 0 ? t('インターネットにつながっているか確かめてください。') : t('サーバから答えがありませんでした ({code})', { code: res.code });
   }
 
-  async upload({ text, title, mode, visibility, password, days, expiresAt, keepHistory, file, tab, quiet }) {
+  async upload({ text, title, mode, visibility, password, days, expiresAt, keepHistory, listed, file, tab, quiet }) {
     toast(t('公開しています…'));
-    const base = { text, title, mode, visibility, days: days || 0, keepHistory };
+    const base = { text, title, mode, visibility, days: days || 0, keepHistory, listed: !!listed && visibility === 'public' };
     if (expiresAt) base.expiresAt = expiresAt;
     if (visibility === 'password') base.password = password;
     // 「画像としてコピー」用に、いまの画面の画像も送る (パスワード制のものは送らない)
@@ -362,7 +411,7 @@ export class ShareLink {
       if (!quiet) await alertBox(t('公開できませんでした'), this.failText(res));
       return null;
     }
-    const rec = { id: o.id, url: o.url, token: o.token, title, visibility, created: toApple(Date.now()), contentHash: contentHash(text, mode), keepHistory };
+    const rec = { id: o.id, url: o.url, token: o.token, title, visibility, created: toApple(Date.now()), contentHash: contentHash(text, mode), keepHistory, listed: !!listed && visibility === 'public' };
     if (typeof o.expires === 'number') rec.expires = o.expires - APPLE_EPOCH;
     if (file) rec.path = file;
     this.records = [rec].concat(this.records);
@@ -404,7 +453,7 @@ export class ShareLink {
   async editSettings(r, { values, quiet } = {}) {
     const f = values || await this.form({ title: r.title, editing: r });
     if (!f) return false;
-    const body = { title: f.title, visibility: f.visibility, keepHistory: f.keepHistory };
+    const body = { title: f.title, visibility: f.visibility, keepHistory: f.keepHistory, listed: !!f.listed && f.visibility === 'public' };
     if (f.visibility === 'password' && f.password) body.password = f.password;
     if (f.expiresAt) body.expiresAt = f.expiresAt; else if (!f.keepExpiry) body.days = f.days;
     if (f.clearHistory) body.clearHistory = true;
@@ -419,6 +468,7 @@ export class ShareLink {
     nr.visibility = o.visibility || nr.visibility;
     if (typeof o.expires === 'number') nr.expires = o.expires - APPLE_EPOCH; else delete nr.expires;
     if (typeof o.keepHistory === 'boolean') nr.keepHistory = o.keepHistory;
+    nr.listed = typeof o.listed === 'boolean' ? o.listed : body.listed;
     this.replace(nr);
     if (!quiet) {
       await alertBox(t('公開の設定を変えました'), r.url + '\n' + this.visibilityName(nr.visibility) + '\n'
@@ -430,10 +480,17 @@ export class ShareLink {
 
   // ---------- 公開をやめる ----------
 
-  async unpublish(r) {
+  /// 公開をやめる。404 (サーバにもう無い。期限切れなど) は、やめたのと同じなので記録を消す。失敗したときは必ず知らせる
+  async unpublish(r, { quiet } = {}) {
     const res = await this.request('DELETE', '/api/share/' + r.id, null, r.token, 20000);
-    if (res.code === 200) this.records = this.records.filter(x => x.id !== r.id);
-    return res.code === 200;
+    const ok = res.code === 200 || res.code === 404;
+    if (ok) this.records = this.records.filter(x => x.id !== r.id);
+    else if (!quiet) {
+      const why = res.code === 0 ? t('インターネットにつながっているか確かめてください。')
+        : res.code === 403 ? t('この公開をやめる鍵が合いませんでした。') : t('サーバから答えがありませんでした ({code})', { code: res.code });
+      await alertBox(t('公開をやめられませんでした'), why + '\n\n' + r.url + '\n' + t('ページはまだ公開されたままです。'));
+    }
+    return ok;
   }
 
   async confirmUnpublish(r) {
@@ -442,9 +499,8 @@ export class ShareLink {
       buttons: [{ label: t('公開をやめる'), value: true, primary: true }, { label: t('キャンセル'), value: false, cancel: true }],
     });
     if (!ok) return false;
-    const done = await this.unpublish(r);
-    if (!done) await alertBox(t('公開をやめられませんでした'), t('インターネットにつながっているか確かめてください。'));
-    else toast(t('公開をやめました'));
+    const done = await this.unpublish(r);   // 失敗したときは unpublish が知らせる
+    if (done) toast(t('公開をやめました'));
     return done;
   }
 
@@ -475,4 +531,78 @@ export class ShareLink {
       h('button', { onclick: async () => { const r = cur(); if (r && await this.confirmUnpublish(r)) { picked = 0; render(); } } }, t('公開をやめる')));
     await modal({ title: t('公開したリンク'), body: h('div', {}, table, buttons), width: 680, buttons: [{ label: t('閉じる'), value: true, primary: true, cancel: true }] });
   }
+}
+
+// ---------- 期限を決める小窓 ----------
+
+/// 期間を指定: 何日・何時間・何分・何秒 (はじめはすべて 0。10 秒以上)。やめたら null、決めたら秒
+async function askPeriod(seconds) {
+  const n = Math.floor(seconds || 0);
+  const units = [['日', Math.floor(n / 86400), 3650], ['時間', Math.floor(n % 86400 / 3600), 23], ['分', Math.floor(n % 3600 / 60), 59], ['秒', n % 60, 59]];
+  const fields = units.map(([, v, max]) => h('input', { type: 'number', class: 'period-field', min: '0', max: String(max), step: '1', value: String(v) }));
+  const clamp = (f, max) => { const v = Math.round(Number(f.value) || 0); f.value = String(Math.max(0, Math.min(max, v))); };
+  const row = h('div', { class: 'period-row' }, ...units.map(([name, , max], i) => {
+    const f = fields[i];
+    f.addEventListener('change', () => clamp(f, max));
+    const step = d => { f.value = String((Number(f.value) || 0) + d); clamp(f, max); };
+    return h('span', { class: 'period-unit' }, f,
+      h('span', { class: 'stepper' }, h('button', { type: 'button', tabindex: '-1', 'aria-label': '▲', onclick: () => step(1) }, '▲'), h('button', { type: 'button', tabindex: '-1', 'aria-label': '▼', onclick: () => step(-1) }, '▼')),
+      h('span', {}, t(name)));
+  }));
+  const total = () => { units.forEach(([, , max], i) => clamp(fields[i], max)); const v = fields.map(f => Number(f.value) || 0); return v[0] * 86400 + v[1] * 3600 + v[2] * 60 + v[3]; };
+  const ok = await modal({
+    title: t('公開の期間'), width: 420, className: 'period-dialog',
+    body: h('div', {}, h('div', { class: 'modal-line' }, t('公開してから、どれだけのあいだ読めるようにするかを決めます。')), row),
+    buttons: [{ label: 'OK', value: true, primary: true, validate: async () => {
+      if (total() < 10) { await alertBox(t('期間は 10 秒以上にしてください'), ''); return false; }
+      return true;
+    } }, { label: t('キャンセル'), value: false, cancel: true }],
+  });
+  return ok ? total() : null;
+}
+
+/// 期日を指定: カレンダーで日を選び、時刻 (時・分・秒) も決める。今より後だけ。やめたら null、決めたらミリ秒
+async function askDate(initial) {
+  const start = new Date(Math.max(initial || 0, Date.now() + 60000));
+  let picked = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  let shown = new Date(picked.getFullYear(), picked.getMonth(), 1);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const maxDay = new Date(today.getTime() + 3650 * 86400000);
+  const time = h('input', { type: 'time', step: '1', value: `${pad(start.getHours())}:${pad(start.getMinutes())}:${pad(start.getSeconds())}`, class: 'date-time' });
+  const cal = h('div', { class: 'calendar' });
+  const lang = i18n.language() === 'en' ? 'en-US' : 'ja-JP';
+  const render = () => {
+    cal.textContent = '';
+    const title = shown.toLocaleDateString(lang, { year: 'numeric', month: 'long' });
+    cal.append(h('div', { class: 'cal-head' },
+      h('button', { type: 'button', class: 'cal-nav', 'aria-label': '‹', disabled: shown <= new Date(today.getFullYear(), today.getMonth(), 1), onclick: () => { shown = new Date(shown.getFullYear(), shown.getMonth() - 1, 1); render(); } }, '‹'),
+      h('span', { class: 'cal-title' }, title),
+      h('button', { type: 'button', class: 'cal-nav', 'aria-label': '›', onclick: () => { shown = new Date(shown.getFullYear(), shown.getMonth() + 1, 1); render(); } }, '›')));
+    const grid = h('div', { class: 'cal-grid' });
+    const names = lang === 'en-US' ? ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'] : ['日', '月', '火', '水', '木', '金', '土'];
+    for (const n of names) grid.append(h('span', { class: 'cal-wd' }, n));
+    for (let i = 0; i < shown.getDay(); i++) grid.append(h('span', {}));
+    const days = new Date(shown.getFullYear(), shown.getMonth() + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) {
+      const day = new Date(shown.getFullYear(), shown.getMonth(), d);
+      const off = day < today || day > maxDay;
+      grid.append(h('button', { type: 'button', class: 'cal-day' + (day.getTime() === picked.getTime() ? ' picked' : '') + (day.getTime() === today.getTime() ? ' today' : ''), disabled: off,
+        onclick: () => { picked = day; render(); } }, String(d)));
+    }
+    cal.append(grid);
+  };
+  render();
+  const when = () => {
+    const [hh, mm, ss] = String(time.value || '0:0:0').split(':').map(x => Number(x) || 0);
+    return new Date(picked.getFullYear(), picked.getMonth(), picked.getDate(), hh, mm, ss).getTime();
+  };
+  const ok = await modal({
+    title: t('公開の期日'), width: 340, className: 'date-dialog', noEnter: false,
+    body: h('div', {}, h('div', { class: 'modal-line' }, t('この日時まで読めるようにします。')), cal, h('div', { class: 'form-row date-time-row' }, h('label', {}, t('時刻')), time)),
+    buttons: [{ label: 'OK', value: true, primary: true, validate: async () => {
+      if (!(when() > Date.now() + 10000)) { await alertBox(t('今より後の日時を選んでください'), ''); return false; }
+      return true;
+    } }, { label: t('キャンセル'), value: false, cancel: true }],
+  });
+  return ok ? when() : null;
 }

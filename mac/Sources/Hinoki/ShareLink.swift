@@ -23,6 +23,8 @@ enum ShareLink {
         var contentHash: String?
         /// 更新したとき、前の中身を変更履歴に残すか (前の版の記録は nil = 残す)
         var keepHistory: Bool?
+        /// 「みんなのメモ」に載せてよい (「公開」のときだけ)
+        var listed: Bool?
         var isAlive: Bool { expires.map { $0 > Date() } ?? true }
     }
 
@@ -325,19 +327,19 @@ enum ShareLink {
             }
             upload(text: text, title: form.titleField.stringValue, mode: mode, visibility: form.visibility,
                    password: form.password, days: max(0, form.days), expiresAt: form.customExpiry,
-                   keepHistory: form.keepHistory, file: file, window: window)
+                   keepHistory: form.keepHistory, listed: form.listed, file: file, window: window)
         }
         if let w = window { a.beginSheetModal(for: w, completionHandler: handle) } else { handle(a.runModal()) }
     }
 
     private static func upload(text: String, title: String, mode: String, visibility: String, password: String, days: Int,
-                               expiresAt: Date? = nil, keepHistory: Bool, file: URL?, window: NSWindow?) {
+                               expiresAt: Date? = nil, keepHistory: Bool, listed: Bool = false, file: URL?, window: NSWindow?) {
         var req = URLRequest(url: URL(string: base + "/api/share")!)
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 30
         var body: [String: Any] = ["text": text, "title": title, "mode": mode, "visibility": visibility, "days": days,
-                                   "keepHistory": keepHistory]
+                                   "keepHistory": keepHistory, "listed": listed && visibility == "public"]
         if let e = expiresAt { body["expiresAt"] = e.timeIntervalSince1970 }
         if mode == "genko" || mode == "genkoH" { body["layout"] = genkoLayout(text, horizontal: mode == "genkoH") }
         if mode == "editor" { body["theme"] = editorTheme() }
@@ -361,7 +363,7 @@ enum ShareLink {
                 let exp = (o["expires"] as? Double).map { Date(timeIntervalSince1970: $0) }
                 records = [Record(id: id, url: url, token: token, title: title, visibility: visibility, created: Date(), expires: exp,
                                   path: file.map(normalized), contentHash: contentHash(text, mode: mode),
-                                  keepHistory: keepHistory)] + records
+                                  keepHistory: keepHistory, listed: listed && visibility == "public")] + records
                 TextLibrary.changed() // 一覧に「公開中」の印を付ける
                 NSPasteboard.general.clearContents()
                 NSPasteboard.general.setString(url, forType: .string)
@@ -416,10 +418,22 @@ enum ShareLink {
         req.timeoutInterval = 20
         URLSession.shared.dataTask(with: req) { _, resp, err in
             DispatchQueue.main.async {
-                let ok = err == nil && (resp as? HTTPURLResponse)?.statusCode == 200
+                let code = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                // 404 = サーバにもう無い (期限切れなど): やめたのと同じなので、記録を消す
+                let ok = err == nil && (code == 200 || code == 404)
                 if ok {
                     records = records.filter { $0.id != r.id }
                     TextLibrary.changed()
+                } else {
+                    // 失敗したら、必ず知らせる
+                    let e = NSAlert()
+                    e.alertStyle = .warning
+                    e.messageText = L("公開をやめられませんでした")
+                    e.informativeText = (err != nil ? L("インターネットにつながっているか確かめてください。")
+                        : code == 403 ? L("この公開をやめる鍵が合いませんでした。")
+                        : L("サーバから答えがありませんでした ({0})", code))
+                        + "\n\n" + r.url + "\n" + L("ページはまだ公開されたままです。")
+                    if let w = NSApp.keyWindow { e.beginSheetModal(for: w) } else { e.runModal() }
                 }
                 completion(ok)
             }
@@ -435,12 +449,28 @@ final class ShareForm: NSObject {
     let passwordField = NSSecureTextField()
     let daysPopup = NSPopUpButton()
     private static let kinds = ["public", "unlisted", "password"]
-    /// -1 = 日時を指定 (下の日時の欄で、分まで決める)
-    private static let dayChoices: [(Int, String)] = [(1, "1 日"), (7, "7 日"), (30, "30 日"), (365, "1 年"), (0, "期限なし"), (-1, "日時を指定…")]
-    /// 期限の日時 (「日時を指定…」を選んだときだけ使える)
+    /// -3 = 今日まで、-4 = 明日まで (その日の終わりまで)、-2 = 期間を指定 (何日・何時間・何分・何秒)、-1 = 期日を指定 (カレンダーで、いつまで)
+    private static let dayChoices: [(Int, String)] = [(-3, "今日まで"), (-4, "明日まで"), (1, "1 日"), (3, "3 日"), (7, "7 日"), (30, "30 日"),
+                                                      (365, "1 年"), (0, "期限なし"), (-2, "期間を指定…"), (-1, "期日を指定…")]
+    /// 期日 (「期日を指定…」で選んだ日時)
     let datePicker = NSDatePicker()
-    /// 日時を指定した期限 (選んでいなければ nil)
-    var customExpiry: Date? { !keepExpiry && days == -1 ? datePicker.dateValue : nil }
+    /// 期間 (秒。「期間を指定…」で決めたもの)
+    private var periodSeconds: TimeInterval = 0   // はじめは日・時間・分・秒すべて 0
+    /// 前に選んでいた項目 (指定の画面でやめたとき戻す)
+    private var lastIndex = 0
+    /// 指定した期限 (選んでいなければ nil)。期間は、公開するときから数える
+    var customExpiry: Date? {
+        guard !keepExpiry else { return nil }
+        if days == -1 { return datePicker.dateValue }
+        if days == -2 { return Date().addingTimeInterval(periodSeconds) }
+        if days == -3 || days == -4 {
+            // その日の 23:59:59 まで
+            let c = Calendar.current
+            let day = c.date(byAdding: .day, value: days == -3 ? 1 : 2, to: c.startOfDay(for: Date())) ?? Date()
+            return day.addingTimeInterval(-1)
+        }
+        return nil
+    }
 
     var visibility: String { Self.kinds[radios.firstIndex { $0.state == .on } ?? 1] }
     var password: String { passwordField.stringValue }
@@ -454,6 +484,9 @@ final class ShareForm: NSObject {
     /// 公開中のものの設定: 今ある変更履歴を消す
     let clearHistoryBox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
     var keepHistory: Bool { historyBox.state == .on }
+    /// 「みんなのメモ」に掲載 OK (「公開」を選んだときだけ出る)
+    let listedBox = NSButton(checkboxWithTitle: "", target: nil, action: nil)
+    var listed: Bool { visibility == "public" && listedBox.state == .on }
     var clearHistory: Bool { clearHistoryBox.state == .on }
 
     /// 公開中のものの設定を変える画面 (いまの設定を入れておく)
@@ -468,8 +501,10 @@ final class ShareForm: NSObject {
         daysPopup.insertItem(withTitle: r.expires.map { L("変えない ({0} まで)", df.string(from: $0)) } ?? L("変えない (期限なし)"), at: 0)
         daysPopup.selectItem(at: 0)
         if let e = r.expires, e > Date() { datePicker.dateValue = e }
+        lastIndex = 0
         if r.visibility == "password" { passwordField.placeholderString = L("変えないときは空のまま") }
         historyBox.state = (r.keepHistory ?? true) ? .on : .off
+        listedBox.state = (r.listed ?? false) ? .on : .off
         clearHistoryBox.isHidden = false
         refresh()
         // 出した項目のぶん、高さを合わせ直す
@@ -497,17 +532,14 @@ final class ShareForm: NSObject {
             r.state = Self.kinds[i] == saved ? .on : .off
         }
         Self.dayChoices.forEach { daysPopup.addItem(withTitle: L($0.1)) }
-        daysPopup.selectItem(at: Self.dayChoices.firstIndex { $0.0 == (UserDefaults.standard.object(forKey: "shareDays") as? Int ?? 30) } ?? 2)
+        daysPopup.selectItem(at: Self.dayChoices.firstIndex { $0.0 == (UserDefaults.standard.object(forKey: "shareDays") as? Int ?? 30) } ?? 5)
         daysPopup.target = self
         daysPopup.action = #selector(daysChanged(_:))
+        lastIndex = daysPopup.indexOfSelectedItem
         let titleRow = NSStackView(views: [NSTextField(labelWithString: L("題名")), titleField])
         titleField.widthAnchor.constraint(equalToConstant: 290).isActive = true
-        datePicker.datePickerStyle = .textFieldAndStepper
-        datePicker.datePickerElements = [.yearMonthDay, .hourMinute]
-        datePicker.minDate = Date().addingTimeInterval(5 * 60)
-        datePicker.maxDate = Date().addingTimeInterval(3650 * 86400)
         datePicker.dateValue = Date().addingTimeInterval(7 * 86400)
-        let daysRow = NSStackView(views: [NSTextField(labelWithString: L("公開の期限")), daysPopup, datePicker])
+        let daysRow = NSStackView(views: [NSTextField(labelWithString: L("公開の期限")), daysPopup])
         let note = NSTextField(wrappingLabelWithString: L("公開をやめる・設定を変えるには、メニューの「公開」から。"))
         note.font = .systemFont(ofSize: 11)
         note.textColor = .secondaryLabelColor
@@ -520,7 +552,16 @@ final class ShareForm: NSObject {
         historyBox.action = #selector(historyChanged(_:))
         clearHistoryBox.title = L("今ある変更履歴を消す")
         clearHistoryBox.isHidden = true
-        let stack = NSStackView(views: [titleRow] + radios + [pwRow, daysRow, historyBox, clearHistoryBox, note])
+        listedBox.title = L("「みんなのメモ」に掲載 OK (サイトの一覧に載ります)")
+        listedBox.state = .off
+        // 「公開」の下に、少し下げて出す
+        let listedRow = NSStackView(views: [NSView(), listedBox])
+        listedRow.spacing = 14
+        self.listedRow = listedRow
+        var views: [NSView] = [titleRow, radios[0], listedRow]
+        views += Array(radios.dropFirst()) as [NSView]
+        views += [pwRow, daysRow, historyBox, clearHistoryBox, note]
+        let stack = NSStackView(views: views)
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 6
@@ -546,13 +587,126 @@ final class ShareForm: NSObject {
     }
 
     @objc private func daysChanged(_ sender: NSPopUpButton) {
+        if !keepExpiry && days == -2 {
+            guard let sec = askPeriod() else { sender.selectItem(at: lastIndex); return }
+            periodSeconds = sec
+            sender.selectedItem?.title = L("期間: {0}", Self.periodText(sec))
+        } else if !keepExpiry && days == -1 {
+            guard let d = askDate() else { sender.selectItem(at: lastIndex); return }
+            datePicker.dateValue = d
+            let df = DateFormatter()
+            df.locale = Locale.current
+            df.setLocalizedDateFormatFromTemplate("yMMMdHms")
+            sender.selectedItem?.title = L("期日: {0} まで", df.string(from: d))
+        }
+        lastIndex = sender.indexOfSelectedItem
         if !editing && days >= 0 { UserDefaults.standard.set(days, forKey: "shareDays") }
         refresh()
     }
 
+    /// 「3 日 4 時間 5 分」のような書き方 (0 のところは出さない)
+    static func periodText(_ sec: TimeInterval) -> String {
+        let t = Int(sec)
+        let parts = [(t / 86400, L("日")), (t % 86400 / 3600, L("時間")), (t % 3600 / 60, L("分")), (t % 60, L("秒"))]
+            .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }
+        return parts.isEmpty ? L("0 秒") : parts.joined(separator: " ")
+    }
+
+    /// 期間を指定: 何日・何時間・何分・何秒
+    private func askPeriod() -> TimeInterval? {
+        let a = NSAlert()
+        a.messageText = L("公開の期間")
+        a.informativeText = L("公開してから、どれだけのあいだ読めるようにするかを決めます。")
+        let t = Int(periodSeconds)
+        let units: [(String, Int, Int)] = [(L("日"), t / 86400, 3650), (L("時間"), t % 86400 / 3600, 23), (L("分"), t % 3600 / 60, 59), (L("秒"), t % 60, 59)]
+        var fields: [NSTextField] = []
+        var row: [NSView] = []
+        for (name, value, maxV) in units {
+            let f = NSTextField(string: String(value))
+            let nf = NumberFormatter()
+            nf.minimum = 0
+            nf.maximum = NSNumber(value: maxV)
+            nf.allowsFloats = false
+            f.formatter = nf
+            f.alignment = .right
+            f.widthAnchor.constraint(equalToConstant: name == L("日") ? 52 : 38).isActive = true
+            let st = NSStepper()
+            st.minValue = 0
+            st.maxValue = Double(maxV)
+            st.integerValue = value
+            st.valueWraps = false
+            // 矢印と数字の欄を合わせる
+            st.target = f
+            st.action = #selector(NSTextField.takeIntegerValueFrom(_:))
+            f.target = st
+            f.action = #selector(NSStepper.takeIntegerValueFrom(_:))
+            fields.append(f)
+            row += [f, st, NSTextField(labelWithString: name)]
+        }
+        let stack = NSStackView(views: row)
+        stack.spacing = 3
+        stack.setFrameSize(stack.fittingSize)
+        a.accessoryView = stack
+        a.addButton(withTitle: L("OK"))
+        a.addButton(withTitle: L("キャンセル"))
+        a.window.initialFirstResponder = fields[0]
+        guard a.runModal() == .alertFirstButtonReturn else { return nil }
+        let v = fields.map { Double($0.integerValue) }
+        let sec = v[0] * 86400 + v[1] * 3600 + v[2] * 60 + v[3]
+        guard sec >= 10 else {
+            let e = NSAlert()
+            e.messageText = L("期間は 10 秒以上にしてください")
+            e.runModal()
+            return nil
+        }
+        return sec
+    }
+
+    /// 期日を指定: カレンダーで日を選び、時刻も決める
+    private func askDate() -> Date? {
+        let a = NSAlert()
+        a.messageText = L("公開の期日")
+        a.informativeText = L("この日時まで読めるようにします。")
+        let start = max(datePicker.dateValue, Date().addingTimeInterval(60))
+        let cal = NSDatePicker()
+        cal.datePickerStyle = .clockAndCalendar
+        cal.datePickerElements = [.yearMonthDay]
+        cal.minDate = Calendar.current.startOfDay(for: Date())
+        cal.maxDate = Date().addingTimeInterval(3650 * 86400)
+        cal.dateValue = start
+        let time = NSDatePicker()
+        time.datePickerStyle = .textFieldAndStepper
+        time.datePickerElements = [.hourMinuteSecond]
+        time.dateValue = start
+        let timeRow = NSStackView(views: [NSTextField(labelWithString: L("時刻")), time])
+        let stack = NSStackView(views: [cal, timeRow])
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 8
+        stack.setFrameSize(NSSize(width: max(240, stack.fittingSize.width), height: stack.fittingSize.height))
+        a.accessoryView = stack
+        a.addButton(withTitle: L("OK"))
+        a.addButton(withTitle: L("キャンセル"))
+        guard a.runModal() == .alertFirstButtonReturn else { return nil }
+        // 選んだ日 + 時刻
+        let c = Calendar.current
+        var d = c.dateComponents([.year, .month, .day], from: cal.dateValue)
+        let tc = c.dateComponents([.hour, .minute, .second], from: time.dateValue)
+        d.hour = tc.hour; d.minute = tc.minute; d.second = tc.second
+        guard let date = c.date(from: d), date > Date().addingTimeInterval(10) else {
+            let e = NSAlert()
+            e.messageText = L("今より後の日時を選んでください")
+            e.runModal()
+            return nil
+        }
+        return date
+    }
+
+    private weak var listedRow: NSView?
+
     func refresh() {
         passwordField.isEnabled = visibility == "password"
-        datePicker.isEnabled = !keepExpiry && days == -1
+        listedRow?.isHidden = visibility != "public"
         // 残さない設定にすると、今ある履歴も消える
         if !historyBox.isOn { clearHistoryBox.state = .on }
         clearHistoryBox.isEnabled = historyBox.isOn
@@ -670,15 +824,7 @@ final class SharedLinksWindow: NSWindowController, NSTableViewDataSource, NSTabl
         a.addButton(withTitle: L("公開をやめる"))
         a.addButton(withTitle: L("キャンセル"))
         guard a.runModal() == .alertFirstButtonReturn else { return }
-        ShareLink.unpublish(r) { [weak self] ok in
-            if !ok {
-                let e = NSAlert()
-                e.messageText = L("公開をやめられませんでした")
-                e.informativeText = L("インターネットにつながっているか確かめてください。")
-                e.runModal()
-            }
-            self?.reload()
-        }
+        ShareLink.unpublish(r) { [weak self] _ in self?.reload() }  // 失敗したときは unpublish が知らせる
     }
 }
 
@@ -775,6 +921,7 @@ extension ShareLink {
             if vis == "password" && !form.password.isEmpty { body["password"] = form.password }
             if let e = form.customExpiry { body["expiresAt"] = e.timeIntervalSince1970 } else if !form.keepExpiry { body["days"] = form.days }
             body["keepHistory"] = form.keepHistory
+            body["listed"] = form.listed
             if form.clearHistory { body["clearHistory"] = true }
             putSettings(r, body: body, window: window)
         }
@@ -805,6 +952,7 @@ extension ShareLink {
                 nr.visibility = (o["visibility"] as? String) ?? nr.visibility
                 nr.expires = (o["expires"] as? Double).map { Date(timeIntervalSince1970: $0) }
                 nr.keepHistory = (o["keepHistory"] as? Bool) ?? nr.keepHistory
+                nr.listed = (o["listed"] as? Bool) ?? nr.listed
                 replace(nr)
                 let done = NSAlert()
                 done.messageText = L("公開の設定を変えました")

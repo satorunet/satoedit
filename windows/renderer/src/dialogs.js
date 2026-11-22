@@ -141,7 +141,7 @@ export function floatWindow({ id, title, body, width, onClose }) {
 }
 export function floatOpen(id) { return floats.get(id) || null; }
 
-/// ポップアップメニュー。items: [{ label, checked, disabled, header, icon, submenu: [...], action } | 'sep']。x, y は画面上の位置
+/// ポップアップメニュー。items: [{ label, checked, disabled, header, icon, submenu: [...], action, remove: { tip, action } } | 'sep']。x, y は画面上の位置
 /// header は押せない見出し (薄い字)。submenu を付けると、乗せたとき横に出る
 let popups = [];
 function buildPopup(items, x, y, { alignBottom, level = 0, beside = null, className = '' } = {}) {
@@ -162,7 +162,10 @@ function buildPopup(items, x, y, { alignBottom, level = 0, beside = null, classN
         while (popups.length > level + 1) popups.pop().remove();
         if (it.submenu && !it.disabled) openSub();
       },
-    }, h('span', { class: 'popup-check' }, it.checked ? '✓' : (it.icon || '')), h('span', { class: 'popup-label' }, it.label), it.submenu ? h('span', { class: 'popup-arrow' }, '›') : null);
+    }, h('span', { class: 'popup-check' }, it.checked ? '✓' : (it.icon || '')), h('span', { class: 'popup-label' }, it.label), it.submenu ? h('span', { class: 'popup-arrow' }, '›') : null,
+    // 行の右はしの ✕ (remove: { tip, action })。押しても行の action は動かない
+    it.remove ? h('span', { class: 'popup-remove', title: it.remove.tip || null, role: 'button',
+      onclick: e => { e.stopPropagation(); closePopup(); it.remove.action(); } }, '✕') : null);
     const openSub = () => {
       while (popups.length > level + 1) popups.pop().remove();
       const r = row.getBoundingClientRect();

@@ -115,7 +115,10 @@ public enum TextCodec {
         if bytes.starts(with: TextEncoding.utf16LE.bom) { return .utf16LE }
         if bytes.starts(with: TextEncoding.utf16BE.bom) { return .utf16BE }
 
-        let isASCII = !bytes.contains { $0 >= 0x80 }
+        let isASCII = data.withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Bool in
+            for v in raw where v >= 0x80 { return false }
+            return true
+        }
         if isASCII {
             return containsJISEscape(bytes) ? .iso2022JP : .utf8
         }

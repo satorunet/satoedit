@@ -1,7 +1,7 @@
 {
   "name": "satoru-editor",
   "productName": "satoruEditor",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "さとるエディタ (satoruEditor) — 軽くて多機能なテキストエディタ。Mac 版と同じ機能の Windows 版",
   "main": "main.js",
   "license": "MIT",

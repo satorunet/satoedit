@@ -36,7 +36,7 @@ export function installMockAPI() {
     on(channel, fn) { (listeners[channel] = listeners[channel] || []).push(fn); },
     emit,
     async init() {
-      return { prefs, theme: themeDef.defaults(), themeProblems: [], userProfiles: [], platform: 'mock', version: '1.0.1', files: [],
+      return { prefs, theme: themeDef.defaults(), themeProblems: [], userProfiles: [], platform: 'mock', version: '1.0.2', files: [],
         secretsAvailable: true, aiPriceOverrides: {}, configDir: '/mock/.satoruEditor', userName: 'user', hostName: 'pc', homeDir: '/mock',
         language: i18n.resolve(prefs.language, navigator.language) };
     },
@@ -178,7 +178,7 @@ export function installMockAPI() {
     async closeWindow() { log('closeWindow'); return true; },
     async quit() { emit('app:request-close'); return true; },
     async about() { return true; },
-    async updateCheck(o) { return (o && o.auto) ? { status: 'off', current: '1.0.1' } : { status: 'latest', current: '1.0.1', version: '1.0.1' }; },
+    async updateCheck(o) { return (o && o.auto) ? { status: 'off', current: '1.0.2' } : { status: 'latest', current: '1.0.2', version: '1.0.2' }; },
     async updateDownload() { return { status: 'cancel' }; },
     async updateCancel() { return true; },
     async updateInstall() { return { status: 'error', message: 'mock' }; },
@@ -223,6 +223,10 @@ export function installMockAPI() {
     async libraryInfo() { return { root: 'C:\\Users\\you\\Documents\\さとるエディタ', history: '' }; },
     async libraryItems() { return []; },
     async libraryTree() { return []; },
+    async librarySetRoot() { return { root: 'C:\\Users\\you\\Documents\\さとるエディタ', history: '', custom: false, name: 'さとるエディタ' }; },
+    async libraryScan() { return { files: [], tree: [], externals: [] }; },
+    async libraryRead(paths) { return paths.map(() => null); },
+    async beep() { return true; },
     async versionList() { return []; },
     async http() { return { status: 0, body: '' }; },
   };

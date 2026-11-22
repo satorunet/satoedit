@@ -76,6 +76,7 @@ function build(state) {
     item('閉じる', 'file.close', 'Ctrl+W'),
     item('上書き保存', 'file.save', 'Ctrl+S'),
     item('名前を付けて保存…', 'file.saveAs', 'Ctrl+Shift+S'),
+    item('名前を変更…', 'file.rename'),
     item('保存時の状態に戻す', 'file.revert'),
     ...(p.libraryEnabled !== false && p.versionHistory !== false ? [item('版の履歴…', 'file.versions', '', { enabled: !!state.hasPath })] : []),
     sep,

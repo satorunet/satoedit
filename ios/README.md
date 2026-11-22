@@ -6,7 +6,18 @@ UIKit で書いた iPhone / iPad 版。iOS 15 以上。Bundle ID `net.satoru.sat
 - **書く**: 標準エディタ (行番号・ゴシック/明朝/等幅・文字の大きさ) と 原稿用紙 (縦 20×20 朱 / 横 緑、自動ふりがな・作文の自動整形)。
   右上の印で エディタ / 原稿用紙 (縦) / 原稿用紙 (横) を切り替え、ファイルごとに覚える (Mac 版と同じ拡張属性 `net.satoru.satoruEditor.mode#S`)。
   原稿用紙のときは上に原稿用紙、下に書く欄。書く欄で書くと (日本語入力の変換中も) すぐマスに入る。マスをタップするとそこにカーソル。ピンチで拡大。
-- **テキスト一覧**: 書類フォルダの .txt (ファイル App の「このiPhone内 > さとるエディタ」から見える)。フォルダ 1 段、新しい順、探す、作る・名前を変える・フォルダへ移す・消す。
+- **テキスト一覧**: .txt などのふつうのファイル。フォルダ 1 段、新しい順、探す、作る・名前を変える・フォルダへ移す・消す。
+  一覧の上のタブで **iCloud** / **ローカル** を切り替える (はじめは iCloud。選んだタブを覚える。タブは見せる場所を替えるだけで、写さない)。
+  - iCloud … iCloud コンテナ `iCloud.net.satoru.satoruEditor` の `Documents` (ファイル App では「iCloud Drive > さとるエディタ」)。
+    Mac 版も同じ所 (`~/Library/Mobile Documents/iCloud~net~satoru~satoruEditor/Documents`) に置くので、同じテキストが見られる。
+    iCloud が使えない (サインインしていない・iCloud Drive が切ってある・シミュレータ) と、iCloud のタブは押せず、ひとこと出る。
+  - ローカル … アプリの書類フォルダ (ファイル App の「このiPhone内 > さとるエディタ」)。
+  - 長押しのメニューの「iCloud に移す」/「ローカルに移す」で、もう一方へ移す (フォルダ名・表示の拡張属性はそのまま。`setUbiquitous`)。
+  - まだ落としていない iCloud のファイル (`.名前.txt.icloud` / ダウンロード状態 notDownloaded) は雲の印つきで出し、一覧に出たら落とし始める。開くと届くまで待つ。
+  - 読み書きは NSFileCoordinator を通す。一覧は 4 秒ごと・アプリに戻ったとき・引っぱったときに見直す。開いているテキストは 3 秒ごとに見直す:
+    こちらで書き換えていなければ読み直す。こちらでも書き換えていたら、こちらの版を使い、ほかの端末の版は「名前 (別の端末).txt」として隣に残す
+    (iCloud が見つけた食い違いの版 NSFileVersion も同じく残して片づける)。
+  - 保存しても Mac 版の拡張属性 (`net.satoru.…mode#S` の a4 など・`history#S`) は消さない (書く前のものを戻す)。
   「新規テキスト」のまま書き始めると、閉じたときに 1 行目の名前に付け替える。文字コード (Shift_JIS など) と改行はもとのまま保存。
 - **AI アシスト**: ChatGPT / Claude / Gemini / OpenAI 互換。キーは iOS のキーチェーン。校正・要約・読みやすく・翻訳・続きを書く (原稿用紙では作文向けの依頼も)。答えは少しずつ届き、置き換える / 挿入 / コピー。
 - **リンクで公開共有**: docs.satoru.net に公開 (Mac 版と同じ API・同じ中身)。公開前に個人情報を点検。公開したリンクの一覧から 開く / コピー / 公開をやめる。
@@ -30,7 +41,9 @@ XcodeGen などは使えないので、`scripts/gen_xcodeproj.py` が `SatoruEdi
 
 ### 動作確認 (画面を自動で動かして撮る)
 ```
-./scripts/selftest.sh library|editor|genko|genkoH|ai|share|links ["iPhone 11"]
+./scripts/selftest.sh library|editor|genko|genkoH|ai|share|links|cloud|nocloud ["iPhone 11"]
+./scripts/selftest.sh cloud    # build/cloudtest/Documents を iCloud の Documents の代わりにして、Mac 側からファイルを置いて確かめる
+./scripts/selftest.sh nocloud  # iCloud が使えないとき (シミュレータはいつもこれ)
 SATORU_AI_BASE_URL=http://127.0.0.1:8765/v1 ./scripts/selftest.sh ai   # 偽の AI (fakeai2.py <port> <返事のファイル>) を先に起動
 SATORU_SHARE_PUBLISH=1 ./scripts/selftest.sh share  # 本当に 1 件公開して、すぐ公開をやめる
 SATORU_LANG=en ./scripts/selftest.sh library        # 英語
@@ -47,7 +60,12 @@ SATORU_LANG=en ./scripts/selftest.sh library        # 英語
 - 新しい Xcode で必要になるもの: プライバシーマニフェスト `PrivacyInfo.xcprivacy` (UserDefaults を使う理由 `CA92.1`、ファイルの日時 `C617.1`) を `SatoruEditor/` に置き、gen_xcodeproj.py のリソースに足す。
   iPad のマルチタスク (Split View) を正式に使うなら UIScene に移すか `UIRequiresFullScreen` を決める。
 - スクリーンショット (6.7"/6.5"/iPad 12.9")、説明文、プライバシーポリシーの URL (AI のキーは端末だけ・公開は docs.satoru.net に送る、と書く)、輸出規制 (暗号は標準のもののみ → `ITSAppUsesNonExemptEncryption = NO` 済み)。
-- iCloud Drive の同期は未対応 (署名に iCloud の権限が要る)。
+- **iCloud**: `SatoruEditor/SatoruEditor.entitlements` (iCloud コンテナ `iCloud.net.satoru.satoruEditor`・CloudDocuments) を
+  `CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]` で実機・Release だけに付ける (シミュレータのビルドには付けない)。
+  App ID `net.satoru.satoruEditor.ios` に **iCloud の機能 (iCloud Documents) とコンテナ `iCloud.net.satoru.satoruEditor`** が要る。
+  自動署名で `xcodebuild ... -allowProvisioningUpdates` (GitHub Actions なら App Store Connect API キーを渡す) なら足されることがあるが、
+  足されなければ developer.apple.com の Identifiers で App ID に iCloud を付け、コンテナを作って選ぶ (Mac 版の App ID にも同じコンテナ)。
+  Info.plist の `NSUbiquitousContainers` (名前「さとるエディタ」・公開) を変えたら、iCloud Drive に出すために CFBundleVersion を上げる。
 
 ## まだできないこと・限り
 - 原稿用紙の上で直接打つことはできない (下の書く欄で打つ)。iPhone の縦向きでは用紙が小さいので、ピンチで拡大するか横向きに。

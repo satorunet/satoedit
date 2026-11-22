@@ -134,6 +134,22 @@ class Store:
             day = self.db.execute("SELECT COUNT(*) FROM docs WHERE created > ?", (time.time() - 86400,)).fetchone()[0]
         return {"total": total, "views": views, "chars": chars, "today": day, "by_visibility": by_vis}
 
+    def listed_list(self, limit=60):
+        """「みんなのメモ」に載せてよいもの (作者が掲載 OK にしたもの・パスワード制でないもの)。期限切れは除く"""
+        import time as _t
+        with self.lock:
+            rows = self.db.execute("SELECT id, data FROM docs WHERE visibility='public' AND data LIKE '%\"listed\": true%' "
+                                   "ORDER BY created DESC LIMIT ?", (limit * 2,)).fetchall()
+        now = _t.time()
+        out = []
+        for r in rows:
+            d = json.loads(r["data"])
+            if not d.get("listed") or (d.get("expires") and d["expires"] < now):
+                continue
+            out.append((d.get("updated") or d.get("created", 0), r["id"], d))
+        out.sort(key=lambda x: x[0], reverse=True)
+        return out[:limit]
+
     def public_list(self, limit=100):
         with self.lock:
             rows = self.db.execute("SELECT id, data FROM docs WHERE visibility='public' ORDER BY created DESC LIMIT ?", (limit,)).fetchall()

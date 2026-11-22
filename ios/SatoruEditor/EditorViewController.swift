@@ -19,6 +19,9 @@ final class EditorViewController: UIViewController, UITextViewDelegate {
     private var saveWork: DispatchWorkItem?
     private var rubyWork: DispatchWorkItem?
     private var modeButton: UIBarButtonItem!
+    /// ほかの端末 (Mac・iCloud) で書き換えられていないか、ときどき見る
+    private var diskTimer: Timer?
+    var pauseDiskCheckForTesting = false
 
     init(doc: TextDocument) {
         self.doc = doc
@@ -91,6 +94,10 @@ final class EditorViewController: UIViewController, UITextViewDelegate {
 
         NotificationCenter.default.addObserver(self, selector: #selector(prefsChanged), name: Prefs.didChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(appWillResign), name: UIApplication.willResignActiveNotification, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(checkDisk), name: UIApplication.didBecomeActiveNotification, object: nil)
+        doc.onKeptOtherVersion = { [weak self] copy in
+            DispatchQueue.main.async { self?.keptOtherVersion(copy) }
+        }
         applyPrefs()
         applyMode()
         updateTitle()
@@ -99,6 +106,37 @@ final class EditorViewController: UIViewController, UITextViewDelegate {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         if doc.text.isEmpty && !SelfTest.isRunning { textView.becomeFirstResponder() }
+        diskTimer?.invalidate()
+        diskTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.checkDisk() }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        diskTimer?.invalidate()
+        diskTimer = nil
+    }
+
+    // MARK: ほかの端末で書き換えられたとき
+
+    @objc private func checkDisk() {
+        guard !pauseDiskCheckForTesting, view.window != nil, UIApplication.shared.applicationState == .active,
+              textView.markedTextRange == nil else { return }
+        doc.text = textView.text
+        guard doc.checkDisk() == .reloaded else { return }
+        let sel = textView.selectedRange
+        let len = (doc.text as NSString).length
+        textView.text = doc.text
+        textView.selectedRange = NSRange(location: min(sel.location, len), length: 0)
+        textView.textDidChange()
+        applyMode()
+        toast(L("ほかの端末で書き換えられたので、読み直しました"))
+        SelfTest.log("editor-reloaded")
+    }
+
+    private func keptOtherVersion(_ copy: URL) {
+        SelfTest.log("kept-other \(copy.lastPathComponent)")
+        showMessage(L("ほかの端末でも書き換えられていました"),
+                    L("こちらで書いたものはそのまま残し、ほかの端末の版は「{0}」として保存しました。", copy.deletingPathExtension().lastPathComponent))
     }
 
     override func viewWillDisappear(_ animated: Bool) {

@@ -7,25 +7,37 @@ public enum BinaryData {
     /// NUL がなくても、改行・タブなど以外の制御文字が多ければバイナリ
     public static func looksBinary(_ sample: Data) -> Bool {
         if sample.isEmpty { return false }
-        let b = [UInt8](sample.prefix(8192))
-        // BOM 付きの UTF-16 / UTF-32 / UTF-8 はテキスト
-        if b.starts(with: [0xFF, 0xFE]) || b.starts(with: [0xFE, 0xFF]) || b.starts(with: [0xEF, 0xBB, 0xBF]) { return false }
-        let nulCount = b.reduce(0) { $0 + ($1 == 0 ? 1 : 0) }
-        if nulCount > 0 {
-            // BOM なしの UTF-16: 偶数か奇数の片方の位置にだけ 0 が並ぶ
-            var even = 0, odd = 0
-            for (i, v) in b.enumerated() where v == 0 { if i % 2 == 0 { even += 1 } else { odd += 1 } }
-            let half = b.count / 2
-            if half > 0, (Double(even) > Double(half) * 0.4 && odd == 0) || (Double(odd) > Double(half) * 0.4 && even == 0) {
-                return false
+        // 1 バイトずつ見るので、配列を作らず生のバイトをそのまま数える (たくさんのファイルを続けて見ても速いように)
+        return sample.prefix(8192).withUnsafeBytes { (raw: UnsafeRawBufferPointer) -> Bool in
+            let n = raw.count
+            guard n > 0, let p = raw.bindMemory(to: UInt8.self).baseAddress else { return false }
+            // BOM 付きの UTF-16 / UTF-32 / UTF-8 はテキスト
+            if n >= 2 && ((p[0] == 0xFF && p[1] == 0xFE) || (p[0] == 0xFE && p[1] == 0xFF)) { return false }
+            if n >= 3 && p[0] == 0xEF && p[1] == 0xBB && p[2] == 0xBF { return false }
+            var even = 0, odd = 0, controls = 0
+            var i = 0
+            while i < n {
+                let v = p[i]
+                if v == 0 {
+                    if i & 1 == 0 { even += 1 } else { odd += 1 }
+                } else if v < 0x20 {
+                    // 改行・タブ・改ページ・ESC・BS 以外の制御文字
+                    if v != 0x09 && v != 0x0A && v != 0x0D && v != 0x0C && v != 0x1B && v != 0x08 { controls += 1 }
+                } else if v == 0x7F {
+                    controls += 1
+                }
+                i += 1
             }
-            return true
+            if even + odd > 0 {
+                // BOM なしの UTF-16: 偶数か奇数の片方の位置にだけ 0 が並ぶ
+                let half = n / 2
+                if half > 0, (Double(even) > Double(half) * 0.4 && odd == 0) || (Double(odd) > Double(half) * 0.4 && even == 0) {
+                    return false
+                }
+                return true
+            }
+            return Double(controls) / Double(n) > 0.1
         }
-        // 制御文字 (改行・タブ・改ページ・ESC などを除く) の割合
-        let controls = b.reduce(0) { n, v in
-            n + ((v < 0x20 && ![0x09, 0x0A, 0x0D, 0x0C, 0x1B, 0x08].contains(v)) || v == 0x7F ? 1 : 0)
-        }
-        return Double(controls) / Double(b.count) > 0.1
     }
 
     /// 16 バイト 1 行の表示: 「00000010  48 65 6C 6C 6F 0A 00 …  |Hello..|」の 3 つの部分

@@ -9,13 +9,14 @@ import HinokiCore
 ///   SATORU_AI_BASE_URL  = 偽の AI (OpenAI 互換) のアドレス。例 http://127.0.0.1:8765/v1
 ///   SATORU_SHARE_PUBLISH= 1 なら、本当に docs.satoru.net に 1 件公開し、すぐ公開をやめる (id を記録に書く)
 ///   SATORU_LANG         = ja | en  (言語を決めて始める)
+///   SATORU_CLOUD_DIR    = cloud のとき、このフォルダを iCloud コンテナの Documents の代わりにする
 /// 画像はアプリの「書類/.selftest/」に書く (scripts/selftest.sh が取り出す)。結果は .selftest/log.txt
 enum SelfTest {
     static var mode: String? { ProcessInfo.processInfo.environment["SATORU_SELFTEST"] }
     static var isRunning: Bool { mode != nil }
     static var aiFinished: (() -> Void)?
     private static var env: [String: String] { ProcessInfo.processInfo.environment }
-    static var outDir: URL { Library.root.appendingPathComponent(".selftest", isDirectory: true) }
+    static var outDir: URL { Library.localRoot.appendingPathComponent(".selftest", isDirectory: true) }
 
     /// 起動の最初 (画面を作る前)
     static func prepare() {
@@ -33,6 +34,10 @@ enum SelfTest {
         try? FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
         try? "".write(to: outDir.appendingPathComponent("log.txt"), atomically: true, encoding: .utf8)
         if env["SATORU_SEED"] == "1" { seed() }
+        if mode == "cloud", let dir = env["SATORU_CLOUD_DIR"], !dir.isEmpty {
+            LibraryLocation.overrideForTesting = URL(fileURLWithPath: dir, isDirectory: true)
+            LibraryLocation.prefersICloud = true
+        }
         // キーチェーンに書けるか (API キーの置き場所)
         let ok = Keychain.set("test-key", for: "selftest") && Keychain.get("selftest") == "test-key"
         Keychain.delete("selftest")
@@ -92,12 +97,12 @@ Meeting notes
 
     static func seed() {
         let fm = FileManager.default
-        for u in (try? fm.contentsOfDirectory(at: Library.root, includingPropertiesForKeys: nil)) ?? [] where u.lastPathComponent != ".selftest" {
+        for u in (try? fm.contentsOfDirectory(at: Library.localRoot, includingPropertiesForKeys: nil)) ?? [] where u.lastPathComponent != ".selftest" {
             try? fm.removeItem(at: u)
         }
         UserDefaults.standard.removeObject(forKey: "sharedLinks")
         func write(_ name: String, _ text: String, folder: String?, mode: String?, ago: TimeInterval) {
-            let dir = Library.folderURL(folder)
+            let dir = Library.folderURL(folder, in: Library.localRoot)
             try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
             let u = dir.appendingPathComponent(name)
             try? text.data(using: .utf8)?.write(to: u)
@@ -128,6 +133,8 @@ Meeting notes
             case "ai": runAI()
             case "share": runShare()
             case "links": runLinks()
+            case "cloud": runCloud()
+            case "nocloud": runNoCloud()
             default: log("unknown mode")
             }
         }
@@ -304,6 +311,146 @@ Meeting notes
             after(0.8) {
                 snap("links")
                 ShareStore.records = []
+                log("done")
+            }
+        }
+    }
+
+    // MARK: iCloud Drive のフォルダ (シミュレータでは、Mac のふつうのフォルダを選んだことにして確かめる)
+
+    private static func waitUntil(_ timeout: Double, _ cond: @escaping () -> Bool, _ then: @escaping (Bool) -> Void) {
+        let start = Date()
+        func tick() {
+            if cond() { then(true) } else if Date().timeIntervalSince(start) > timeout { then(false) } else { after(0.3) { tick() } }
+        }
+        tick()
+    }
+
+    private static var topEditor: EditorViewController? { library?.navigationController?.topViewController as? EditorViewController }
+    private static func back() { library?.navigationController?.popToRootViewController(animated: false) }
+    private static func rawAttr(_ u: URL, _ name: String) -> String {
+        Library.appAttributes(of: u)["net.satoru.satoruEditor." + name].map { String(decoding: $0, as: UTF8.self) } ?? "nil"
+    }
+
+    static func runCloud() {
+        guard LibraryLocation.isICloud else { return log("FAIL not using iCloud") }
+        log("location \(LibraryLocation.displayName) root=\(Library.root.path)")
+        library?.reload()
+        for i in Library.items() {
+            log("item \(i.folder.map { $0 + "/" } ?? "")\(i.url.lastPathComponent) mode=\(i.mode ?? "nil") placeholder=\(i.isPlaceholder)")
+        }
+        snap("cloud-library")
+        // タブを「この iPhone」に → 日記を iCloud に移す (表示の拡張属性もついていく) → タブを iCloud に戻す
+        LibraryLocation.prefersICloud = false
+        log("tab-local icloud=\(LibraryLocation.isICloud) items=\(Library.items().count)")
+        after(0.6) {
+            snap("cloud-tab-local")
+            guard let d = Library.items().first(where: { $0.name == "日記" }) else { return log("FAIL no local diary") }
+            library?.moveToOtherPlace(d)
+            after(1.0) {
+                let moved = Library.items(in: LibraryLocation.iCloudDocuments!).first { $0.name.hasPrefix("日記 ") }
+                log("moved-to-icloud \(moved?.url.lastPathComponent ?? "nil") mode=\(moved?.mode ?? "nil") local-left=\(FileManager.default.fileExists(atPath: d.url.path))")
+                LibraryLocation.prefersICloud = true
+                after(0.6) { cloudOpenSteps() }
+            }
+        }
+    }
+
+    private static func cloudOpenSteps() {
+        after(0.1) {
+            snap("cloud-library-moved")
+            // Mac で原稿用紙にしたテキスト
+            guard let g = url("春の作文.txt"), let ed = library?.open(g) else { return log("FAIL open genko") }
+            after(1.5) {
+                log("genko-open mode=\(ed.doc.mode ?? "nil") isGenko=\(ed.isGenko)")
+                snap("cloud-genko")
+                back()
+                // iCloud にだけあるもの (.クラウドだけ.txt.icloud): 開くと待ち、Mac 側で中身が届いたら開く
+                guard let p = Library.items().first(where: { $0.isPlaceholder }) else { return log("FAIL no placeholder") }
+                library?.open(p.url)
+                after(0.8) {
+                    snap("cloud-downloading")
+                    log("await download")
+                    waitUntil(25, { topEditor?.doc.url.lastPathComponent == p.url.lastPathComponent }) { ok in
+                        log("downloaded-open \(ok) mode=\(topEditor?.doc.mode ?? "nil") text=\(topEditor?.textView.text.prefix(10) ?? "")")
+                        after(1.2) {
+                            snap("cloud-downloaded")
+                            back()
+                            cloudExternalEdit()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// 開いているあいだに Mac 側で書き換える → 読み直す。こちらでも書き換えていたら、両方残す
+    private static func cloudExternalEdit() {
+        guard let m = url("Macのメモ.txt"), let ed = library?.open(m) else { return log("FAIL open memo") }
+        after(1.0) {
+            log("await external-edit")
+            waitUntil(25, { ed.textView.text.contains("Mac で書き足した行") }) { ok in
+                log("reloaded \(ok) dirty=\(ed.doc.isDirty)")
+                after(0.3) {
+                    snap("cloud-reloaded")
+                    // 食い違い: ほかの端末で書いたあとに、こちらでも書く (見直しを止めて、保存のときに気づくか)
+                    ed.pauseDiskCheckForTesting = true
+                    let other = "Macのメモ\n別の端末で書いた版\n"
+                    try? other.data(using: .utf8)?.write(to: ed.doc.url)
+                    try? FileManager.default.setAttributes([.modificationDate: Date().addingTimeInterval(5)], ofItemAtPath: ed.doc.url.path)
+                    ed.textView.becomeFirstResponder()
+                    ed.textView.selectedRange = NSRange(location: (ed.textView.text as NSString).length, length: 0)
+                    ed.textView.insertText("iPhone で書いた行\n")
+                    after(2.5) {
+                        let mine = (try? String(contentsOf: ed.doc.url, encoding: .utf8)) ?? ""
+                        let copy = ed.doc.url.deletingLastPathComponent().appendingPathComponent("Macのメモ (別の端末).txt")
+                        let theirs = (try? String(contentsOf: copy, encoding: .utf8)) ?? ""
+                        log("conflict mine-kept=\(mine.contains("iPhone で書いた行")) other-kept=\(theirs == other)")
+                        ed.textView.resignFirstResponder()
+                        after(0.5) {
+                            snap("cloud-conflict")
+                            ed.presentedViewController?.dismiss(animated: false)
+                            ed.pauseDiskCheckForTesting = false
+                            back()
+                            cloudKeepsAttributes()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Mac 版の表示 (a4) と変更履歴の id は、iPhone で書いて保存しても消えない
+    private static func cloudKeepsAttributes() {
+        guard let a = url("A4の書類.txt"), let ed = library?.open(a) else { return log("FAIL open a4") }
+        after(1.0) {
+            log("a4-open mode=\(ed.doc.mode ?? "nil") (editor)")
+            ed.textView.selectedRange = NSRange(location: 0, length: 0)
+            ed.textView.insertText("追記 ")
+            after(2.0) {
+                log("after-save mode=\(rawAttr(a, "mode#S")) history=\(rawAttr(a, "history#S"))")
+                back()
+                library?.present(UINavigationController(rootViewController: SettingsViewController()), animated: false)
+                after(0.8) {
+                    snap("cloud-settings")
+                    library?.dismiss(animated: false)
+                    after(0.5) {
+                        snap("cloud-library-final")
+                        log("done")
+                    }
+                }
+            }
+        }
+    }
+
+    /// iCloud が使えない (シミュレータ・サインインしていない): この iPhone の中を使い、設定に書いておく
+    static func runNoCloud() {
+        waitUntil(10, { if case .checking = LibraryLocation.iCloud { return false }; return true }) { _ in
+            log("nocloud icloud=\(LibraryLocation.isICloud) name=\(LibraryLocation.displayName) items=\(Library.items().count)")
+            library?.present(UINavigationController(rootViewController: SettingsViewController()), animated: false)
+            after(0.8) {
+                snap("nocloud-settings")
+                library?.dismiss(animated: false)
                 log("done")
             }
         }

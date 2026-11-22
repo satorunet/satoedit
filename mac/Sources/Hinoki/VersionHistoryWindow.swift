@@ -260,6 +260,14 @@ final class VersionHistoryWindowController: NSWindowController, NSTableViewDataS
 }
 
 extension EditorWindowController {
+    /// ファイル > 名前を変更…: 開いているファイルそのものの名前を変える (まだ保存していなければ、保存して名前を付ける)
+    @objc func renameFileHM(_ sender: Any?) {
+        guard let d = hdoc else { return }
+        guard let u = d.fileURL, d.remote == nil else { d.saveAs(nil); return }
+        if d.isDocumentEdited { d.save(nil) }
+        TextLibrary.askRename(u, window: window)
+    }
+
     /// ファイル > 版の履歴…
     @objc func versionHistoryHM(_ sender: Any?) {
         guard let u = hdoc?.fileURL else { NSSound.beep(); return }

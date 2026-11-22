@@ -24,3 +24,4 @@ mac/tools/
 ios/SatoruEditor.xcodeproj/
 windows/host/tests/bin/
 windows/host/tests/obj/
+__pycache__/

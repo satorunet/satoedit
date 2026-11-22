@@ -145,17 +145,16 @@ export function backupPane(app) {
     pane.textContent = '';
     pane.append(
       box(t('テキストのバックアップ'),
-        h('div', { class: 'modal-line' }, t('テキスト一覧のファイルを、パスワードで鍵をかけた 1 つのファイルに書き出します。読み込むと、別の PC や Mac にも戻せます。')),
+        h('div', { class: 'modal-line' }, t('テキストを、パスワード付きの 1 つのファイルにまとめて保存します。別の PC や Mac にも戻せます。')),
         h('div', { class: 'form-row' },
           h('button', { onclick: () => exportBackup(app) }, t('テキストをバックアップ (書き出す)…')),
           h('button', { onclick: () => importBackup(app) }, t('バックアップから戻す (読み込む)…'))),
-        h('div', { class: 'dim' }, t('入るもの: さとるエディタのフォルダのファイルすべて (フォルダの形のまま)、一覧に出ている「ほかの場所」のテキスト、表示 (原稿用紙など)・ピン・ロック・日時、版の履歴、フォルダのアイコンと並び、公開したリンクの記録。')),
-        h('div', { class: 'dim' }, t('戻すときは、今あるファイルは消しません。同じ名前で中身が違うものは「(バックアップ)」を付けて別に置きます。パスワードを忘れると、このバックアップは開けません。'))),
-      box(t('版の記録'),
+        h('div', { class: 'dim' }, t('テキスト・フォルダ・版の履歴などが、まるごと入ります。')),
+        h('div', { class: 'dim' }, t('戻しても、今あるファイルは消えません。パスワードを忘れると開けないので注意。'))),
+      box(t('版の履歴'),
         h('label', { class: 'check-row' }, h('input', { type: 'checkbox', checked: app.prefs.versionHistory !== false, onchange: e => app.setPref('versionHistory', e.target.checked) }),
           t('保存のたびに、テキストごとの版を残す')),
-        h('div', { class: 'dim' }, t('保存するたびに、そのテキストの中身を記録します (自動保存が続くあいだは 20 秒ごとに 1 つにまとめます。Ctrl+S で保存したときは、すぐ記録します)。ファイル > 版の履歴… や、テキスト一覧の右クリックから、前の版を見たり、今との違いを見たり、戻したりできます。')),
-        h('div', { class: 'dim' }, t('記録はこの PC の中 (%USERPROFILE%\\.satoruEditor\\history) に、テキストごとに置きます。あなたのフォルダには何も作りません。エクスプローラーで動かしたり名前を変えたりしても履歴はついていき、テキストを削除すると履歴も消えます。暗号化した文書は記録しません。')),
+        h('div', { class: 'dim' }, t('保存するたびに版を残します。テキスト一覧の右クリックから、前の版を見たり戻したりできます。')),
         h('div', { class: 'form-row' }, h('label', {}, t('テキストごとに残す版の数')), maxSel, h('span', { class: 'dim' }, t('(それより古い版は消えます)'))),
         h('div', { class: 'form-row' }, h('button', { onclick: () => app.api.versionReveal() }, t('記録の場所をエクスプローラーで開く')))));
   };

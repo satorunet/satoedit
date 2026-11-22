@@ -16,8 +16,11 @@ namespace SatoEdit {
     public const string HistoryStream = "net.satoru.satoruEditor.history";
     public const string BlankBaseName = "新規テキスト";
 
-    /// 置き場所。動作確認では SATORU_LIBRARY_DIR で別の場所にする (本物のドキュメントに触れないように)
-    public static string Root {
+    /// ▼ ボタンの「任意フォルダ…」で選んだフォルダ (null = ローカル)。選んでいるあいだは、ここがテキスト一覧の基準になる
+    public static volatile string Custom;
+
+    /// ふだんの置き場所。動作確認では SATORU_LIBRARY_DIR で別の場所にする (本物のドキュメントに触れないように)
+    public static string DefaultRoot {
       get {
         var o = Environment.GetEnvironmentVariable("SATORU_LIBRARY_DIR");
         if (!string.IsNullOrEmpty(o)) return Path.GetFullPath(o);
@@ -25,6 +28,15 @@ namespace SatoEdit {
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "さとるエディタ");
       }
     }
+
+    /// 置き場所 (任意フォルダを選んでいれば、そこ)
+    public static string Root {
+      get {
+        var c = Custom;
+        return c != null && Directory.Exists(c) ? c : DefaultRoot;
+      }
+    }
+    public static bool UsesCustom { get { var c = Custom; return c != null && Directory.Exists(c); } }
 
     public static string Norm(string p) {
       try { return Path.GetFullPath(p).TrimEnd('\\'); } catch { return p ?? ""; }
@@ -117,7 +129,9 @@ namespace SatoEdit {
       var outl = new List<object>();
       if (depth >= 8) return outl;
       foreach (var c in ChildFolders(rel, order)) {
-        outl.Add(new JObj { { "rel", c }, { "name", c.Split('/').Last() }, { "children", Tree(c, order, depth + 1) } });
+        double created = 0;
+        try { created = Ms(Directory.GetCreationTimeUtc(FolderPath(c))); } catch { }
+        outl.Add(new JObj { { "rel", c }, { "name", c.Split('/').Last() }, { "created", created }, { "children", Tree(c, order, depth + 1) } });
       }
       return outl;
     }
@@ -225,6 +239,80 @@ namespace SatoEdit {
       foreach (var f in files) {
         try { var it = Item(f); if (it != null) outl.Add(it); } catch { }
       }
+      return outl;
+    }
+
+    static bool Hidden(FileSystemInfo f) => f.Name.StartsWith(".") || (f.Attributes & (FileAttributes.Hidden | FileAttributes.System)) != 0;
+
+    static JObj Lite(FileInfo fi, string group) => new JObj { { "path", fi.FullName }, { "name", fi.Name }, { "title", Path.GetFileNameWithoutExtension(fi.Name) },
+      { "modified", Ms(fi.LastWriteTimeUtc) }, { "created", Ms(fi.CreationTimeUtc) }, { "group", group }, { "inFolder", group != null },
+      { "locked", (fi.Attributes & FileAttributes.ReadOnly) != 0 } };
+
+    /// 一覧に出すファイルを集める (中身は読まない。速い): さとるエディタのフォルダの中すべて、開いた・保存したファイル (known)、
+    /// 開いたほかの場所のフォルダ (externals。中のフォルダも 3 段まで、2000 件まで)。フォルダの木もいっしょに返す
+    public static JObj Scan(List<string> known, List<string> order, List<string> externals) {
+      var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+      var files = new List<object>();
+      var root = Root;
+      var rootNorm = Norm(root);
+      if (Directory.Exists(root)) {
+        foreach (var rel in new[] { "" }.Concat(Subfolders(order))) {
+          var dir = rel == "" ? rootNorm : rootNorm + "\\" + rel.Replace('/', '\\');
+          try {
+            foreach (var f in new DirectoryInfo(dir).GetFiles()) {
+              if (Hidden(f) || IsNonText(f.Name) || !seen.Add(f.FullName)) continue;
+              files.Add(Lite(f, rel));
+            }
+          } catch { }
+        }
+      }
+      foreach (var k in known) {
+        try {
+          var p = Norm(k);
+          if (seen.Contains(p) || IsNonText(p)) continue;
+          var fi = new FileInfo(p);
+          if (!fi.Exists) continue;
+          seen.Add(fi.FullName);
+          files.Add(Lite(fi, Group(fi.FullName)));
+        } catch { }
+      }
+      var ext = new List<object>();
+      foreach (var e in externals) {
+        var top = Norm(e);
+        if (!Directory.Exists(top)) continue;
+        int n = 0;
+        void Walk(string dir, int depth) {
+          if (n >= 2000) return;
+          try {
+            var di = new DirectoryInfo(dir);
+            foreach (var f in di.GetFiles()) {
+              if (Hidden(f) || IsNonText(f.Name)) continue;
+              if (seen.Add(f.FullName)) { files.Add(Lite(f, Group(f.FullName))); if (++n >= 2000) return; }
+            }
+            if (depth < 3) foreach (var d in di.GetDirectories()) if (!Hidden(d)) Walk(d.FullName, depth + 1);
+          } catch { }
+        }
+        Walk(top, 0);
+        ext.Add(ExtTree(top, 0));
+      }
+      return new JObj { { "root", root }, { "files", files }, { "tree", Tree("", order) }, { "externals", ext } };
+    }
+
+    /// 開いたほかの場所のフォルダの木 (3 段まで。1 段 200 個まで)
+    static JObj ExtTree(string path, int depth) {
+      var kids = new List<object>();
+      if (depth < 3) {
+        try {
+          foreach (var d in new DirectoryInfo(path).GetDirectories().Where(d => !Hidden(d)).OrderBy(d => d.Name, Ja).Take(200)) kids.Add(ExtTree(d.FullName, depth + 1));
+        } catch { }
+      }
+      return new JObj { { "path", path }, { "name", Path.GetFileName(path.TrimEnd('\\')) is string nm && nm != "" ? nm : path }, { "children", kids } };
+    }
+
+    /// 中身 (題名・本文のはじめ・表示) を読む。テキストでないものは null
+    public static List<object> Read(List<string> paths) {
+      var outl = new List<object>();
+      foreach (var p in paths) { try { outl.Add(Item(p)); } catch { outl.Add(null); } }
       return outl;
     }
 

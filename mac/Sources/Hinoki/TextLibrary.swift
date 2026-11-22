@@ -2,6 +2,8 @@ import AppKit
 import UniformTypeIdentifiers
 
 private var panelWidthKey = 0
+private var panelHandleKey = 0
+private var panelLinkKey = 0
 import HinokiCore
 
 // テキスト一覧 (メモ帳のように、これまで書いた・開いたテキストをまとめて扱う)。
@@ -92,13 +94,148 @@ enum TextLibrary {
     private static let visibleKey = "libraryVisible"
     private static let maxKnown = 500
 
-    /// 自動で保存する場所 (書類/さとるエディタ)
+    /// 自動で保存する場所 (書類/さとるエディタ。iCloud に置く設定なら iCloud Drive/さとるエディタ)
     static var folder: URL {
         // 動作確認用: 本物の書類フォルダに触れないよう、別の場所に差し替える (アプリ本体では使わない)
         if let o = ProcessInfo.processInfo.environment["SATORU_LIBRARY_DIR"] { return URL(fileURLWithPath: o, isDirectory: true) }
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        // 表示の言語を変えても同じ場所を使うよう、名前は訳さない
-        return docs.appendingPathComponent("さとるエディタ", isDirectory: true)
+        if !usesICloud, let c = customFolder { return c }   // 任意フォルダを選んでいるときは、そこが基準
+        if usesICloud, iCloudDriveRoot != nil {
+            // iCloud に置いているときは、写した先 (覚えておいた場所)。覚えていなければ、いま使える iCloud の場所
+            if let p = UserDefaults.standard.string(forKey: iCloudPathKey) { return URL(fileURLWithPath: p, isDirectory: true) }
+            if let u = iCloudFolder { return u }
+        }
+        return localFolder
+    }
+
+    /// この Mac の中の置き場所 (書類/さとるエディタ)。表示の言語を変えても同じ場所を使うよう、名前は訳さない
+    static var localFolder: URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("さとるエディタ", isDirectory: true)
+    }
+
+    // MARK: iCloud Drive に置く (iPhone 版と同じテキストを見るため)
+
+    static let iCloudKey = "libraryInICloud"
+    /// ▾ ボタンの「任意フォルダ」で選んだ、この Mac の中のフォルダ (フォルダの欄はここを基準にする)
+    static let customKey = "libraryCustomFolder"
+    static var customRecent: [String] {
+        get { UserDefaults.standard.stringArray(forKey: "libraryCustomRecent") ?? [] }
+        set { UserDefaults.standard.set(newValue, forKey: "libraryCustomRecent") }
+    }
+    static var customFolder: URL? {
+        guard let p = UserDefaults.standard.string(forKey: customKey) else { return nil }
+        var dir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: p, isDirectory: &dir) && dir.boolValue ? URL(fileURLWithPath: p, isDirectory: true) : nil
+    }
+    /// いちばん上の階層の名前 (ふだんは「メモ」、任意フォルダのときはそのフォルダの名前)
+    static var rootName: String { !usesICloud ? customFolder?.lastPathComponent ?? L("メモ") : L("メモ") }
+    /// 任意フォルダを基準にして見る
+    static func showCustom(_ url: URL) {
+        let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+        UserDefaults.standard.set(false, forKey: iCloudKey)
+        UserDefaults.standard.set(path, forKey: customKey)
+        // 開いたことのある任意フォルダ (新しい順に 8 つまで。▾ ボタンの「任意フォルダ…」の下に出す)
+        customRecent = Array(([path] + customRecent.filter { $0 != path }).prefix(8))
+        selectedGroup = "all"
+        changed()
+    }
+    /// iCloud Drive に置く設定か
+    static var usesICloud: Bool { UserDefaults.standard.bool(forKey: iCloudKey) }
+    /// iCloud Drive のいちばん上 (この Mac で iCloud Drive を使っていなければ nil)
+    static var iCloudDriveRoot: URL? {
+        let u = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+        var dir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: u.path, isDirectory: &dir) && dir.boolValue ? u : nil
+    }
+    /// iPhone 版と同じ iCloud の入れ物 (iPhone 版を一度使うと、この Mac にもできる)。
+    /// iCloud Drive では「さとるエディタ」という名前のフォルダに見える
+    static var iCloudContainerDocuments: URL? {
+        let u = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Mobile Documents/iCloud~net~satoru~satoruEditor/Documents", isDirectory: true)
+        var dir: ObjCBool = false
+        return FileManager.default.fileExists(atPath: u.path, isDirectory: &dir) && dir.boolValue ? u : nil
+    }
+    /// iCloud の置き場所: iPhone 版と同じ入れ物があればそこ、なければ iCloud Drive の「さとるエディタ」フォルダ
+    static var iCloudFolder: URL? {
+        if let c = iCloudContainerDocuments { return c }
+        return iCloudDriveRoot?.appendingPathComponent("さとるエディタ", isDirectory: true)
+    }
+    private static let iCloudPathKey = "libraryICloudPath"
+
+    /// 起動したとき: iCloud Drive が使えるなら、何も選ばなくても最初から iCloud に置く (今のテキストは写す)。
+    /// iPhone 版と同じ入れ物がこの Mac にできたら、そちらへ写して使う
+    static func autoICloud() {
+        guard ProcessInfo.processInfo.environment["SATORU_LIBRARY_DIR"] == nil, iCloudDriveRoot != nil else { return }
+        let d = UserDefaults.standard
+        // はじめはローカル (この Mac)。iCloud は ▾ ボタンから選ぶ
+        if d.object(forKey: iCloudKey) == nil {
+            showStorage(iCloud: false)
+            return
+        }
+        guard usesICloud, let target = iCloudContainerDocuments,
+              folder.standardizedFileURL.path != target.standardizedFileURL.path else { return }
+        _ = try? switchStorage(toICloud: true)
+    }
+
+    /// フォルダの欄のタブ: どちらの置き場所 (iCloud / この Mac) のテキストを見るか。ファイルは写さない
+    static func showStorage(iCloud: Bool) {
+        guard iCloud != usesICloud || customFolder != nil || UserDefaults.standard.object(forKey: iCloudKey) == nil else { return }
+        UserDefaults.standard.removeObject(forKey: customKey)
+        if iCloud, let to = iCloudFolder {
+            try? FileManager.default.createDirectory(at: to, withIntermediateDirectories: true)
+            UserDefaults.standard.set(to.path, forKey: iCloudPathKey)
+        }
+        UserDefaults.standard.set(iCloud, forKey: iCloudKey)
+        selectedGroup = "all"
+        changed()
+    }
+
+    /// 置き場所を変える。前の場所のテキストを新しい場所へ写す (前の場所のファイルは消さない)。
+    /// 同じ名前で中身がちがうものは「(Mac)」を付けて別に置く。写した数を返す
+    @discardableResult
+    static func switchStorage(toICloud: Bool) throws -> Int {
+        let fm = FileManager.default
+        let from = folder
+        guard let to = toICloud ? iCloudFolder : localFolder else { throw CocoaError(.fileNoSuchFile) }
+        defer {
+            if toICloud { UserDefaults.standard.set(to.path, forKey: iCloudPathKey) }
+            else { UserDefaults.standard.removeObject(forKey: iCloudPathKey) }
+        }
+        try fm.createDirectory(at: to, withIntermediateDirectories: true)
+        var copied = 0
+        if from.standardizedFileURL.path != to.standardizedFileURL.path,
+           let walker = fm.enumerator(at: from, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles]) {
+            for case let u as URL in walker {
+                let rel = String(u.standardizedFileURL.path.dropFirst(from.standardizedFileURL.path.count + 1))
+                var dest = to.appendingPathComponent(rel)
+                if (try? u.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true {
+                    try? fm.createDirectory(at: dest, withIntermediateDirectories: true)
+                    continue
+                }
+                if fm.fileExists(atPath: dest.path) {
+                    if fm.contentsEqual(atPath: u.path, andPath: dest.path) { continue }
+                    let base = dest.deletingPathExtension().lastPathComponent, ext = dest.pathExtension
+                    dest = dest.deletingLastPathComponent().appendingPathComponent(base + " (Mac)" + (ext.isEmpty ? "" : "." + ext))
+                    if fm.fileExists(atPath: dest.path) { continue }
+                }
+                // 写すと、表示 (作文など) の印 (拡張属性) もいっしょに付いていく
+                try fm.copyItem(at: u, to: dest)
+                copied += 1
+            }
+        }
+        UserDefaults.standard.set(toICloud, forKey: iCloudKey)
+        changed()
+        return copied
+    }
+
+    /// iCloud から、まだこの Mac に落ちてきていないファイル (「.名前.icloud」) を落としてくる
+    private static func downloadPlaceholders(in dir: URL) {
+        let fm = FileManager.default
+        guard usesICloud, let list = try? fm.contentsOfDirectory(atPath: dir.path) else { return }
+        for name in list where name.hasPrefix(".") && name.hasSuffix(".icloud") {
+            let real = dir.appendingPathComponent(String(name.dropFirst().dropLast(".icloud".count)))
+            try? fm.startDownloadingUbiquitousItem(at: real)
+        }
     }
 
     static func isInFolder(_ url: URL?) -> Bool { group(of: url) != nil }
@@ -258,6 +395,7 @@ enum TextLibrary {
         case "all": return true
         case "root": return item.group == ""
         case "other": return item.group == nil && externalRoot(of: item.url) == nil
+        case "shared": return item.sharedURL != nil   // リンクで公開共有しているもの
         case let k where k.hasPrefix("ext:"):
             let root = URL(fileURLWithPath: String(k.dropFirst(4))).standardizedFileURL.resolvingSymlinksInPath().path
             return item.url.path.hasPrefix(root + "/")
@@ -351,6 +489,21 @@ enum TextLibrary {
         return newRel
     }
 
+    /// 確認の窓に出す、左寄せの名前の並び (多いときは 8 件まで + …)
+    static func leftList(_ names: [String]) -> NSView {
+        let text = names.prefix(8).map { "・" + $0 }.joined(separator: "\n") + (names.count > 8 ? "\n…" : "")
+        let f = NSTextField(wrappingLabelWithString: text)
+        f.font = .systemFont(ofSize: 11)
+        f.alignment = .left
+        f.lineBreakMode = .byTruncatingMiddle
+        f.maximumNumberOfLines = 9
+        let w: CGFloat = 230
+        f.preferredMaxLayoutWidth = w
+        let h = ceil(f.sizeThatFits(NSSize(width: w, height: 1000)).height)
+        f.frame = NSRect(x: 0, y: 0, width: w, height: h)
+        return f
+    }
+
     /// 文書を別のフォルダへ移す (group: "" = さとるエディタ直下、"旅行/京都" = その中のフォルダ)
     static func move(_ url: URL, toGroup g: String) {
         move(url, toDirectory: folderURL(g))
@@ -419,7 +572,8 @@ enum TextLibrary {
     // MARK: 読み出し
 
     /// 一覧 (新しく書き換えたものが上)。重いので裏で呼ぶ
-    static func items() -> [Item] {
+    /// 一覧に出すファイルの場所だけを集める (中身は読まない。速い)
+    static func fileURLs() -> [URL] {
         let fm = FileManager.default
         var urls: [URL] = []
         var seen = Set<String>()
@@ -431,9 +585,20 @@ enum TextLibrary {
             seen.insert(p)
             urls.append(URL(fileURLWithPath: p))
         }
-        for dir in [folder] + subfolders().map(folderURL) {
-            if let list = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]) {
-                list.forEach(add)
+        // さとるエディタのフォルダの中: 道すじはそろえてあるので、1 件ずつたどり直さない (ファイルが多くても速いように)
+        let base = folder.standardizedFileURL.resolvingSymlinksInPath()
+        for rel in [""] + subfolders() {
+            let dir = rel.isEmpty ? base : base.appendingPathComponent(rel, isDirectory: true)
+            downloadPlaceholders(in: dir)
+            guard let list = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
+                                                         options: [.skipsHiddenFiles]) else { continue }
+            for u in list {
+                let v = try? u.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                if v?.isSymbolicLink == true { add(u); continue }   // リンクは、たどった先で見る
+                guard v?.isDirectory != true else { continue }
+                let p = dir.path + "/" + u.lastPathComponent
+                guard seen.insert(p).inserted else { continue }
+                urls.append(URL(fileURLWithPath: p, isDirectory: false))
             }
         }
         known.forEach { add(URL(fileURLWithPath: $0)) }
@@ -450,19 +615,90 @@ enum TextLibrary {
                 if n >= 2000 { break }
             }
         }
-        let items = urls.compactMap { u -> Item? in
-            guard var it = item(for: u) else { return nil } // PDF・画像などテキストでないものは出さない
-            it.pinned = isPinned(u)
+        return urls.filter { !isNonTextType($0) }
+    }
+
+    /// 一覧の中身。sel を渡すと、そのフォルダに入るものだけ読む (ほかのフォルダの中身は読まない)。
+    /// 中身 (題名・本文のはじめ) を読むのは新しい順に contentLimit 件まで。それより古いものはファイル名だけで出す
+    static func items(matching sel: String? = nil, contentLimit: Int = .max) -> [Item] {
+        var urls = fileURLs()
+        let ctx = ScanContext()
+        if let sel = sel, sel != "all" { urls = urls.filter { ctx.matches($0.path, sel) } }
+        let dated = urls.map { u in (u, (try? u.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) }
+            .sorted { $0.1 > $1.1 }
+        var items: [Item] = []
+        items.reserveCapacity(dated.count)
+        for (i, (u, date)) in dated.enumerated() {
+            var it: Item
+            if i < contentLimit {
+                guard let x = item(for: u, group: ctx.group(u.path), modified: date) else { continue } // PDF・画像などテキストでないものは出さない
+                it = x
+            } else {
+                let g = ctx.group(u.path)
+                it = Item(url: u, title: g != nil ? u.deletingPathExtension().lastPathComponent : u.lastPathComponent, snippet: "",
+                          modified: date, inFolder: g != nil, encrypted: false, group: g, mode: nil)
+            }
+            it.pinned = ctx.pinned.contains(u.path)
             it.locked = isLocked(u)
-            it.sharedURL = ShareLink.record(for: u)?.url
-            return it
+            it.sharedURL = ctx.shared[u.path]
+            items.append(it)
         }
         return items.sorted { $0.pinned != $1.pinned ? $0.pinned : $0.modified > $1.modified }
     }
 
+    /// たくさんのファイルを続けて見るときに、毎回読み直さないよう 1 回だけ読んでおく設定
+    struct ScanContext {
+        let root: String
+        let rootSlash: String
+        let externals: [String]
+        let pinned: Set<String>
+        let shared: [String: String]   // 道すじ → 公開中のリンク
+        init() {
+            root = TextLibrary.folder.standardizedFileURL.resolvingSymlinksInPath().path
+            rootSlash = root + "/"
+            externals = TextLibrary.externalFolders
+            pinned = Set(UserDefaults.standard.stringArray(forKey: TextLibrary.pinnedKey) ?? [])
+            var sh: [String: String] = [:]
+            for r in ShareLink.records where r.isAlive { if let p = r.path, sh[p] == nil { sh[p] = r.url } }
+            shared = sh
+        }
+        /// fileURLs() が返す道すじ (シンボリックリンクをたどった形) のフォルダ ("" = 直下、nil = 外)
+        func group(_ path: String) -> String? {
+            let parent = (path as NSString).deletingLastPathComponent
+            if parent == root { return "" }
+            guard parent.hasPrefix(rootSlash) else { return nil }
+            return String(parent.dropFirst(rootSlash.count))
+        }
+        func externalRoot(_ path: String) -> String? { externals.filter { path.hasPrefix($0 + "/") }.max { $0.count < $1.count } }
+        func matches(_ path: String, _ sel: String) -> Bool {
+            if let keys = TextLibrary.multiKeys(sel) { return keys.contains { matches(path, $0) } }
+            switch sel {
+            case "all": return true
+            case "root": return group(path) == ""
+            case "other": return group(path) == nil && externalRoot(path) == nil
+            case "shared": return shared[path] != nil
+            case let k where k.hasPrefix("ext:"):
+                let r = URL(fileURLWithPath: String(k.dropFirst(4))).standardizedFileURL.resolvingSymlinksInPath().path
+                return path.hasPrefix(r + "/")
+            default: return sel.hasPrefix("sub:") && group(path) == String(sel.dropFirst(4))
+            }
+        }
+    }
+
     /// テキストとして扱わないファイル (PDF・画像・音・動画・圧縮ファイル・Office 文書など) か。拡張子で見る
+    /// 拡張子ごとの答えを覚えておく (同じ拡張子のファイルがたくさんあっても、調べるのは 1 回)
+    private static var nonTextCache: [String: Bool] = [:]
+    private static let nonTextLock = NSLock()
     static func isNonTextType(_ url: URL) -> Bool {
         let ext = url.pathExtension.lowercased()
+        nonTextLock.lock()
+        if let hit = nonTextCache[ext] { nonTextLock.unlock(); return hit }
+        nonTextLock.unlock()
+        let r = computeNonTextType(ext)
+        nonTextLock.lock(); nonTextCache[ext] = r; nonTextLock.unlock()
+        return r
+    }
+    private static func computeNonTextType(_ ext: String) -> Bool {
         if ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "key", "pages", "numbers", "odt", "ods", "odp",
             "zip", "gz", "tgz", "bz2", "xz", "7z", "rar", "dmg", "pkg", "app", "exe", "dll", "so", "dylib", "o", "class", "jar",
             "sqlite", "db", "bin", "dat", "iso", "psd", "ai", "sketch", "fig"].contains(ext) { return true }
@@ -473,20 +709,29 @@ enum TextLibrary {
     }
 
     /// 一覧の 1 件。テキストでないもの (拡張子か中身がバイナリ) は nil
-    private static func item(for url: URL) -> Item? {
+    private static func item(for url: URL, group g: String??  = .none, modified m: Date? = nil) -> Item? {
         if isNonTextType(url) { return nil }
-        let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        let modified = m ?? (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+        let grp: String? = g ?? group(of: url)
         let head = (try? FileHandle(forReadingFrom: url)).map { h -> Data in
             defer { try? h.close() }
             return h.readData(ofLength: 6000)
         } ?? Data()
-        let inFolder = isInFolder(url)
+        let inFolder = grp != nil
         if !FileCrypto.isEncrypted(head) && BinaryData.looksBinary(head) { return nil }
         if FileCrypto.isEncrypted(head) {
             return Item(url: url, title: url.deletingPathExtension().lastPathComponent, snippet: "🔒 " + L("暗号化された文書"),
-                        modified: modified, inFolder: inFolder, encrypted: true, group: group(of: url), mode: nil)
+                        modified: modified, inFolder: inFolder, encrypted: true, group: grp, mode: nil)
         }
-        var text = (try? TextCodec.decode(head))?.text ?? ""
+        // 先頭だけ切り出したので、最後の字が途中で切れていると UTF-8 と見分けられず、遅い判定に回ってしまう。
+        // 切れた字のかけらを落としてから読む
+        var sample = head
+        if sample.count >= 6000 {
+            var cut = 0
+            while cut < 3, let last = sample.last, last & 0xC0 == 0x80 { sample.removeLast(); cut += 1 }
+            if let last = sample.last, last >= 0xC0 { sample.removeLast() }
+        }
+        var text = (try? TextCodec.decode(sample))?.text ?? ""
         // 途中で切ったので、最後の 1 文字が壊れていることがある
         if text.hasSuffix("\u{FFFD}") { text.removeLast() }
         let lines = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
@@ -497,7 +742,7 @@ enum TextLibrary {
         // 作文は原稿用紙 1 枚ぶん (400 字と改行) を描けるよう、少し長めに持つ
         let isGenko = mode == "genko" || mode == "genkoH"
         let snippet = isGenko ? String(text.prefix(700)) : String(body.prefix(400))
-        return Item(url: url, title: title, snippet: snippet, modified: modified, inFolder: inFolder, encrypted: false, group: group(of: url), mode: mode)
+        return Item(url: url, title: title, snippet: snippet, modified: modified, inFolder: inFolder, encrypted: false, group: grp, mode: mode)
     }
 
     /// 新しい文書を自動で保存するときのファイル名: 1 行目 (なければ日時) から作る。同じ名前があれば番号を付ける
@@ -719,7 +964,7 @@ enum TextLibrary {
             // タブはそのまま、中身だけ入れ替える
             if old.switchContents(to: url) {
                 oldWindow.makeKeyAndOrderFront(nil)
-                changed()
+                // 一覧は読み直さない (選んでいる行は、ウインドウが文書の入れ替えを受けて付け直す)
                 return
             }
         }
@@ -749,8 +994,29 @@ enum TextLibrary {
                 handle.widthAnchor.constraint(equalToConstant: 5),
             ])
         }
-        handle.onDrag = { dx in wc.constant = Swift.min(max, Swift.max(min, wc.constant + dx)) }
-        handle.onEnd = { UserDefaults.standard.set(Double(wc.constant), forKey: key) }
+        // 上下 2 段のときのフォルダの欄は、自分の幅を持たない (下のテキスト一覧に合わせる): そのときは一覧の幅を動かす
+        handle.onDrag = { [weak view] dx in
+            if !wc.isActive, let v = view, let other = resizeLink(of: v) { resizeHandle(of: other)?.onDrag?(dx); return }
+            wc.constant = Swift.min(max, Swift.max(min, wc.constant + dx))
+        }
+        handle.onEnd = { [weak view] in
+            if !wc.isActive, let v = view, let other = resizeLink(of: v) { resizeHandle(of: other)?.onEnd?(); return }
+            UserDefaults.standard.set(Double(wc.constant), forKey: key)
+        }
+        objc_setAssociatedObject(view, &panelHandleKey, handle, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+
+    /// 幅を動かすつまみ
+    static func resizeHandle(of view: NSView) -> PanelResizeHandle? {
+        objc_getAssociatedObject(view, &panelHandleKey) as? PanelResizeHandle
+    }
+    /// 自分の幅の決まりを外しているとき、代わりに幅を動かす欄 (弱く覚える)
+    private final class WeakBox { weak var view: NSView?; init(_ v: NSView?) { view = v } }
+    static func setResizeLink(_ view: NSView, to other: NSView?) {
+        objc_setAssociatedObject(view, &panelLinkKey, WeakBox(other), .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+    static func resizeLink(of view: NSView) -> NSView? {
+        (objc_getAssociatedObject(view, &panelLinkKey) as? WeakBox)?.view
     }
 
     /// 欄の幅の決まり (1 列にするとき、フォルダの欄の幅を外すため)
@@ -789,7 +1055,7 @@ enum TextLibrary {
             let depth = rel.components(separatedBy: "/").count - 1
             return (String(repeating: "\u{3000}", count: depth) + (rel as NSString).lastPathComponent, rel)
         }
-        for (name, g) in [(L("メモ"), "")] + folders {
+        for (name, g) in [(rootName, "")] + folders {
             _ = add(name, #selector(TextLibraryActions.moveMany(_:)), "folder", object: [urls, g] as [Any], to: sub)
         }
         let mv = add(L("移動"), nil, "folder", object: nil)
@@ -838,6 +1104,72 @@ enum TextLibrary {
         if let m = mode(for: url.standardizedFileURL.resolvingSymlinksInPath().path) { setMode(m, for: to) }
         changed()
         return to
+    }
+
+    /// ファイルの名前を変える (同じ場所のまま。別名で保存ではなく、元のファイルそのものの名前を変える)。
+    /// 拡張子を書かなければ、今の拡張子のまま。開いている文書は、そのまま新しい名前で編集を続けられる
+    @discardableResult
+    static func rename(_ url: URL, to newName: String, window: NSWindow? = nil) -> Bool {
+        var name = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        name = String(name.unicodeScalars.filter { !"/:".unicodeScalars.contains($0) && $0.value >= 0x20 })
+        guard !name.isEmpty, !name.hasPrefix(".") else { NSSound.beep(); return false }
+        if (name as NSString).pathExtension.isEmpty, !url.pathExtension.isEmpty { name += "." + url.pathExtension }
+        let to = url.deletingLastPathComponent().appendingPathComponent(name)
+        guard to.lastPathComponent != url.lastPathComponent else { return true }
+        if FileManager.default.fileExists(atPath: to.path), to.path.lowercased() != url.path.lowercased() {
+            let a = NSAlert()
+            a.messageText = L("「{0}」はもうあります", name)
+            a.informativeText = L("ほかの名前にしてください。")
+            if let w = window { a.beginSheetModal(for: w) } else { a.runModal() }
+            return false
+        }
+        if isLocked(url) {
+            let a = NSAlert()
+            a.messageText = L("ロックしているので名前を変えられません")
+            if let w = window { a.beginSheetModal(for: w) } else { a.runModal() }
+            return false
+        }
+        let pinned = isPinned(url), m = mode(for: url.standardizedFileURL.resolvingSymlinksInPath().path)
+        let finish = {
+            ShareLink.repath(from: url, to: to)
+            VersionStore.repath(from: url, to: to)
+            forget(url)
+            if !isInFolder(to) { remember(to) }
+            if pinned { setPinned(false, url); setPinned(true, to) }
+            if let m = m { setMode(m, for: to) }
+            changed()
+        }
+        if let doc = NSDocumentController.shared.document(for: url) {
+            doc.move(to: to) { err in
+                if let e = err { NSApp.presentError(e) } else { finish() }
+            }
+        } else {
+            do { try FileManager.default.moveItem(at: url, to: to); finish() } catch { NSApp.presentError(error); return false }
+        }
+        return true
+    }
+
+    /// 名前を聞いて変える (ファイル > 名前を変更…・一覧の右クリック)
+    static func askRename(_ url: URL, window: NSWindow?) {
+        let a = NSAlert()
+        a.messageText = L("ファイルの名前を変更")
+        a.informativeText = L("元のファイルの名前を変えます (中身はそのまま)。")
+        let f = NSTextField(frame: NSRect(x: 0, y: 0, width: 280, height: 24))
+        f.stringValue = url.lastPathComponent
+        a.accessoryView = f
+        a.addButton(withTitle: L("変更"))
+        a.addButton(withTitle: L("キャンセル"))
+        a.window.initialFirstResponder = f
+        // 拡張子の前までを選んでおく (すぐ打ち直せるように)
+        DispatchQueue.main.async {
+            let base = (url.lastPathComponent as NSString).deletingPathExtension as NSString
+            f.currentEditor()?.selectedRange = NSRange(location: 0, length: base.length)
+        }
+        let handle: (NSApplication.ModalResponse) -> Void = { r in
+            guard r == .alertFirstButtonReturn else { return }
+            rename(url, to: f.stringValue, window: window)
+        }
+        if let w = window { a.beginSheetModal(for: w, completionHandler: handle) } else { handle(a.runModal()) }
     }
 
     /// 好きな場所 (フォルダ) へ移す。開いている文書は、そのまま新しい場所で編集を続けられる
@@ -929,6 +1261,7 @@ enum TextLibrary {
         add(L("開く"), #selector(TextLibraryActions.openItem(_:)), "doc.text")
         add(L("Finder で表示"), #selector(TextLibraryActions.revealItem(_:)), "folder")
         add(L("ファイルの情報…"), #selector(TextLibraryActions.showInfo(_:)), "info.circle")
+        add(L("名前を変更…"), #selector(TextLibraryActions.renameItem(_:)), "pencil")
         if !item.encrypted && EditorExtension.publish.isOn { add(L("リンクで公開共有…"), #selector(TextLibraryActions.shareItem(_:)), "link") }
         m.addItem(.separator())
         add(item.pinned ? L("ピン固定を外す") : L("ピン固定 (いちばん上に)"), #selector(TextLibraryActions.togglePin(_:)), item.pinned ? "pin.slash" : "pin")
@@ -941,7 +1274,7 @@ enum TextLibrary {
             let depth = rel.components(separatedBy: "/").count - 1
             return (String(repeating: "　", count: depth) + (rel as NSString).lastPathComponent, rel)
         }
-        for (name, g) in [(L("メモ"), "")] + folders where g != item.group {
+        for (name, g) in [(rootName, "")] + folders where g != item.group {
             add(name, #selector(TextLibraryActions.moveItem(_:)), "folder", to: sub, object: [item.url, g] as [Any])
         }
         if !sub.items.isEmpty { sub.addItem(.separator()) }
@@ -1090,10 +1423,7 @@ final class TextLibraryActions: NSObject {
         a.addButton(withTitle: L("公開をやめる"))
         a.addButton(withTitle: L("キャンセル"))
         guard a.runModal() == .alertFirstButtonReturn else { return }
-        ShareLink.unpublish(r) { ok in
-            if !ok { NSSound.beep() }
-            SharedLinksWindow.shared.reload()
-        }
+        ShareLink.unpublish(r) { _ in SharedLinksWindow.shared.reload() }  // 失敗したときは unpublish が知らせる
     }
 
     /// 右クリックに出した版を押した: 履歴の窓で、その版を選んで見せる
@@ -1119,6 +1449,9 @@ final class TextLibraryActions: NSObject {
             doc.save(nil)
         }
         TextLibrary.setLocked(lock, u)
+    }
+    @objc func renameItem(_ sender: NSMenuItem) {
+        if let u = sender.representedObject as? URL { TextLibrary.askRename(u, window: NSApp.keyWindow) }
     }
     @objc func duplicateItem(_ sender: NSMenuItem) {
         if let u = sender.representedObject as? URL { TextLibrary.duplicate(u) }
@@ -1160,14 +1493,19 @@ final class TextLibraryActions: NSObject {
         let a = NSAlert()
         a.messageText = targets.count == 1 ? L("「{0}」を削除しますか？", targets[0].lastPathComponent) : L("{0} 件のテキストを削除しますか？", targets.count)
         a.informativeText = L("ゴミ箱に入れます。ゴミ箱から戻すこともできます。")
-            + (targets.count > 1 ? "\n\n" + targets.prefix(8).map { "・" + $0.lastPathComponent }.joined(separator: "\n") + (targets.count > 8 ? "\n…" : "") : "")
             + (locked.isEmpty ? "" : "\n\n" + L("ロックしている {0} 件は削除しません。", locked.count))
+        // いくつもあるときは、名前の並びを左寄せで出す
+        if targets.count > 1 { a.accessoryView = TextLibrary.leftList(targets.map(\.lastPathComponent)) }
         a.addButton(withTitle: L("削除"))
         a.addButton(withTitle: L("キャンセル"))
         a.buttons.first?.hasDestructiveAction = true
         guard a.runModal() == .alertFirstButtonReturn else { return }
         // 開いている文書なら先に閉じる
-        for u in targets { NSDocumentController.shared.document(for: u)?.close() }
+        // 開いている文書は、タブを閉じずに空の新しいテキストにする (ウインドウが消えないように)
+        for u in targets {
+            guard let d = NSDocumentController.shared.document(for: u) else { continue }
+            if let doc = d as? Document, doc.remote == nil { doc.becomeBlank() } else { d.close() }
+        }
         VersionStore.forget(targets)   // 版の履歴も消す
         NSWorkspace.shared.recycle(targets) { done, _ in
             for u in done.keys {
@@ -1257,6 +1595,12 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
     private var all: [TextLibrary.Item] = []
     private var rows: [TextLibrary.Item] = []
     private var generation = 0
+    /// フォルダにまだテキストが無いときの案内 (一覧のまん中に)
+    private let emptyLabel = EmptyStateView()
+    /// 左上の「新しいテキスト」ボタン (空のときの案内にマウスを乗せると、ぴょんぴょん跳ねて場所を知らせる)
+    private weak var newTextButton: NSButton?
+    /// 読み込み中のしるし
+    private let loading = LoadingOverlay()
     /// サムネの画面を出す (ウインドウが受け持つ)
     var onShowGrid: (() -> Void)?
     /// 中身にちょうどよい高さが変わった (上下 2 段のとき、少ないならフォルダの欄を上へ寄せる)
@@ -1287,13 +1631,21 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         title.textColor = .secondaryLabelColor
         countLabel.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
         countLabel.textColor = .secondaryLabelColor
-        let newButton = iconButton("doc.badge.plus", L("新しいテキスト"), #selector(newText(_:))) // ツールバーの「新規作成」と同じ形
+        let newButton = iconButton("doc.badge.plus", L("新しいテキスト"), #selector(newText(_:)))
+        newTextButton = newButton // ツールバーの「新規作成」と同じ形
         let searchButton = iconButton("magnifyingglass", L("検索"), #selector(toggleSearch(_:)))
         // 1 列 (フォルダを上に) ⇔ 2 列 (フォルダを左に) の切り替え
         layoutButton = iconButton(TextLibrary.oneColumn ? "rectangle.split.2x1" : "rectangle.split.1x2",
                                   L("上下 / 左右に並べ替える"), #selector(toggleColumns(_:)))
         let gridButton = iconButton("square.grid.2x2", L("サムネで一覧 (カードで見渡す)"), #selector(showGrid(_:)))
         let closeButton = iconButton("xmark", L("テキスト一覧を閉じる"), #selector(closePanel(_:)))
+        // ゴミ箱: 押すと選んだテキストを削除。ファイルやフォルダをつかんで置いても削除できる
+        let trashButton = TrashDropButton(image: NSImage(systemSymbolName: "trash", accessibilityDescription: L("削除")) ?? NSImage(),
+                                          target: self, action: #selector(trashClicked(_:)))
+        trashButton.isBordered = false
+        trashButton.toolTip = L("ゴミ箱 (選んだテキストを削除。ファイルやフォルダをここに置いても削除できます)")
+        trashButton.contentTintColor = .secondaryLabelColor
+        trashButton.symbolConfiguration = .init(pointSize: 11, weight: .regular)
         // 件数はフォルダの欄に出ているので、ここには出さない
         // 新規はいちばん左。サムネの一覧はツールバーと「表示」メニューから出す
         _ = gridButton
@@ -1301,7 +1653,7 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         let moreButton = iconButton("ellipsis.circle", L("履歴の操作"), #selector(showMore(_:)))
         // 見出しの文字は出さない (ボタンだけ)
         _ = title
-        let header = NSStackView(views: [newButton, NSView(), searchButton, layoutButton, moreButton, closeButton])
+        let header = NSStackView(views: [newButton, NSView(), searchButton, layoutButton, moreButton, trashButton, closeButton])
         header.orientation = .horizontal
         header.spacing = 2
 
@@ -1329,6 +1681,10 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         // ⇧ (続けて) ・⌘ (飛び飛び) を押しながら押すと、いくつも選べる。選んだものは右クリック・⌫ でまとめて扱う
         table.allowsMultipleSelection = true
         table.onDelete = { [weak self] in self?.deleteSelected() }
+        // 行をなぞると、そのファイルをつかんで動かせる (上のフォルダに置くと、そのフォルダへ移る)
+        table.verticalMotionCanBeginDrag = true
+        table.setDraggingSourceOperationMask(.move, forLocal: true)
+        table.setDraggingSourceOperationMask(.copy, forLocal: false)
         table.setAccessibilityLabel(L("テキスト一覧"))
         let menu = NSMenu()
         menu.delegate = self
@@ -1339,13 +1695,37 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         scroll.drawsBackground = false
         scroll.borderType = .noBorder
 
+        emptyLabel.isHidden = true
+        // 案内の「左上のボタン」を押しても、新しいテキストを作る
+        emptyLabel.onHintClick = { [weak self] in self?.newText(nil) }
+        emptyLabel.onHintHover = { [weak self] on in hopButton(self?.newTextButton, on) }
         let stack = NSStackView(views: [header, search, scroll])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 4
         stack.edgeInsets = NSEdgeInsets(top: 6, left: 4, bottom: 0, right: 2)
         stack.translatesAutoresizingMaskIntoConstraints = false
+        // ボタンの並び (見出し) は、ほんの少し濃い地にして一覧と区別する
+        let headerBG = TintBackgroundView()
+        headerBG.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(headerBG)
         addSubview(stack)
+        addSubview(emptyLabel, positioned: .above, relativeTo: nil)
+        addSubview(loading, positioned: .above, relativeTo: nil)
+        NSLayoutConstraint.activate([
+            loading.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 14),
+            loading.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+        ])
+        NSLayoutConstraint.activate([
+            headerBG.topAnchor.constraint(equalTo: topAnchor),
+            headerBG.leadingAnchor.constraint(equalTo: leadingAnchor),
+            headerBG.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -1),
+            headerBG.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: 4),
+        ])
+        NSLayoutConstraint.activate([
+            emptyLabel.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 24),
+            emptyLabel.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+        ])
         let line = NSBox()
         line.boxType = .separator
         line.translatesAutoresizingMaskIntoConstraints = false
@@ -1374,7 +1754,8 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
     required init?(coder: NSCoder) { fatalError() }
     deinit { NotificationCenter.default.removeObserver(self) }
 
-    @objc private func groupChanged(_ note: Notification) { applyFilter() }
+    /// 選ぶフォルダが変わった: そのフォルダの分を読み直す
+    @objc private func groupChanged(_ note: Notification) { reload(nil) }
 
     private func iconButton(_ symbol: String, _ tip: String, _ action: Selector) -> NSButton {
         let b = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: tip) ?? NSImage(), target: self, action: action)
@@ -1389,10 +1770,20 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
     @objc func reload(_ note: Notification?) {
         generation += 1
         let gen = generation
+        // 時間がかかるときは、前の中身を消してから「読み込み中…」を出す
+        loading.begin { [weak self] in
+            guard let self = self else { return }
+            self.emptyLabel.isHidden = true
+            self.rows = []
+            self.table.reloadData()
+        }
+        let sel = TextLibrary.selectedGroup
         DispatchQueue.global(qos: .userInitiated).async {
-            let list = TextLibrary.items()
+            // 選んでいるフォルダの分だけ読む。「すべて」のときも、中身を読むのは新しい 120 件まで
+            let list = TextLibrary.items(matching: sel, contentLimit: 120)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, gen == self.generation else { return }
+                self.loading.end()
                 self.all = list
                 self.applyFilter()
             }
@@ -1403,9 +1794,24 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         let q = search.stringValue.trimmingCharacters(in: .whitespaces).lowercased()
         let sel = TextLibrary.selectedGroup
         let inGroup = all.filter { TextLibrary.matches($0, sel) }
-        rows = q.isEmpty ? inGroup : inGroup.filter { $0.title.lowercased().contains(q) || $0.snippet.lowercased().contains(q) }
-        countLabel.stringValue = q.isEmpty ? L("全 {0} 件", inGroup.count) : L("{0} / {1} 件", rows.count, inGroup.count)
-        table.reloadData()
+        let full = q.isEmpty ? inGroup : inGroup.filter { $0.title.lowercased().contains(q) || $0.snippet.lowercased().contains(q) }
+        countLabel.stringValue = q.isEmpty ? L("全 {0} 件", inGroup.count) : L("{0} / {1} 件", full.count, inGroup.count)
+        emptyLabel.isHidden = !full.isEmpty || !loading.isHidden
+        // 空のときは、文ではなくアイコンで (検索で見つからないときは虫めがね)
+        if q.isEmpty { emptyLabel.show(symbol: "tray", caption: "NO DATA", hint: L("「左上のボタン」で新規ファイル")) }
+        else { emptyLabel.show(symbol: "magnifyingglass", caption: "NO MATCH") }
+        // 新しく作ったファイルは、上からすべり込んで入る (はじめて出るときだけ)
+        let fresh = IndexSet(full.indices.filter { !slid.contains(full[$0].url.path) && NewMark.remaining(full[$0].url) != nil })
+        fresh.forEach { slid.insert(full[$0].url.path) }
+        if !fresh.isEmpty, window != nil {
+            rows = full.enumerated().filter { !fresh.contains($0.offset) }.map(\.element)
+            table.reloadData()
+            rows = full
+            table.insertRows(at: fresh, withAnimation: [.slideDown, .effectFade])
+        } else {
+            rows = full
+            table.reloadData()
+        }
         onContentHeightChange?(contentHeight)
         selectCurrent()
     }
@@ -1463,6 +1869,14 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
             m.addItem(i)
         }
         add(L("新しいテキスト"), "doc.badge.plus") { TextLibrary.createBlankText() }
+        // フォルダの欄の操作 (同じウインドウのフォルダの欄が受け持つ)
+        add(L("新規フォルダ…"), "folder.badge.plus") { [weak self] in
+            NotificationCenter.default.post(name: TextFolderPanel.newFolderRequest, object: self?.window)
+        }
+        add(L("ほかの場所のフォルダを開く…"), "folder") { [weak self] in
+            NotificationCenter.default.post(name: TextFolderPanel.openFolderRequest, object: self?.window)
+        }
+        m.addItem(.separator())
         add(L("サムネで一覧"), "square.grid.2x2") { [weak self] in self?.onShowGrid?() }
         add(L("保存フォルダを Finder で開く"), "folder") {
             try? FileManager.default.createDirectory(at: TextLibrary.folder, withIntermediateDirectories: true)
@@ -1527,6 +1941,11 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         table.selectedRowIndexes.compactMap { $0 < rows.count ? rows[$0].url : nil }
     }
 
+    @objc private func trashClicked(_ sender: Any?) {
+        if selectedURLs.isEmpty { NSSound.beep(); return }
+        deleteSelected()
+    }
+
     private func deleteSelected() {
         let urls = selectedURLs
         guard !urls.isEmpty else { return }
@@ -1535,13 +1954,21 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
 
     func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
 
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard row >= 0, row < rows.count else { return nil }
+        return rows[row].url as NSURL
+    }
+
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? { LibrarySelectionRowView() }
+
+    /// 上からすべり込ませたファイル (同じものは 2 回すべらせない)
+    private var slid = Set<String>()
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let id = NSUserInterfaceItemIdentifier("libraryRow")
         let cell = (tableView.makeView(withIdentifier: id, owner: self) as? LibraryRowView) ?? LibraryRowView()
         cell.identifier = id
-        cell.show(rows[row], showFolder: TextLibrary.selectedGroup == "all" || TextLibrary.selectedGroup == "other"
+        cell.show(rows[row], showFolder: TextLibrary.selectedGroup == "all" || TextLibrary.selectedGroup == "other" || TextLibrary.selectedGroup == "shared"
                                         || TextLibrary.selectedGroup.hasPrefix("multi:"))
         return cell
     }
@@ -1575,6 +2002,8 @@ private final class LibraryRowView: NSTableCellView {
     private let time = NSTextField(labelWithString: "")
     /// 「すべて」を見ているときだけ、どのフォルダのものかを右下 (時間と同じ行) に出す
     private let folderTag = NSTextField(labelWithString: "")
+    /// 新しく作ったファイルの小さな点 (アイコンの左の余白に)
+    private let newBadge = NewMark.makeBadge()
 
     init() {
         super.init(frame: .zero)
@@ -1608,6 +2037,11 @@ private final class LibraryRowView: NSTableCellView {
         extLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         extLabel.setContentHuggingPriority(.required, for: .horizontal)
         folderTag.setContentHuggingPriority(.required, for: .horizontal)
+        addSubview(newBadge)
+        NSLayoutConstraint.activate([
+            newBadge.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 1),
+            newBadge.centerYAnchor.constraint(equalTo: title.centerYAnchor),
+        ])
         // 行と行の間の区切り線 (下の辺)
         let line = NSBox()
         line.boxType = .separator
@@ -1668,6 +2102,7 @@ private final class LibraryRowView: NSTableCellView {
         let fileName = ext.isEmpty ? item.url.lastPathComponent : item.url.deletingPathExtension().lastPathComponent
         extLabel.stringValue = ext.lowercased()
         extLabel.isHidden = ext.isEmpty
+        NewMark.show(newBadge, for: item.url)
         let t = NSMutableAttributedString(attributedString: TextLibrary.markedTitle(item, font: title.font ?? .systemFont(ofSize: 11.5, weight: .semibold), name: fileName))
         t.addAttribute(.paragraphStyle, value: tail, range: NSRange(location: 0, length: t.length))
         title.attributedStringValue = t
@@ -1697,7 +2132,7 @@ private final class LibraryRowView: NSTableCellView {
             // ほかの場所のテキストは、入っているフォルダの場所を出す (広ければ ~/… の道すじ、狭ければフォルダの名前)
             let parent = item.url.deletingLastPathComponent()
             let otherFull = (parent.path as NSString).abbreviatingWithTildeInPath
-            let name = item.group.map { $0.isEmpty ? L("メモ") : $0 } ?? extName ?? otherFull
+            let name = item.group.map { $0.isEmpty ? TextLibrary.rootName : $0 } ?? extName ?? otherFull
             fullTag = make(name)
             shortTag = make(item.group == nil && extName == nil ? parent.lastPathComponent : (name as NSString).lastPathComponent)
             folderTag.attributedStringValue = fullTag!
@@ -1923,7 +2358,13 @@ final class FolderNode: NSObject {
 }
 
 final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate {
-    private let outline = NSOutlineView()
+    private let outline = FolderOutlineView()
+    /// 自分で作ったフォルダがまだ無いときの案内 (フォルダの並びのすぐ下)
+    private let folderHint = HoverLabel(wrappingLabelWithString: "")
+    private var folderHintTop: NSLayoutConstraint?
+    private weak var newFolderButton: NSButton?
+    /// 読み込み中のしるし (フォルダの中を読むのに時間がかかるとき)
+    private let loading = LoadingOverlay()
     private var top: [FolderNode] = []
     private var generation = 0
     private var restoring = false
@@ -1936,8 +2377,73 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         let sv = outline.enclosingScrollView
         let chrome = bounds.height > 0 ? max(0, bounds.height - (sv?.frame.height ?? 0)) : 56
         return chrome + CGFloat(outline.numberOfRows) * (outline.rowHeight + outline.intercellSpacing.height) + 6
+            + (folderHint.isHidden ? 0 : 40)   // 作り方の案内のぶん
     }
-    private static let dragType = NSPasteboard.PasteboardType("net.satoru.satoruEditor.folderRow")
+    /// 置き場所の切り替え: 「iCloud ▾」「ローカル ▾」のボタンから選ぶ
+    private let storageTabs = NSPopUpButton(frame: .zero, pullsDown: true)
+    private func refreshStorageTabs() {
+        let can = TextLibrary.iCloudDriveRoot != nil
+        let cloud = TextLibrary.usesICloud && can
+        // ▾ ボタン: いちばん上の項目がボタンの字 (いまの置き場所)。下の 2 つから選ぶ
+        storageTabs.autoenablesItems = false
+        guard storageTabs.numberOfItems >= 3 else { return }
+        let custom = cloud ? nil : TextLibrary.customFolder
+        storageTabs.item(at: 0)?.title = cloud ? "iCloud" : custom?.lastPathComponent ?? L("ローカル")
+        storageTabs.item(at: 0)?.image = storageTabs.item(at: cloud ? 2 : custom != nil ? 4 : 1)?.image
+        storageTabs.item(at: 1)?.state = !cloud && custom == nil ? .on : .off
+        storageTabs.item(at: 2)?.isEnabled = can
+        storageTabs.item(at: 2)?.state = cloud ? .on : .off
+        storageTabs.item(at: 4)?.state = .off
+        // 開いたことのある任意フォルダを、「任意フォルダ…」の下に並べる
+        while storageTabs.numberOfItems > 5 { storageTabs.removeItem(at: 5) }
+        let fm = FileManager.default
+        var recent = TextLibrary.customRecent
+        if let c = custom?.path, !recent.contains(c) { recent.insert(c, at: 0) }
+        for p in recent where fm.fileExists(atPath: p) {
+            storageTabs.addItem(withTitle: "")   // 同じ名前があっても足せるよう、空で足してから名前を付ける
+            guard let it = storageTabs.lastItem else { continue }
+            it.title = (p as NSString).lastPathComponent
+            it.toolTip = p
+            it.representedObject = p
+            // 名前の右に ✕ (この履歴を消す)。押した行のフォルダに切り替える
+            it.view = RecentFolderMenuView(path: p, current: custom?.path == p, pick: { [weak self] in
+                TextLibrary.showCustom(URL(fileURLWithPath: p, isDirectory: true))
+                self?.refreshStorageTabs()
+            }, remove: { [weak self, weak it] in
+                TextLibrary.customRecent = TextLibrary.customRecent.filter { $0 != p }
+                if let it = it { it.menu?.removeItem(it) }
+                // 今見ているフォルダを消したときは、ローカルに戻す
+                if TextLibrary.customFolder?.path == p { TextLibrary.showStorage(iCloud: false) }
+                DispatchQueue.main.async { self?.refreshStorageTabs() }
+            })
+        }
+    }
+    @objc private func storageTabChanged(_ sender: NSPopUpButton) {
+        let i = sender.indexOfSelectedItem
+        if i >= 5, let p = sender.selectedItem?.representedObject as? String {
+            TextLibrary.showCustom(URL(fileURLWithPath: p, isDirectory: true))
+            refreshStorageTabs()
+            return
+        }
+        // 任意フォルダ: 好きな場所のフォルダを選んで、その中のテキストを一覧に出す
+        if i == 4 {
+            refreshStorageTabs()
+            DispatchQueue.main.async {
+                if let u = self.pickLocalFolders(multiple: false, message: L("フォルダの欄の基準にする、この Mac の中のフォルダを選んでください")).first {
+                    TextLibrary.showCustom(u)
+                }
+                self.refreshStorageTabs()
+            }
+            return
+        }
+        TextLibrary.showStorage(iCloud: i == 2)
+        refreshStorageTabs()
+    }
+
+    static let dragType = NSPasteboard.PasteboardType("net.satoru.satoruEditor.folderRow")
+    /// テキスト一覧の「…」から: 新規フォルダ・ほかの場所のフォルダを開く (object = ウインドウ)
+    static let newFolderRequest = Notification.Name("satoruEditor.newFolderRequest")
+    static let openFolderRequest = Notification.Name("satoruEditor.openFolderRequest")
     private static let expandedKey = "libraryFolderExpanded"
 
     init() {
@@ -1954,14 +2460,35 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         title.font = .boldSystemFont(ofSize: 11)
         title.textColor = .secondaryLabelColor
         // 「フォルダ」の横: 好きな場所のフォルダを開くボタン
-        let openButton = NSButton(image: NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: L("フォルダを開く")) ?? NSImage(),
-                                  target: self, action: #selector(openFolder(_:)))
+        // 左上: 新規フォルダ (選んでいるフォルダの中に作る)。好きな場所のフォルダを開くのは右クリックから
+        let openButton = NSButton(image: NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: L("新規フォルダ")) ?? NSImage(),
+                                  target: self, action: #selector(newFolder(_:)))
         openButton.isBordered = false
         openButton.contentTintColor = .secondaryLabelColor
-        openButton.toolTip = L("好きな場所のフォルダを開いて、中のテキストを一覧に出す")
+        openButton.toolTip = L("新規フォルダ (選んでいるフォルダの中に作る)")
+        newFolderButton = openButton
         // 見出しの文字は出さない (フォルダを開くボタンだけ)
         _ = title
-        let header = NSStackView(views: [openButton, NSView()])
+        // 置き場所のタブ: iCloud / この Mac
+        storageTabs.removeAllItems()
+        storageTabs.addItem(withTitle: "")   // ボタンの字 (いまの置き場所)
+        for (title, sym) in [(L("ローカル"), "laptopcomputer"), ("iCloud", "icloud")] {
+            storageTabs.addItem(withTitle: title)
+            storageTabs.lastItem?.image = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?
+                .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+        }
+        storageTabs.menu?.addItem(.separator())
+        storageTabs.addItem(withTitle: L("任意フォルダ…"))
+        storageTabs.lastItem?.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .regular))
+        storageTabs.isBordered = false
+        storageTabs.controlSize = .small
+        storageTabs.font = .systemFont(ofSize: 11)
+        storageTabs.target = self
+        storageTabs.action = #selector(storageTabChanged(_:))
+        storageTabs.toolTip = L("見るテキストの置き場所: iCloud (iPhone 版と同じ)・この Mac・好きなフォルダ")
+        refreshStorageTabs()
+        let header = NSStackView(views: [openButton, NSView(), storageTabs])
         header.orientation = .horizontal
         header.spacing = 4
 
@@ -1984,8 +2511,15 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         outline.action = #selector(folderClicked(_:))
         outline.autosaveExpandedItems = false
         outline.setAccessibilityLabel(L("フォルダ"))
+        outline.onDelete = { [weak self] in
+            guard let self = self else { return }
+            let rels = self.outline.selectedRowIndexes.compactMap { (self.outline.item(atRow: $0) as? FolderNode) }
+                .filter { $0.key.hasPrefix("sub:") }.compactMap(\.rel)
+            if rels.isEmpty { NSSound.beep(); return }   // 「すべて」「メモ」などは消せない
+            Self.trashFolders(rels)
+        }
         // ドラッグで並べ替え・ほかのフォルダの中へ (置く場所に線、フォルダの上に置くとその中へ)
-        outline.registerForDraggedTypes([Self.dragType])
+        outline.registerForDraggedTypes([Self.dragType, .fileURL])
         outline.setDraggingSourceOperationMask(.move, forLocal: true)
         outline.draggingDestinationFeedbackStyle = .regular
         outline.verticalMotionCanBeginDrag = true
@@ -2007,13 +2541,34 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         add.font = .systemFont(ofSize: 11)
         add.toolTip = L("新規フォルダ (選んでいるフォルダの中に作る)")
 
-        let stack = NSStackView(views: [header, scroll, add])
+        // 下の「＋ フォルダ」は、左上のボタンと同じなので出さない
+        _ = add
+        let stack = NSStackView(views: [header, scroll])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 4
         stack.edgeInsets = NSEdgeInsets(top: 6, left: 4, bottom: 6, right: 2)
         stack.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stack)
+        addSubview(loading, positioned: .above, relativeTo: nil)
+        // 「左上のボタン」で新規フォルダ: 押すと作る、マウスを乗せると左上のボタンが跳ねる
+        folderHint.attributedStringValue = EmptyStateView.hintText(L("「左上のボタン」で新規フォルダ"))
+        folderHint.translatesAutoresizingMaskIntoConstraints = false
+        folderHint.isHidden = true
+        folderHint.onClick = { [weak self] in self?.newFolder(nil) }
+        folderHint.onHover = { [weak self] on in hopButton(self?.newFolderButton, on) }
+        addSubview(folderHint, positioned: .above, relativeTo: nil)
+        let hintTop = folderHint.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 70)
+        folderHintTop = hintTop
+        NSLayoutConstraint.activate([
+            hintTop,
+            folderHint.leadingAnchor.constraint(equalTo: scroll.leadingAnchor, constant: 8),
+            folderHint.trailingAnchor.constraint(equalTo: scroll.trailingAnchor, constant: -8),
+        ])
+        NSLayoutConstraint.activate([
+            loading.topAnchor.constraint(equalTo: scroll.topAnchor, constant: 10),
+            loading.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+        ])
         let line = NSBox()
         line.boxType = .separator
         line.translatesAutoresizingMaskIntoConstraints = false
@@ -2030,6 +2585,14 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         ])
         NotificationCenter.default.addObserver(self, selector: #selector(reload), name: TextLibrary.didChange, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(followSelection), name: TextLibrary.selectionDidChange, object: nil)
+        NotificationCenter.default.addObserver(forName: Self.newFolderRequest, object: nil, queue: .main) { [weak self] n in
+            guard let self = self, n.object as? NSWindow === self.window else { return }
+            self.newFolder(nil)
+        }
+        NotificationCenter.default.addObserver(forName: Self.openFolderRequest, object: nil, queue: .main) { [weak self] n in
+            guard let self = self, n.object as? NSWindow === self.window else { return }
+            self.openFolder(nil)
+        }
         reload()
     }
 
@@ -2045,10 +2608,22 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
 
     /// フォルダの木と件数を作り直す (ファイルを読むので裏で)
     @objc func reload() {
+        refreshStorageTabs()   // ほかのウインドウで切り替えたときも合わせる
         generation += 1
         let gen = generation
+        // 時間がかかるときは、前のフォルダの並びを消してから「読み込み中…」を出す
+        loading.begin { [weak self] in
+            guard let self = self else { return }
+            self.restoring = true
+            self.top = []
+            self.outline.reloadData()
+            self.restoring = false
+        }
         DispatchQueue.global(qos: .userInitiated).async {
-            let items = TextLibrary.items()
+            // 数えるだけなので、ファイルの中身は読まない
+            struct Lite { let url: URL; let group: String?; let sharedURL: String? }
+            let ctx = TextLibrary.ScanContext()
+            let items = TextLibrary.fileURLs().map { Lite(url: $0, group: ctx.group($0.path), sharedURL: ctx.shared[$0.path]) }
             var counts: [String: Int] = [:]
             for it in items { if let g = it.group { counts[g, default: 0] += 1 } }
             func build(_ rel: String) -> [FolderNode] {
@@ -2063,10 +2638,10 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
             }
             let all = FolderNode(key: "all", name: L("すべて"), symbol: "tray.full")
             all.count = items.count
-            let root = FolderNode(key: "root", name: L("メモ"), symbol: "folder")
+            let root = FolderNode(key: "root", name: TextLibrary.rootName, symbol: "folder")
             root.count = counts[""] ?? 0
             let other = FolderNode(key: "other", name: L("ほかの場所"), symbol: "folder")
-            other.count = items.filter { $0.group == nil && TextLibrary.externalRoot(of: $0.url) == nil }.count
+            other.count = items.filter { $0.group == nil && ctx.externalRoot($0.url.path) == nil }.count
             // 開いたフォルダ (さとるエディタのフォルダの外)
             // 中のフォルダもツリーでたどれるように (3 段まで。隠しフォルダ・パッケージは出さない)
             func extTree(_ path: String, depth: Int, top: Bool) -> FolderNode {
@@ -2085,9 +2660,33 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
                 return n
             }
             let externals = TextLibrary.externalFolders.map { extTree($0, depth: 0, top: true) }
-            let list = [all, root] + build("") + externals + [other]
+            // リンクで公開共有しているテキスト (あるときだけ出す)
+            let shared = FolderNode(key: "shared", name: L("公開共有中"), symbol: "folder")
+            shared.count = items.filter { $0.sharedURL != nil }.count
+            let list = [all, root] + build("") + externals + [other] + (shared.count > 0 ? [shared] : [])
             DispatchQueue.main.async { [weak self] in
                 guard let self = self, gen == self.generation else { return }
+                self.loading.end()
+                // 新しく作ったフォルダは、いったん外して読み直し、あとから上から差し込むように入れる
+                var fresh: [(parent: FolderNode?, index: Int, node: FolderNode)] = []
+                func pull(_ nodes: inout [FolderNode], parent: FolderNode?) {
+                    var i = 0
+                    while i < nodes.count {
+                        let n = nodes[i]
+                        if n.key.hasPrefix("sub:"), let rel = n.rel, !self.slid.contains(rel),
+                           NewMark.remaining(TextLibrary.folderURL(rel)) != nil {
+                            self.slid.insert(rel)
+                            fresh.append((parent, i, n))
+                            nodes.remove(at: i)
+                            continue
+                        }
+                        pull(&nodes[i].children, parent: nodes[i])
+                        i += 1
+                    }
+                }
+                var list = list
+                let animate = self.window != nil && !self.top.isEmpty
+                if animate { pull(&list, parent: nil) }
                 self.top = list
                 self.restoring = true
                 self.outline.reloadData()
@@ -2096,11 +2695,35 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
                     for n in nodes where expanded.contains(n.key) { self.outline.expandItem(n); expand(n.children) }
                 }
                 expand(list)
+                // 前から順に戻す (同じ親の中では、外したときの位置の小さい順)
+                for f in fresh.reversed() {
+                    if let p = f.parent {
+                        p.children.insert(f.node, at: min(f.index, p.children.count))
+                        if expanded.contains(p.key) || p.key == "root" {
+                            if self.outline.isItemExpanded(p) && p.children.count > 1 {
+                                self.outline.insertItems(at: IndexSet(integer: min(f.index, p.children.count - 1)), inParent: p, withAnimation: [.slideDown, .effectFade])
+                            } else {
+                                self.outline.reloadItem(p, reloadChildren: true)
+                                self.outline.expandItem(p)
+                            }
+                        } else {
+                            self.outline.reloadItem(p, reloadChildren: true)
+                        }
+                    } else {
+                        self.top.insert(f.node, at: min(f.index, self.top.count))
+                        self.outline.insertItems(at: IndexSet(integer: min(f.index, self.top.count - 1)), inParent: nil, withAnimation: [.slideDown, .effectFade])
+                    }
+                }
+                if !fresh.isEmpty { expand(self.top) }
                 // 消えたフォルダを選んでいたら「すべて」に戻す
-                if !self.selectRows(for: TextLibrary.selectedGroup, in: list) {
+                if !self.selectRows(for: TextLibrary.selectedGroup, in: self.top) {
                     TextLibrary.selectedGroup = "all"
                 }
                 self.restoring = false
+                // 自分で作ったフォルダがまだ無いときは、並びのすぐ下に作り方の案内を出す
+                let noFolders = !self.top.contains { $0.key.hasPrefix("sub:") }
+                self.folderHint.isHidden = !noFolders
+                self.folderHintTop?.constant = CGFloat(self.outline.numberOfRows) * (self.outline.rowHeight + self.outline.intercellSpacing.height) + 10
                 self.onContentHeightChange?(self.contentHeight)
             }
         }
@@ -2153,7 +2776,7 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         name.font = .systemFont(ofSize: 11.5)
         name.lineBreakMode = .byTruncatingTail
         name.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let count = NSTextField(labelWithString: String(r.count))
+        let count = NSTextField(labelWithString: r.count > 0 ? String(r.count) : "")   // 0 件は出さない
         count.textColor = .secondaryLabelColor
         count.font = .monospacedDigitSystemFont(ofSize: 10, weight: .regular)
         count.setContentCompressionResistancePriority(.required, for: .horizontal)
@@ -2166,10 +2789,23 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
             row.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
             row.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
         ])
+        // 新しく作ったフォルダ: 名前のすぐ右に小さな点 (少しのあいだだけ)
+        if r.key.hasPrefix("sub:"), let rel = r.rel {
+            let badge = NewMark.makeBadge()
+            cell.addSubview(badge)
+            NSLayoutConstraint.activate([
+                badge.leadingAnchor.constraint(equalTo: name.trailingAnchor, constant: 3),
+                badge.centerYAnchor.constraint(equalTo: name.centerYAnchor),
+            ])
+            NewMark.show(badge, for: TextLibrary.folderURL(rel))
+        }
         return cell
     }
 
     func outlineView(_ outlineView: NSOutlineView, rowViewForItem item: Any) -> NSTableRowView? { LibrarySelectionRowView() }
+
+    /// 上から差し込んだフォルダ (同じものは 2 回動かさない)
+    private var slid = Set<String>()
 
     /// フォルダを押した: 選んであったフォルダなら開く・閉じるを切り替え、新しく選んだ閉じたフォルダは開く
     private var pickedByMouse = false
@@ -2236,17 +2872,51 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
             return (rel, index >= 0 ? index : nil)
         }
         // いちばん上の階層: 「すべて」「メモ」と「ほかの場所」の間だけ
-        guard index >= 2, index <= top.count - 1 else { return nil }
+        let otherIndex = top.firstIndex { $0.key == "other" } ?? top.count
+        guard index >= 2, index <= otherIndex else { return nil }
         return ("", index - 2)
     }
 
+    /// 一覧からつかんできたファイル
+    private func draggedFiles(_ info: NSDraggingInfo) -> [URL] {
+        guard info.draggingSource is LibraryTableView else { return [] }
+        return (info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+    }
+    /// ファイルを置く先のフォルダ (マウスの下の行。「すべて」「ほかの場所」には置けない)
+    private func fileTarget(_ outlineView: NSOutlineView, _ info: NSDraggingInfo) -> (node: FolderNode, rel: String)? {
+        let r = outlineView.row(at: outlineView.convert(info.draggingLocation, from: nil))
+        guard r >= 0, let n = outlineView.item(atRow: r) as? FolderNode, let rel = n.rel else { return nil }
+        return (n, rel)
+    }
+    private func isIn(_ u: URL, _ rel: String) -> Bool {
+        u.deletingLastPathComponent().standardizedFileURL.resolvingSymlinksInPath().path
+            == TextLibrary.folderURL(rel).standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
     func outlineView(_ outlineView: NSOutlineView, validateDrop info: NSDraggingInfo, proposedItem item: Any?, proposedChildIndex index: Int) -> NSDragOperation {
+        let files = draggedFiles(info)
+        if !files.isEmpty {
+            guard let t = fileTarget(outlineView, info), files.contains(where: { !isIn($0, t.rel) }) else { return [] }
+            outlineView.setDropItem(t.node, dropChildIndex: NSOutlineViewDropOnItemIndex)
+            return .move
+        }
         guard let dragged = info.draggingPasteboard.string(forType: Self.dragType), let t = target(item, index) else { return [] }
         if t.parent == dragged || t.parent.hasPrefix(dragged + "/") { return [] } // 自分の中へは入れない
         return .move
     }
 
     func outlineView(_ outlineView: NSOutlineView, acceptDrop info: NSDraggingInfo, item: Any?, childIndex index: Int) -> Bool {
+        let files = draggedFiles(info)
+        if !files.isEmpty {
+            guard let n = item as? FolderNode, let rel = n.rel else { return false }
+            var moved = false
+            for u in files where !isIn(u, rel) {
+                if TextLibrary.isLocked(u) { NSSound.beep(); continue } // ロックしたものは動かさない
+                TextLibrary.move(u, toGroup: rel)
+                moved = true
+            }
+            return moved
+        }
         guard let dragged = info.draggingPasteboard.string(forType: Self.dragType), let t = target(item, index) else { return false }
         let oldParent = (dragged as NSString).deletingLastPathComponent
         var rel = dragged
@@ -2274,7 +2944,17 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         var parent = ""
         if let m = sender as? NSMenuItem, let p = m.representedObject as? String { parent = p }
         else if let n = outline.item(atRow: outline.selectedRow) as? FolderNode, let rel = n.rel { parent = rel }
-        guard let name = ask(L("新しいフォルダ"), parent.isEmpty ? L("フォルダの名前") : L("「{0}」の中に作るフォルダの名前", (parent as NSString).lastPathComponent), "") else { return }
+        let fromMenu = (sender as? NSMenuItem)?.representedObject is String
+        var name: String
+        if !fromMenu, !parent.isEmpty {
+            // 自分で作ったフォルダを選んでいるとき: その中に作るか、いちばん上に別のフォルダとして作るかを選べる
+            guard let r = askPlace(parent) else { return }
+            name = r.name
+            if !r.inside { parent = "" }
+        } else {
+            guard let n = ask(L("新しいフォルダ"), parent.isEmpty ? L("フォルダの名前") : L("「{0}」の中に作るフォルダの名前", (parent as NSString).lastPathComponent), "") else { return }
+            name = n
+        }
         if let rel = TextLibrary.createFolder(name, in: parent) {
             if !parent.isEmpty {
                 var keys = Set(UserDefaults.standard.stringArray(forKey: Self.expandedKey) ?? [])
@@ -2285,6 +2965,34 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         } else {
             NSSound.beep()
         }
+    }
+
+    /// 新規フォルダの名前と、作る場所 (選んでいるフォルダの中 / いちばん上に別のフォルダとして)
+    private func askPlace(_ parent: String) -> (name: String, inside: Bool)? {
+        let a = NSAlert()
+        a.messageText = L("新しいフォルダ")
+        a.informativeText = L("フォルダの名前")
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        let inside = NSButton(radioButtonWithTitle: L("「{0}」の中に作る", (parent as NSString).lastPathComponent), target: self, action: #selector(placePicked(_:)))
+        let top = NSButton(radioButtonWithTitle: L("別のフォルダとして、いちばん上に作る"), target: self, action: #selector(placePicked(_:)))
+        inside.state = .on
+        let stack = NSStackView(views: [field, inside, top])
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 6
+        stack.frame = NSRect(x: 0, y: 0, width: 260, height: 74)
+        field.widthAnchor.constraint(equalToConstant: 260).isActive = true
+        a.accessoryView = stack
+        a.addButton(withTitle: L("OK"))
+        a.addButton(withTitle: L("キャンセル"))
+        a.window.initialFirstResponder = field
+        guard a.runModal() == .alertFirstButtonReturn else { return nil }
+        return (field.stringValue, inside.state == .on)
+    }
+    /// ラジオボタン: 同じ欄のほかのボタンを外す
+    @objc private func placePicked(_ sender: NSButton) {
+        sender.superview?.subviews.compactMap { $0 as? NSButton }.filter { $0 !== sender && $0.title != "" }.forEach { $0.state = .off }
+        sender.state = .on
     }
 
     private func ask(_ title: String, _ message: String, _ value: String) -> String? {
@@ -2346,6 +3054,7 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         } else {
             add(L("新規フォルダ…"), #selector(newFolder(_:)), "")
         }
+        add(L("ほかの場所のフォルダを開く…"), #selector(openFolder(_:)), nil)
         if n.key.hasPrefix("sub:"), let rel = n.rel {
             menu.addItem(.separator())
             add(L("名前を変更…"), #selector(renameFolder(_:)), rel)
@@ -2408,17 +3117,31 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
 
     /// 好きなフォルダを開いて、一覧に足す (中のテキストが出る。さとるエディタのフォルダには写さない)
     @objc private func openFolder(_ sender: Any?) {
+        let picked = pickLocalFolders(multiple: true, message: L("一覧に出す、この Mac の中のフォルダを選んでください (中のテキストが出ます)"))
+        picked.forEach { TextLibrary.addExternalFolder($0) }
+        if let first = picked.first {
+            TextLibrary.selectedGroup = "ext:" + first.standardizedFileURL.resolvingSymlinksInPath().path
+        }
+    }
+    /// この Mac の中のフォルダを選ぶ (ホームから始める。iCloud Drive の中は選ばせない)
+    private func pickLocalFolders(multiple: Bool, message: String) -> [URL] {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
-        panel.allowsMultipleSelection = true
+        panel.allowsMultipleSelection = multiple
         panel.prompt = L("開く")
-        panel.message = L("一覧に出すフォルダを選んでください (中のテキストが出ます)")
-        guard panel.runModal() == .OK else { return }
-        panel.urls.forEach { TextLibrary.addExternalFolder($0) }
-        if let first = panel.urls.first {
-            TextLibrary.selectedGroup = "ext:" + first.standardizedFileURL.resolvingSymlinksInPath().path
+        panel.message = message
+        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
+        guard panel.runModal() == .OK else { return [] }
+        let cloud = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Mobile Documents").standardizedFileURL.resolvingSymlinksInPath().path + "/"
+        let picked = panel.urls.filter { !($0.standardizedFileURL.resolvingSymlinksInPath().path + "/").hasPrefix(cloud) }
+        if picked.count < panel.urls.count {
+            let a = NSAlert()
+            a.messageText = L("iCloud Drive の中のフォルダは選べません")
+            a.informativeText = L("この Mac の中のフォルダを選んでください。iCloud のテキストは、▾ ボタンの「iCloud」で見られます。")
+            a.runModal()
         }
+        return picked
     }
     @objc private func revealExternal(_ sender: NSMenuItem) {
         guard let p = sender.representedObject as? String else { return }
@@ -2452,11 +3175,11 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
 
     @objc private func trashFolder(_ sender: NSMenuItem) {
         guard let rel = sender.representedObject as? String else { return }
-        trash([rel])
+        Self.trashFolders([rel])
     }
     @objc private func trashFolders(_ sender: NSMenuItem) {
         guard let rels = sender.representedObject as? [String] else { return }
-        trash(rels)
+        Self.trashFolders(rels)
     }
     @objc private func moveManyToTop(_ sender: NSMenuItem) {
         guard let rels = sender.representedObject as? [String] else { return }
@@ -2465,7 +3188,7 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
     }
 
     /// フォルダをゴミ箱に入れる (いくつでも。聞くのは 1 回。中のテキストも一緒に)
-    private func trash(_ rels: [String]) {
+    static func trashFolders(_ rels: [String]) {
         // 選んだフォルダの中のフォルダは、親と一緒に入るので外す
         let tops = rels.filter { r in !rels.contains { r != $0 && r.hasPrefix($0 + "/") } }
         guard !tops.isEmpty else { return }
@@ -2473,12 +3196,14 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         a.messageText = tops.count == 1 ? L("フォルダ「{0}」をゴミ箱に入れますか？", (tops[0] as NSString).lastPathComponent)
             : L("{0} 個のフォルダをゴミ箱に入れますか？", tops.count)
         a.informativeText = L("中のテキストとフォルダも一緒にゴミ箱に入ります。")
-            + (tops.count > 1 ? "\n\n" + tops.prefix(8).map { "・" + $0 }.joined(separator: "\n") : "")
+        if tops.count > 1 { a.accessoryView = TextLibrary.leftList(tops) }
         a.addButton(withTitle: L("ゴミ箱に入れる"))
         a.addButton(withTitle: L("キャンセル"))
         guard a.runModal() == .alertFirstButtonReturn else { return }
         for d in NSDocumentController.shared.documents {
-            if let g = TextLibrary.group(of: d.fileURL), tops.contains(where: { g == $0 || g.hasPrefix($0 + "/") }) { d.close() }
+            if let g = TextLibrary.group(of: d.fileURL), tops.contains(where: { g == $0 || g.hasPrefix($0 + "/") }) {
+                if let doc = d as? Document, doc.remote == nil { doc.becomeBlank() } else { d.close() }   // タブは閉じない
+            }
         }
         VersionStore.forget(tops.map { TextLibrary.folderURL($0) })   // 中のテキストの版の履歴も消す
         NSWorkspace.shared.recycle(tops.map { TextLibrary.folderURL($0) }) { _, _ in
@@ -2501,8 +3226,331 @@ extension Document {
 }
 
 /// テキスト一覧の表: ⌫ (と fn+⌫) で、選んでいるものを削除する
+/// 新しく作ったファイル・フォルダの目じるし: 入るときに横からすべり込み、少しのあいだ小さな「NEW」が付く
+/// ボタンをぴょんぴょん跳ねさせて場所を知らせる (on = false で止める)
+func hopButton(_ b: NSButton?, _ on: Bool) {
+    guard let b = b else { return }
+    b.wantsLayer = true
+    if on {
+        let a = CAKeyframeAnimation(keyPath: "transform.translation.y")
+        a.values = [0, 5, 0, 2.5, 0, 0]
+        a.keyTimes = [0, 0.18, 0.36, 0.5, 0.64, 1]
+        a.duration = 0.75
+        a.repeatCount = .infinity
+        b.layer?.add(a, forKey: "hop")
+        b.contentTintColor = .controlAccentColor
+    } else {
+        b.layer?.removeAnimation(forKey: "hop")
+        b.contentTintColor = .secondaryLabelColor
+    }
+}
+
+/// マウスが乗ったことを知らせるラベル
+final class HoverLabel: NSTextField {
+    var onHover: ((Bool) -> Void)?
+    /// 押した (押せるときだけ指のカーソルにする)
+    var onClick: (() -> Void)?
+    override func resetCursorRects() { if onClick != nil { addCursorRect(bounds, cursor: .pointingHand) } }
+    override func mouseDown(with event: NSEvent) { if onClick == nil { super.mouseDown(with: event) } }
+    override func mouseUp(with event: NSEvent) { onClick?() }
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        trackingAreas.forEach(removeTrackingArea)
+        addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self))
+    }
+    override func mouseEntered(with event: NSEvent) { onHover?(true) }
+    override func mouseExited(with event: NSEvent) { onHover?(false) }
+}
+
+/// 空のときのしるし: 大きめのアイコンと、小さな英字 (NO DATA など)
+final class EmptyStateView: NSStackView {
+    private let icon = NSImageView()
+    private let caption = NSTextField(labelWithString: "")
+    private let hint = HoverLabel(wrappingLabelWithString: "")
+    /// 案内の文にマウスが乗った / 外れた
+    var onHintHover: ((Bool) -> Void)? {
+        get { hint.onHover }
+        set { hint.onHover = newValue }
+    }
+    /// 案内の文を押した
+    var onHintClick: (() -> Void)? {
+        get { hint.onClick }
+        set { hint.onClick = newValue; hint.window?.invalidateCursorRects(for: hint) }
+    }
+    init() {
+        super.init(frame: .zero)
+        orientation = .vertical
+        alignment = .centerX
+        spacing = 4
+        icon.contentTintColor = .tertiaryLabelColor
+        icon.symbolConfiguration = .init(pointSize: 26, weight: .light)
+        hint.font = .systemFont(ofSize: 11)
+        hint.textColor = .secondaryLabelColor
+        hint.alignment = .center
+        setViews([icon, caption, hint], in: .center)
+        setCustomSpacing(10, after: caption)
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    /// hint の中の「」で囲んだところは、強調色の下線付きで見せる (マウスを乗せると、そのボタンが跳ねる)
+    func show(symbol: String, caption text: String, hint h: String? = nil) {
+        hint.isHidden = h == nil
+        hint.attributedStringValue = Self.hintText(h ?? "")
+        icon.image = NSImage(systemSymbolName: symbol, accessibilityDescription: text)
+        // 字の間を少しあけて、記号のように見せる
+        caption.attributedStringValue = NSAttributedString(string: text, attributes: [
+            .font: NSFont.systemFont(ofSize: 9, weight: .semibold), .foregroundColor: NSColor.tertiaryLabelColor, .kern: 1.2])
+        setAccessibilityLabel(text)
+    }
+    /// 「」で囲んだところを強調色の下線付きにした案内の文 (「」は出さない)
+    static func hintText(_ h: String) -> NSAttributedString {
+        let a = NSMutableAttributedString()
+        let p = NSMutableParagraphStyle()
+        p.alignment = .center
+        for (i, part) in h.components(separatedBy: "「").enumerated() {
+            if i > 0, let end = part.range(of: "」") {
+                // 「」は出さず、その中を強調色の下線付きで
+                a.append(NSAttributedString(string: String(part[..<end.lowerBound]), attributes: [
+                    .foregroundColor: NSColor.controlAccentColor, .underlineStyle: NSUnderlineStyle.single.rawValue]))
+                a.append(NSAttributedString(string: String(part[end.upperBound...]), attributes: [.foregroundColor: NSColor.secondaryLabelColor]))
+            } else {
+                a.append(NSAttributedString(string: part, attributes: [.foregroundColor: NSColor.secondaryLabelColor]))
+            }
+        }
+        a.addAttributes([.font: NSFont.systemFont(ofSize: 11), .paragraphStyle: p], range: NSRange(location: 0, length: a.length))
+        return a
+    }
+}
+
+/// 読み込み中のしるし: ぐるぐると「読み込み中…」(時間がかかるときだけ出す)
+final class LoadingOverlay: NSStackView {
+    private let spinner = NSProgressIndicator()
+    private let label = NSTextField(labelWithString: L("読み込み中…"))
+    private var pending: DispatchWorkItem?
+    init() {
+        super.init(frame: .zero)
+        spinner.style = .spinning
+        spinner.controlSize = .small
+        spinner.isDisplayedWhenStopped = false
+        label.font = .systemFont(ofSize: 11)
+        label.textColor = .secondaryLabelColor
+        setViews([spinner, label], in: .center)
+        orientation = .horizontal
+        spacing = 6
+        isHidden = true
+        translatesAutoresizingMaskIntoConstraints = false
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    /// 読み始めた: 少し待っても終わらなければ出す
+    func begin(_ onShow: (() -> Void)? = nil) {
+        pending?.cancel()
+        let w = DispatchWorkItem { [weak self] in
+            self?.isHidden = false
+            self?.spinner.startAnimation(nil)
+            onShow?()
+        }
+        pending = w
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25, execute: w)
+    }
+    func end() {
+        pending?.cancel()
+        pending = nil
+        spinner.stopAnimation(nil)
+        isHidden = true
+    }
+}
+
+/// ▾ ボタンの、開いたことのある任意フォルダの行: フォルダの名前 (押すと切り替え) と、右はしの ✕ (履歴から消す)
+final class RecentFolderMenuView: NSView {
+    private let pick: () -> Void
+    private let remove: () -> Void
+    private var hover = false { didSet { needsDisplay = true; name.textColor = hover ? .selectedMenuItemTextColor : .labelColor } }
+    private let name = NSTextField(labelWithString: "")
+    init(path: String, current: Bool, pick: @escaping () -> Void, remove: @escaping () -> Void) {
+        self.pick = pick
+        self.remove = remove
+        super.init(frame: NSRect(x: 0, y: 0, width: 230, height: 22))
+        toolTip = path
+        let check = NSTextField(labelWithString: current ? "✓" : "")
+        check.font = .menuFont(ofSize: 13)
+        check.frame = NSRect(x: 8, y: 3, width: 14, height: 16)
+        let icon = NSImageView(image: NSImage(systemSymbolName: "folder", accessibilityDescription: nil) ?? NSImage())
+        icon.frame = NSRect(x: 24, y: 3, width: 16, height: 16)
+        icon.contentTintColor = .secondaryLabelColor
+        name.stringValue = (path as NSString).lastPathComponent
+        name.font = .menuFont(ofSize: 13)
+        name.lineBreakMode = .byTruncatingMiddle
+        name.frame = NSRect(x: 44, y: 3, width: 150, height: 17)
+        let x = NSButton(image: NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: L("履歴から消す")) ?? NSImage(),
+                         target: nil, action: nil)
+        x.isBordered = false
+        x.contentTintColor = .tertiaryLabelColor
+        x.toolTip = L("この履歴を消す (フォルダそのものは消しません)")
+        x.frame = NSRect(x: 202, y: 2, width: 20, height: 18)
+        x.target = self
+        x.action = #selector(removeClicked)
+        for v in [check, icon, name, x] { addSubview(v) }
+        addTrackingArea(NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeAlways, .inVisibleRect], owner: self))
+    }
+    required init?(coder: NSCoder) { fatalError() }
+    @objc private func removeClicked() { remove() }
+    override func mouseEntered(with event: NSEvent) { hover = true }
+    override func mouseExited(with event: NSEvent) { hover = false }
+    override func mouseUp(with event: NSEvent) {
+        enclosingMenuItem?.menu?.cancelTracking()
+        DispatchQueue.main.async { self.pick() }
+    }
+    override func draw(_ dirtyRect: NSRect) {
+        guard hover else { return }
+        NSColor.selectedContentBackgroundColor.setFill()
+        NSBezierPath(roundedRect: bounds.insetBy(dx: 5, dy: 0), xRadius: 4, yRadius: 4).fill()
+    }
+}
+
+/// 小さな丸い点 (強調色)
+final class DotView: NSView {
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.controlAccentColor.setFill()
+        NSBezierPath(ovalIn: bounds).fill()
+    }
+}
+
+enum NewMark {
+    /// NEW を付けておく長さ (秒)
+    static let seconds: TimeInterval = 20
+    /// 作ってからの残り時間 (新しくなければ nil)
+    static func remaining(_ url: URL) -> TimeInterval? {
+        guard let c = (try? url.resourceValues(forKeys: [.creationDateKey]))?.creationDate else { return nil }
+        let age = Date().timeIntervalSince(c)
+        return age >= -5 && age < seconds ? seconds - max(0, age) : nil
+    }
+    /// 小さな NEW の札 (場所を取らないよう、アイコンの角に重ねる)
+    static func makeBadge() -> NSView {
+        let b = DotView()
+        b.toolTip = L("新しく作りました")
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.widthAnchor.constraint(equalToConstant: 7).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 7).isActive = true
+        b.isHidden = true
+        return b
+    }
+    /// 札を出し、時間が来たら消す (行が使い回されたときは、その行の札に任せる)
+    static func show(_ badge: NSView, for url: URL?) {
+        let left = url.flatMap { remaining($0) }
+        badge.isHidden = left == nil
+        badge.identifier = NSUserInterfaceItemIdentifier(url?.path ?? "")
+        guard let left = left, let path = url?.path else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + left) { [weak badge] in
+            if let b = badge, b.identifier?.rawValue == path { b.isHidden = true }
+        }
+    }
+}
+
+/// テキスト一覧の上のゴミ箱。一覧のファイル・フォルダの欄のフォルダをつかんで置くと削除する (聞いてから)
+final class TrashDropButton: NSButton {
+    override init(frame: NSRect) { super.init(frame: frame); setup() }
+    required init?(coder: NSCoder) { super.init(coder: coder); setup() }
+    private func setup() { registerForDraggedTypes([.fileURL, TextFolderPanel.dragType]) }
+
+    private func files(_ info: NSDraggingInfo) -> [URL] {
+        guard info.draggingSource is LibraryTableView else { return [] }
+        return (info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+    }
+    private func folders(_ info: NSDraggingInfo) -> [String] {
+        guard info.draggingSource is NSOutlineView else { return [] }
+        return (info.draggingPasteboard.pasteboardItems ?? []).compactMap { $0.string(forType: TextFolderPanel.dragType) }
+    }
+    private func lit(_ on: Bool) { contentTintColor = on ? .systemRed : .secondaryLabelColor }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        let ok = !files(sender).isEmpty || !folders(sender).isEmpty
+        lit(ok)
+        return ok ? .move : []
+    }
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        !files(sender).isEmpty || !folders(sender).isEmpty ? .move : []
+    }
+    override func draggingExited(_ sender: NSDraggingInfo?) { lit(false) }
+    override func draggingEnded(_ sender: NSDraggingInfo) { lit(false) }
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        let fs = files(sender), ds = folders(sender)
+        lit(false)
+        guard !fs.isEmpty || !ds.isEmpty else { return false }
+        // ドラッグが終わってから聞く
+        DispatchQueue.main.async {
+            if !fs.isEmpty { TextLibraryActions.shared.trash(fs) }
+            if !ds.isEmpty { TextFolderPanel.trashFolders(ds) }
+        }
+        return true
+    }
+}
+
+/// フォルダの欄: ふつうになぞるとフォルダをつかむ (⇧・⌘ を押しながらなぞったときだけ、続けて選ぶ)
+final class FolderOutlineView: NSOutlineView {
+    var onDelete: (() -> Void)?
+    /// Delete (⌫ / ⌦) で、選んでいるフォルダを削除する (聞いてから)
+    override func keyDown(with event: NSEvent) {
+        if event.keyCode == 51 || event.keyCode == 117, event.modifierFlags.intersection([.option, .control]).isEmpty {
+            onDelete?()
+            return
+        }
+        super.keyDown(with: event)
+    }
+    /// ふつうに押してなぞる: つかめるフォルダならつかむ、つかめない行ならなぞっても選び広げない。
+    /// ⇧・⌘ を押しているときだけ、なぞって続けて選ぶ (いつもの動き)
+    override func mouseDown(with event: NSEvent) {
+        let start = convert(event.locationInWindow, from: nil)
+        let row = self.row(at: start)
+        guard event.modifierFlags.intersection([.shift, .command]).isEmpty, row >= 0, let win = window else {
+            super.mouseDown(with: event); return
+        }
+        var writer: NSPasteboardWriting?
+        if let item = item(atRow: row) {
+            writer = (dataSource as? NSOutlineViewDataSource)?.outlineView?(self, pasteboardWriterForItem: item)
+        }
+        // 離すまでの動きを先に見る。離すだけならふつうのクリック (super に任せる)
+        while let next = win.nextEvent(matching: [.leftMouseDragged, .leftMouseUp], until: .distantFuture, inMode: .eventTracking, dequeue: false) {
+            if next.type == .leftMouseUp { break }
+            _ = win.nextEvent(matching: [.leftMouseDragged])
+            let p = convert(next.locationInWindow, from: nil)
+            guard let w = writer, hypot(p.x - start.x, p.y - start.y) > 4 else { continue }
+            let d = NSDraggingItem(pasteboardWriter: w)
+            var image: NSImage?
+            if let rv = rowView(atRow: row, makeIfNecessary: false), let rep = rv.bitmapImageRepForCachingDisplay(in: rv.bounds) {
+                rv.cacheDisplay(in: rv.bounds, to: rep)
+                let im = NSImage(size: rv.bounds.size); im.addRepresentation(rep); image = im
+            }
+            d.setDraggingFrame(rect(ofRow: row), contents: image)
+            selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+            beginDraggingSession(with: [d], event: event, source: self)
+            return
+        }
+        // 離した: 押した行を選ぶふつうのクリックとして扱う
+        super.mouseDown(with: event)
+    }
+}
+
+/// 薄く色を重ねた地 (下に細い線)。明るい・暗い画面のどちらでも合う色で描く
+final class TintBackgroundView: NSView {
+    var alpha: CGFloat = 0.075
+    override var isFlipped: Bool { true }
+    override func draw(_ dirtyRect: NSRect) {
+        NSColor.labelColor.withAlphaComponent(alpha).setFill()
+        bounds.fill()
+        NSColor.labelColor.withAlphaComponent(0.08).setFill()
+        NSRect(x: 0, y: bounds.height - 1, width: bounds.width, height: 1).fill()
+    }
+}
+
 final class LibraryTableView: NSTableView {
     var onDelete: (() -> Void)?
+    /// ふつうになぞるとファイルをつかむ。⇧ を押しながらなぞったときだけ、続けて選ぶ
+    override func mouseDown(with event: NSEvent) {
+        let shift = event.modifierFlags.contains(.shift)
+        verticalMotionCanBeginDrag = !shift
+        super.mouseDown(with: event)
+        verticalMotionCanBeginDrag = true
+    }
     override func keyDown(with event: NSEvent) {
         if event.keyCode == 51 || event.keyCode == 117, event.modifierFlags.intersection([.command, .option, .control]).isEmpty || event.modifierFlags.contains(.command) {
             onDelete?()

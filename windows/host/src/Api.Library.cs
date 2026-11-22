@@ -12,7 +12,16 @@ namespace SatoEdit {
     readonly ConcurrentDictionary<string, JObj> openedBackups = new ConcurrentDictionary<string, JObj>();
 
     void RegisterLibrary() {
-      On("libraryInfo", a => new JObj { { "root", Library.Root }, { "history", Versions.Root } });
+      On("libraryInfo", a => LibraryInfo());
+      // 任意フォルダを基準にする (null = ローカルに戻す)
+      On("librarySetRoot", a => {
+        var p = Arg(a, 0) as string;
+        Library.Custom = !string.IsNullOrEmpty(p) && Directory.Exists(p) ? Library.Norm(p) : null;
+        return LibraryInfo();
+      });
+      OnBg("libraryScan", a => Library.Scan(Strings(Arg(a, 0)), Strings(Arg(a, 1)), Strings(Arg(a, 2))));
+      OnBg("libraryRead", a => Library.Read(Strings(Arg(a, 0))));
+      On("beep", a => { System.Media.SystemSounds.Beep.Play(); return true; });
       OnBg("libraryItems", a => Library.Items(Strings(Arg(a, 0)), Strings(Arg(a, 1))));
       OnBg("libraryTree", a => Library.Tree("", Strings(Arg(a, 0))));
       OnBg("libraryCreateFolder", a => {
@@ -190,6 +199,9 @@ namespace SatoEdit {
         } catch (Exception e) { return Fail(e); }
       });
     }
+
+    static JObj LibraryInfo() => new JObj { { "root", Library.Root }, { "history", Versions.Root }, { "custom", Library.UsesCustom },
+      { "name", Path.GetFileName(Library.Root.TrimEnd('\\')) }, { "defaultRoot", Library.DefaultRoot } };
 
     static string NewToken() => string.Concat(Primitives.Random(12).Select(b => b.ToString("x2")));
 

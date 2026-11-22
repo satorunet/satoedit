@@ -8,7 +8,7 @@
 <meta property="og:description" content="書く・まとめる・共有するがサクサクできるテキストエディタ。いまは β テスト版で、みんなの意見をもとに改善中。Mac / Windows・無料・オープンソース。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://docs.satoru.net/">
-<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261122e">
+<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261122m">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/site/icon.png?v=4">
@@ -106,7 +106,9 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .hero-shot{position:relative}
 .hero-shot .hero-top{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .45s ease}
 .hero-shot .hero-top.on{opacity:1}
-.hero-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(15,20,25,.78);color:#fff;font-weight:700;font-size:.9rem;padding:5px 16px;border-radius:999px;transition:background .3s}
+.hero-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(15,20,25,.78);color:#fff;font-weight:700;font-size:.9rem;padding:5px 16px;border-radius:999px;transition:background .3s;cursor:pointer;white-space:nowrap}
+.hero-label:hover{filter:brightness(1.15)}
+.hero-label select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
 .beta-note{display:flex;gap:14px;align-items:flex-start;text-align:left;max-width:720px;margin:26px auto 0;background:#fff7ea;border:1px solid #f5c26b;border-radius:14px;padding:14px 18px;color:#6b4a00;font-size:.95rem;line-height:1.7}
 .beta-note b{color:#b26a00}
 .beta-note .ic{font-size:1.4rem;line-height:1}
@@ -125,13 +127,48 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .four img{border-radius:8px;border:1px solid var(--ln);margin-bottom:10px}
 .four b{display:block;font-size:1.1rem;margin-bottom:2px}
 .four p{margin:0;color:var(--mut);font-size:.93rem;line-height:1.7}
-@media (max-width:760px){.four{grid-template-columns:1fr}}
+.four .wide{grid-column:1/-1;display:grid;grid-template-columns:1.2fr 1fr;gap:18px;align-items:center}
+.four .wide img{margin-bottom:0}
+.gk-swap{position:relative;margin-bottom:10px}.gk-swap img{display:block;margin-bottom:0}
+.gk-swap .gk-b{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .8s}
+.gk-swap.h .gk-b{opacity:1}
+.gk-tabs{position:absolute;right:10px;bottom:10px;z-index:2;display:flex;gap:4px;padding:3px;border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.gk-tabs button{font:inherit;font-size:.8rem;font-weight:700;padding:3px 14px;border-radius:999px;border:1.5px solid var(--ln);background:var(--bg);color:var(--mut);cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.gk-tabs button[aria-selected="true"][data-k="v"]{background:var(--shu);border-color:var(--shu);color:#fff}
+.gk-tabs button[aria-selected="true"][data-k="h"]{background:var(--mid);border-color:var(--mid);color:#fff}
+.four .env{grid-column:1/-1;display:flex;gap:20px;align-items:center;padding:20px 22px}
+.env-icons{display:flex;gap:6px;font-size:2rem;flex:none}.env-icons .soon{opacity:.45}
+.env-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px!important}
+.env-tags span{font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--ln);color:var(--fg)}
+.env-tags span.soon{color:var(--mut);border-style:dashed}
+@media (max-width:760px){.four .env{flex-direction:column;align-items:flex-start}}
+@media (max-width:760px){.four{grid-template-columns:1fr}.four .wide{grid-template-columns:1fr}}
+.cust{position:relative;cursor:pointer;user-select:none}
+.cust img{transition:opacity .2s}
+.cust img.fade{opacity:.2}
+.cust-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px}
+.cust-cap{font-weight:700;font-size:.92rem}
+.cust-cap small{font-weight:400;color:var(--mut);margin-left:6px}
+.cust-dots{display:flex;gap:5px}
+.cust-dots i{width:7px;height:7px;border-radius:50%;background:var(--ln);display:block}
+.cust-dots i.on{background:var(--a)}
+.cust{position:relative}
+.cust-hl{position:absolute;left:0;width:18.6%;border-radius:6px;background:rgba(29,155,240,.28);box-shadow:inset 0 0 0 2px rgba(29,155,240,.85);pointer-events:none;z-index:1;transition:top .08s}
+.memos{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin:14px 0 8px}
+.memo{display:block;background:var(--card,#fff);border:1px solid var(--ln);border-radius:12px;padding:14px 16px;color:inherit;text-decoration:none;transition:box-shadow .15s,transform .15s}
+.memo:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-1px)}
+.memo b{display:block;font-size:1rem;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.memo span{font-size:.75rem;color:var(--mut)}
+.memo small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--mut);font-size:.85rem;margin-top:6px;line-height:1.5}
+.memo-empty{color:var(--mut);grid-column:1/-1}
+.memo-more{font-weight:600;color:var(--a);text-decoration:none}
 </style>
 </head>
 <body>
 <nav class="top"><div class="w">
   <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタβ</a>
   <a class="l" href="#features">できること</a>
+  <a class="l" href="#memos">みんなのメモ</a>
   <a class="l" href="#feedback">ご意見</a>
   <a class="dl-s" href="#download">ダウンロード</a>
 </div></nav>
@@ -139,16 +176,17 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 <header class="hero"><div class="w">
   <span class="kicker beta">β テスト版 ・ 実験中</span>
   <h1>みんなで<em>育てる</em>エディタ。</h1>
-  <p class="lead">メモから AI 作文まで、サクサク書けるテキストエディタ。いまは β テスト版です。</p>
+  <p class="lead">編集・管理・共有をサクッとできるテキストエディタ。いまは β テスト版です。</p>
   <div class="dls">
     <a class="dl" href="#download">⬇ 無料でダウンロード <small>Mac / Windows</small></a>
     <a class="dl ghost" href="#feedback">💬 意見を送る</a>
   </div>
   <div class="beta-note"><span class="ic">🧪</span><div><b>実験中です。</b> みんなの意見で、どんどん変わります。</div></div>
   <div class="hero-shot" id="hero-shot">
-    <img id="hero-a" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="さとるエディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
-    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261121x" width="1800" height="1520" alt="" aria-hidden="true">
-    <span class="hero-label" id="hero-label">標準エディタ</span>
+    <img id="hero-a" src="/site/demo-editor.jpg?v=20261122m" width="1800" height="1520" alt="さとるエディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
+    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261122m" width="1800" height="1520" alt="" aria-hidden="true">
+    <label class="hero-label" id="hero-label-box"><span id="hero-label">標準エディタ</span> ▼
+      <select id="hero-pick" aria-label="表示を選ぶ"><option value="auto">自動で切り替え</option><option value="0">標準エディタ</option><option value="1">原稿用紙 (縦書き)</option><option value="2">原稿用紙 (横書き)</option><option value="3">A4用紙</option></select></label>
   </div>
 </div></header>
 
@@ -157,11 +195,32 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   <div class="sec-k">FEATURES</div>
   <h2>できること</h2>
   <div class="four">
-    <div><img src="/site/shot-editor.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="標準エディタの画面"><b>エディタ表示</b><p>行番号つきの軽いエディタ。書いたものは一覧にまとまり、版の履歴も残ります。</p></div>
-    <div><img src="/site/shot-genko.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="原稿用紙の画面"><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
+    <div><img src="/site/shot-editor.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="標準エディタの画面"><b>エディタ表示</b><p>行番号つきの軽いエディタ。書いたものは一覧にまとまり、版の履歴も残ります。</p></div>
+    <div><div class="gk-swap" id="gk-swap"><div class="gk-tabs" id="gk-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-k="v">縦書き</button><button type="button" role="tab" aria-selected="false" data-k="h">横書き</button></div><img src="/site/shot-genko.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (縦書き) の画面"><img class="gk-b" src="/site/shot-genkoH.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (横書き) の画面"></div><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
     <div><img src="/site/shot-ai-proof.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="AI に誤字を直してもらっている画面"><b>AI 補正 <i class="badge">実験中</i></b><p>誤字直し・要約・続きを書く などを、横から出る欄で頼めます。</p></div>
     <div><a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="公開した作文のページ"></a><b>共有機能 <i class="badge">実験中</i></b><p>URL ひとつで、そのままの見た目で公開。<a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener">見本を見る</a></p></div>
+    <div class="wide">
+      <div class="cust" id="cust">
+        <span class="cust-hl" id="cust-hl" hidden></span>
+        <img id="cust-img" src="/site/custom-1.jpg?v=20261122h" width="1840" height="1296" loading="lazy" alt="設定の画面" title="押すと次の設定へ">
+        <div class="cust-bar"><span class="cust-cap" id="cust-cap"></span><span class="cust-dots" id="cust-dots"></span></div>
+      </div>
+      <div><b>用途に応じたカスタマイズ</b><p>使う機能だけをオンにして、色・字・キー・メニューも自分好みに。メモ用にも、作文用にも、仕事用にも、自分に合ったエディタにできます。</p><p class="meta">画面を押すと、次の設定に切り替わります。</p></div>
+    </div>
+    <div class="env">
+      <div class="env-icons" aria-hidden="true"><span>🍎</span><span>🪟</span><span class="soon">📱</span></div>
+      <div><b>Mac でも Windows でも、同じように動く！</b><p>パソコンの種類に関係なく、同じ機能・同じ使い心地。書いたテキストはふつうのファイルなので、どこへでも持っていけます。</p>
+      <p class="env-tags"><span>Mac ✓</span><span>Windows ✓</span><span class="soon">iPhone / iPad (開発中)</span><span class="soon">Android (開発中)</span></p></div>
+    </div>
   </div>
+</section>
+
+<section id="memos">
+  <div class="sec-k">MEMOS</div>
+  <h2>みんなのメモ</h2>
+  <p class="sec-lead">さとるエディタで書いて、「みんなのメモに掲載 OK」にして公開してくれたテキスト・作文です。</p>
+  <div class="memos" id="memo-list"><p class="memo-empty">読み込み中…</p></div>
+  <p><a class="memo-more" href="/memos">みんなのメモをもっと見る →</a></p>
 </section>
 
 <section id="feedback">
@@ -179,8 +238,8 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   <div class="sec-k">DOWNLOAD</div>
   <h2>ダウンロード (無料)</h2>
   <div class="feat">
-    <div><b>Mac 版</b><p>macOS 11 以降 (Apple シリコン / Intel)</p><a class="dl" href="/SatoruEditor-1.0.1-mac.dmg?v=20261121x" download>⬇ ダウンロード (7.1 MB)</a></div>
-    <div><b>Windows 版</b><p>Windows 10 / 11 (64 ビット)</p><a class="dl" href="/SatoruEditor-1.0.1-win-x64-setup.exe?v=20261121y" download>⬇ インストーラー (2.5 MB)</a></div>
+    <div><b>Mac 版</b><p>macOS 11 以降 (Apple シリコン / Intel)</p><a class="dl" href="/SatoruEditor-1.0.2-mac.dmg?v=20261122m" download>⬇ ダウンロード (7.3 MB)</a></div>
+    <div><b>Windows 版</b><p>Windows 10 / 11 (64 ビット)</p><a class="dl" href="/SatoruEditor-1.0.2-win-x64-setup.exe?v=20261122m" download>⬇ インストーラー (2.5 MB)</a></div>
   </div>
   <p class="meta">Windows で「PC が保護されました」と出たら、「詳細情報」→「実行」で起動できます。</p>
 </section>
@@ -193,6 +252,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   </div>
   <nav class="ft-col"><h3>リンク</h3>
     <a href="#download">ダウンロード</a>
+    <a href="/memos">みんなのメモ</a>
     <a href="#feedback">ご意見・不具合の報告</a>
     <a href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a>
     <a href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub (ソースコード)</a>
@@ -205,18 +265,24 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 // トップの画像: 同じ文章を 標準エディタ → 原稿用紙 (縦) → 原稿用紙 (横) → A4 とぱっぱと切り替える
 (function(){
   var views=[["editor","標準エディタ","#334"],["genko","原稿用紙 (縦書き)","#c0392b"],["genkoH","原稿用紙 (横書き)","#2f8f57"],["a4","A4用紙","#555"]];
-  var a=document.getElementById("hero-a"),b=document.getElementById("hero-b"),label=document.getElementById("hero-label");
+  var a=document.getElementById("hero-a"),b=document.getElementById("hero-b"),label=document.getElementById("hero-label"),box=document.getElementById("hero-label-box"),pick=document.getElementById("hero-pick");
   if(!a||!b)return;
-  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261121x"});
-  if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
-  var n=0;
-  setInterval(function(){
-    n=(n+1)%views.length;var v=views[n];
-    b.src="/site/demo-"+v[0]+".jpg?v=20261121x";
-    var show=function(){b.classList.add("on");label.textContent=v[1];label.style.background=v[2];
+  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261122m"});
+  var n=0,timer=null;
+  function go(k){
+    n=k;var v=views[n];
+    b.src="/site/demo-"+v[0]+".jpg?v=20261122m";
+    var show=function(){b.classList.add("on");label.textContent=v[1];box.style.background=v[2];
       setTimeout(function(){a.src=b.src;b.classList.remove("on")},500)};
     if(b.complete)show();else b.onload=show;
-  },2200);
+  }
+  function auto(){if(timer)return;timer=setInterval(function(){go((n+1)%views.length)},2200)}
+  // ▼ で表示を選ぶと、その表示で止める (「自動で切り替え」でまた動かす)
+  pick.addEventListener("change",function(){
+    if(pick.value==="auto"){auto();return}
+    clearInterval(timer);timer=null;go(+pick.value);
+  });
+  if(!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))auto();
 })();
 // デモのタブ: 押した表示の画像に切り替える (画像は先に読んでおく)
 (function(){
@@ -225,14 +291,83 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
     genkoH:["原稿用紙 (横書き)","横書きの原稿用紙 (緑のマス目) にも、ボタン 1 つで。"],
     a4:["A4用紙","A4 の紙の見た目で。そのまま印刷・PDF に。"]};
   var img=document.getElementById("demo-img"),cap=document.getElementById("demo-cap"),tabs=document.querySelectorAll("#demo .demo-tabs button");
-  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261121x"});
+  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261122m"});
   tabs.forEach(function(b){b.addEventListener("click",function(){
     var v=b.getAttribute("data-v");
     tabs.forEach(function(x){x.setAttribute("aria-selected",x===b?"true":"false")});
     img.classList.add("fade");
-    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261121x";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
+    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261122m";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
     img.onload=function(){img.classList.remove("fade")};
   })});
+})();
+</script>
+<script>
+// カスタマイズ: 押すたびに、いろいろな設定の画面に切り替える
+(function(){
+  var list=[["追加機能","使う機能だけスイッチでオン"],["動作環境","表示・編集・文字コードなどの基本"],["ファイルタイプ別の設定","言語ごとのタブ幅・色分け・キーワード"],["色・フォント","テーマ 8 種類。色や字を好みに"],["用紙モード","切り替えに出す用紙・ふりがな"],
+    ["キー割り当て","ショートカットを自由に"],["メニュー編集","メニューの並びや表示を変える"],["AI アシスタント","ChatGPT・Claude・Gemini・手元の AI"],
+    ["読み上げ・音声入力","声の種類・速さ・高さ"],["バックアップ","iCloud・バックアップ・版の履歴の数"]];
+  var files=[1,9,10,2,3,4,5,6,7,8];
+  var box=document.getElementById("cust"),img=document.getElementById("cust-img"),cap=document.getElementById("cust-cap"),dots=document.getElementById("cust-dots");
+  if(!box)return;
+  var n=0;
+  list.forEach(function(v,k){var d=document.createElement("i");dots.appendChild(d);var im=new Image();im.src="/site/custom-"+files[k]+".jpg?v=20261122h"});
+  function show(){cap.innerHTML=list[n][0]+"<small>"+list[n][1]+"</small>";
+    [].forEach.call(dots.children,function(d,k){d.className=k===n?"on":""});}
+  show();
+  // 画面の左の設定の一覧 (高さの割合) → 切り替える先。関連付けは見本が無いので、押しても次へ
+  var side=[[.121,1],[.160,2],[.201,3],[.240,4],[.281,5],[.321,6],[.401,9],[.490,0],[.531,7],[.572,8]];
+  function go(k){
+    if(k===n)return;
+    n=k;img.classList.add("fade");
+    setTimeout(function(){img.src="/site/custom-"+files[n]+".jpg?v=20261122h";img.alt="設定の「"+list[n][0]+"」の画面";show()},150);
+    img.onload=function(){img.classList.remove("fade")};
+  }
+  // 押せる場所 (左の設定の一覧の項目) にマウスが来たら、その項目を光らせる
+  var hl=document.getElementById("cust-hl");
+  function sideAt(e){
+    var r=img.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+    if(fx<0||fx>=0.2)return null;
+    for(var i=0;i<side.length;i++){if(Math.abs(fy-side[i][0])<0.02)return side[i]}
+    return null;
+  }
+  box.addEventListener("mousemove",function(e){
+    var it=sideAt(e);
+    if(!it){hl.hidden=true;return}
+    var r=img.getBoundingClientRect(),br=box.getBoundingClientRect();
+    hl.style.top=(r.top-br.top+r.height*(it[0]-0.019))+"px";
+    hl.style.height=(r.height*0.038)+"px";
+    hl.style.left=(r.left-br.left+r.width*0.006)+"px";
+    hl.hidden=false;
+  });
+  box.addEventListener("mouseleave",function(){hl.hidden=true});
+  box.addEventListener("click",function(e){
+    var r=img.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+    if(fx>=0&&fx<0.2){
+      for(var i=0;i<side.length;i++){if(Math.abs(fy-side[i][0])<0.02){go(side[i][1]);return}}
+    }
+    go((n+1)%list.length);
+  });
+})();
+</script>
+<script>
+// 原稿用紙: 縦書き・横書きのタブを自動で交互に。タブを押したら、その表示で止める
+(function(){
+  var box=document.getElementById("gk-swap"),tabs=document.querySelectorAll("#gk-tabs button");if(!box)return;
+  function show(h){box.classList.toggle("h",h);tabs.forEach(function(t){t.setAttribute("aria-selected",String((t.dataset.k==="h")===h))})}
+  var timer=setInterval(function(){show(!box.classList.contains("h"))},3000);
+  tabs.forEach(function(t){t.addEventListener("click",function(){clearInterval(timer);show(t.dataset.k==="h")})});
+})();
+// みんなのメモ: 作者が「みんなのメモに掲載 OK」にしたものを新しい順に 6 件
+(function(){
+  var box=document.getElementById("memo-list");if(!box)return;
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+  fetch("/api/memos").then(function(r){return r.ok?r.json():[]}).then(function(list){
+    if(!list.length){box.innerHTML='<p class="memo-empty">まだありません。公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>';return}
+    box.innerHTML=list.slice(0,6).map(function(m){
+      return '<a class="memo" href="'+esc(m.url)+'" target="_blank" rel="noopener"><b>'+esc(m.title)+'</b><span>'+esc(m.date)+' ・ '+esc(m.kind)+'</span><small>'+esc(m.snippet)+'</small></a>';
+    }).join("");
+  }).catch(function(){box.innerHTML='<p class="memo-empty">読み込めませんでした。</p>'});
 })();
 </script>
 </body></html>

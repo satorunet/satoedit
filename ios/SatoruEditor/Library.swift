@@ -5,7 +5,8 @@ import HinokiCore
 /// フォルダは 1 段だけ (Mac 版の一覧と同じ: いちばん上 = さとるエディタ、その中のフォルダ)。
 enum Library {
     /// 表示: "genko" (原稿用紙・縦書き) / "genkoH" (原稿用紙・横書き) / nil (標準エディタ)
-    struct Item {
+    struct Item: Equatable {
+        /// 本当のファイルの場所 (iCloud からまだ落としていないときも、落としたあとの場所)
         let url: URL
         let name: String
         let ext: String
@@ -14,6 +15,8 @@ enum Library {
         let modified: Date
         let mode: String?
         let snippet: String
+        /// iCloud にだけあって、まだこの端末に落としていない
+        let isPlaceholder: Bool
         var isGenko: Bool { mode == "genko" || mode == "genkoH" }
     }
 
@@ -22,39 +25,86 @@ enum Library {
     static let blankBaseName = "新規テキスト"
     static let didChange = Notification.Name("LibraryDidChange")
 
+    /// いまの置き場所: iCloud Drive の「さとるエディタ」(使えれば自動で) か、この iPhone の中
     static var root: URL {
         if let o = ProcessInfo.processInfo.environment["SATORU_LIBRARY_DIR"] { return URL(fileURLWithPath: o, isDirectory: true) }
-        return FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return LibraryLocation.iCloudRoot ?? localRoot
     }
+
+    /// この iPhone の中 (アプリの書類フォルダ。ファイル App の「このiPhone内 > さとるエディタ」)
+    static var localRoot: URL { LibraryLocation.localRoot }
 
     static func changed() { NotificationCenter.default.post(name: didChange, object: nil) }
 
     // MARK: 一覧
 
-    static func folders() -> [String] {
+    static func folders(in base: URL? = nil) -> [String] {
         let fm = FileManager.default
-        let list = (try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []
+        let list = (try? fm.contentsOfDirectory(at: base ?? root, includingPropertiesForKeys: [.isDirectoryKey], options: [.skipsHiddenFiles])) ?? []
         return list.filter { (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true && $0.lastPathComponent != "Inbox" }
             .map { $0.lastPathComponent }
             .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
     }
 
+    /// iCloud にまだ落としていないファイルは、「.名前.txt.icloud」という隠しファイルになっている
+    static func placeholderURL(for url: URL) -> URL {
+        url.deletingLastPathComponent().appendingPathComponent("." + url.lastPathComponent + ".icloud")
+    }
+
+    /// まだこの端末に落としていないか (隠しファイルだけある / iCloud の状態が「落としていない」)
+    static func needsDownload(_ url: URL) -> Bool {
+        let fm = FileManager.default
+        if !fm.fileExists(atPath: url.path) { return fm.fileExists(atPath: placeholderURL(for: url).path) }
+        var u = url
+        u.removeAllCachedResourceValues()
+        return (try? u.resourceValues(forKeys: [.ubiquitousItemDownloadingStatusKey]))?.ubiquitousItemDownloadingStatus == .notDownloaded
+    }
+
+    /// iCloud から落とし始める (iCloud でないフォルダなら何もしない)
+    static func requestDownload(_ url: URL) {
+        try? FileManager.default.startDownloadingUbiquitousItem(at: url)
+    }
+
+    private static var snippetCache: [String: (Date, String)] = [:]
+
     /// 全部のテキスト (新しく書き換えた順)
-    static func items() -> [Item] {
+    static func items(in base: URL? = nil) -> [Item] {
+        let base = base ?? root
         var out: [Item] = []
+        let fm = FileManager.default
         func scan(_ dir: URL, folder: String?) {
-            let keys: [URLResourceKey] = [.isDirectoryKey, .contentModificationDateKey]
-            for u in (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles])) ?? [] {
+            let keys: [URLResourceKey] = [.isDirectoryKey, .contentModificationDateKey, .ubiquitousItemDownloadingStatusKey]
+            // 隠しファイルも見る (iCloud の「.名前.txt.icloud」)
+            for u in (try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: keys, options: [])) ?? [] {
                 let v = try? u.resourceValues(forKeys: Set(keys))
                 if v?.isDirectory == true { continue }
-                let ext = u.pathExtension.lowercased()
+                var file = u
+                var placeholder = false
+                let fileName = u.lastPathComponent
+                if fileName.hasPrefix(".") {
+                    guard fileName.hasSuffix(".icloud"), fileName.count > 8 else { continue }
+                    file = dir.appendingPathComponent(String(fileName.dropFirst().dropLast(7)))
+                    if fm.fileExists(atPath: file.path) || file.lastPathComponent.hasPrefix(".") { continue }
+                    placeholder = true
+                } else if v?.ubiquitousItemDownloadingStatus == .notDownloaded {
+                    placeholder = true
+                }
+                let ext = file.pathExtension.lowercased()
                 guard textExtensions.contains(ext) || ext.isEmpty else { continue }
-                out.append(Item(url: u, name: u.deletingPathExtension().lastPathComponent, ext: u.pathExtension, folder: folder,
-                                modified: v?.contentModificationDate ?? .distantPast, mode: mode(of: u), snippet: snippet(u)))
+                let modified = v?.contentModificationDate ?? .distantPast
+                var snip = ""
+                if !placeholder {
+                    if let c = snippetCache[file.path], c.0 == modified { snip = c.1 } else {
+                        snip = snippet(file)
+                        snippetCache[file.path] = (modified, snip)
+                    }
+                }
+                out.append(Item(url: file, name: file.deletingPathExtension().lastPathComponent, ext: file.pathExtension, folder: folder,
+                                modified: modified, mode: placeholder ? nil : mode(of: file), snippet: snip, isPlaceholder: placeholder))
             }
         }
-        scan(root, folder: nil)
-        for f in folders() { scan(root.appendingPathComponent(f, isDirectory: true), folder: f) }
+        scan(base, folder: nil)
+        for f in folders(in: base) { scan(base.appendingPathComponent(f, isDirectory: true), folder: f) }
         return out.sorted { $0.modified > $1.modified }
     }
 
@@ -96,16 +146,139 @@ enum Library {
         }
     }
 
+    /// Mac 版の拡張属性 (net.satoru.…: 表示・変更履歴の id) をまとめて読む。書き直すと消えるので、保存のときに戻す
+    static func appAttributes(of url: URL) -> [String: [UInt8]] {
+        url.withUnsafeFileSystemRepresentation { path -> [String: [UInt8]] in
+            guard let path = path else { return [:] }
+            let size = listxattr(path, nil, 0, 0)
+            guard size > 0 else { return [:] }
+            var names = [CChar](repeating: 0, count: size)
+            guard listxattr(path, &names, size, 0) > 0 else { return [:] }
+            var out: [String: [UInt8]] = [:]
+            for raw in names.split(separator: 0) {
+                let name = String(cString: Array(raw) + [0])
+                guard name.hasPrefix("net.satoru.") else { continue }
+                let n = getxattr(path, name, nil, 0, 0, 0)
+                guard n >= 0 else { continue }
+                var buf = [UInt8](repeating: 0, count: max(n, 1))
+                let r = getxattr(path, name, &buf, buf.count, 0, 0)
+                if r >= 0 { out[name] = Array(buf.prefix(r)) }
+            }
+            return out
+        }
+    }
+
+    static func setAppAttributes(_ attrs: [String: [UInt8]], for url: URL) {
+        url.withUnsafeFileSystemRepresentation { path in
+            guard let path = path else { return }
+            for (k, v) in attrs { _ = setxattr(path, k, v, v.count, 0, 0) }
+        }
+    }
+
+    static func modificationDate(_ url: URL) -> Date? {
+        (try? FileManager.default.attributesOfItem(atPath: url.path))?[.modificationDate] as? Date
+    }
+
+    // MARK: ほかの端末 (iCloud) と取り合わないように、読み書きは NSFileCoordinator を通す
+
+    static func coordinatedRead(_ url: URL) throws -> Data {
+        var err: NSError?
+        var result: Result<Data, Error> = .failure(LibraryError(L("開けませんでした")))
+        NSFileCoordinator(filePresenter: nil).coordinate(readingItemAt: url, options: [], error: &err) { u in
+            result = Result { try Data(contentsOf: u) }
+        }
+        if let e = err { throw e }
+        return try result.get()
+    }
+
+    /// 書く (拡張属性 net.satoru.… は書く前のものを戻す)
+    static func coordinatedWrite(_ data: Data, to url: URL, attributes: [String: [UInt8]]? = nil) throws {
+        var err: NSError?
+        var failure: Error?
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &err) { u in
+            let attrs = attributes ?? appAttributes(of: u)
+            do {
+                try data.write(to: u, options: .atomic)
+                setAppAttributes(attrs, for: u)
+            } catch { failure = error }
+        }
+        if let e = err ?? failure { throw e }
+    }
+
+    static func coordinatedMove(_ src: URL, to dest: URL) throws {
+        var err: NSError?
+        var failure: Error?
+        let c = NSFileCoordinator(filePresenter: nil)
+        c.coordinate(writingItemAt: src, options: .forMoving, writingItemAt: dest, options: .forReplacing, error: &err) { a, b in
+            do {
+                try FileManager.default.moveItem(at: a, to: b)
+                c.item(at: a, didMoveTo: b)
+            } catch { failure = error }
+        }
+        if let e = err ?? failure { throw e }
+    }
+
+    static func coordinatedDelete(_ url: URL) throws {
+        var err: NSError?
+        var failure: Error?
+        NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forDeleting, error: &err) { u in
+            do { try FileManager.default.removeItem(at: u) } catch { failure = error }
+        }
+        if let e = err ?? failure { throw e }
+    }
+
+    /// 消す・移すときの本当の場所 (まだ落としていないなら隠しファイル)
+    private static func onDisk(_ url: URL) -> URL {
+        FileManager.default.fileExists(atPath: url.path) ? url : placeholderURL(for: url)
+    }
+
+    // MARK: iCloud ⇄ この端末 に移す (フォルダの名前はそのまま。表示などの拡張属性もついていく)
+
+    /// 一覧に出している場所から、もう一方へ移す。終わったら新しい場所 (できなければエラー)
+    static func moveToOtherPlace(_ url: URL, done: @escaping (Result<URL, Error>) -> Void) {
+        guard let cloud = LibraryLocation.iCloudDocuments else { return done(.failure(LibraryError(L("iCloud が使えません")))) }
+        let toCloud = !LibraryLocation.isICloud
+        let from = root, to = toCloud ? cloud : localRoot
+        let parent = url.deletingLastPathComponent().standardizedFileURL
+        let folder = parent.path == from.standardizedFileURL.path ? nil : parent.lastPathComponent
+        let dir = folderURL(folder, in: to)
+        let dest = uniqueURL(base: url.deletingPathExtension().lastPathComponent, ext: url.pathExtension, in: dir)
+        let attrs = appAttributes(of: url)
+        let useUbiquity = LibraryLocation.overrideForTesting == nil
+        // iCloud コンテナへの出し入れは setUbiquitous を使う (時間がかかることがあるので、メインスレッドでは呼ばない)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let result = Result<URL, Error> {
+                try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+                if useUbiquity {
+                    try FileManager.default.setUbiquitous(toCloud, itemAt: url, destinationURL: dest)
+                } else {
+                    try coordinatedMove(url, to: dest)
+                }
+                if FileManager.default.fileExists(atPath: dest.path) { setAppAttributes(attrs, for: dest) }
+                return dest
+            }
+            DispatchQueue.main.async {
+                changed()
+                done(result)
+            }
+        }
+    }
+
     // MARK: 作る・名前を変える・移す・消す
 
-    static func folderURL(_ folder: String?) -> URL {
-        folder.map { root.appendingPathComponent($0, isDirectory: true) } ?? root
+    static func folderURL(_ folder: String?, in base: URL? = nil) -> URL {
+        let base = base ?? root
+        return folder.map { base.appendingPathComponent($0, isDirectory: true) } ?? base
+    }
+
+    static func exists(_ url: URL) -> Bool {
+        FileManager.default.fileExists(atPath: url.path) || FileManager.default.fileExists(atPath: placeholderURL(for: url).path)
     }
 
     static func uniqueURL(base: String, ext: String, in dir: URL, excluding: URL? = nil) -> URL {
         var url = dir.appendingPathComponent(base + (ext.isEmpty ? "" : "." + ext))
         var n = 2
-        while FileManager.default.fileExists(atPath: url.path) && url.standardizedFileURL != excluding?.standardizedFileURL {
+        while exists(url) && url.standardizedFileURL != excluding?.standardizedFileURL {
             url = dir.appendingPathComponent("\(base) \(n)" + (ext.isEmpty ? "" : "." + ext))
             n += 1
         }
@@ -117,7 +290,7 @@ enum Library {
         let dir = folderURL(folder)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let url = uniqueURL(base: blankBaseName, ext: "txt", in: dir)
-        guard FileManager.default.createFile(atPath: url.path, contents: Data()) else { return nil }
+        guard (try? coordinatedWrite(Data(), to: url, attributes: [:])) != nil else { return nil }
         setMode(mode, for: url)
         changed()
         return url
@@ -147,8 +320,8 @@ enum Library {
         guard !name.isEmpty, !name.hasPrefix(".") else { throw LibraryError(L("名前を入れてください")) }
         let dest = url.deletingLastPathComponent().appendingPathComponent(name + (url.pathExtension.isEmpty ? "" : "." + url.pathExtension))
         if dest.standardizedFileURL == url.standardizedFileURL { return url }
-        guard !FileManager.default.fileExists(atPath: dest.path) else { throw LibraryError(L("その名前はもう使われています")) }
-        try FileManager.default.moveItem(at: url, to: dest)
+        guard !exists(dest) else { throw LibraryError(L("その名前はもう使われています")) }
+        try coordinatedMove(url, to: dest)
         ShareStore.repath(from: url, to: dest)
         changed()
         return dest
@@ -160,14 +333,14 @@ enum Library {
         if dir.standardizedFileURL == url.deletingLastPathComponent().standardizedFileURL { return url }
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let dest = uniqueURL(base: url.deletingPathExtension().lastPathComponent, ext: url.pathExtension, in: dir)
-        try FileManager.default.moveItem(at: url, to: dest)
+        try coordinatedMove(url, to: dest)
         ShareStore.repath(from: url, to: dest)
         changed()
         return dest
     }
 
     static func delete(_ url: URL) throws {
-        try FileManager.default.removeItem(at: url)
+        try coordinatedDelete(onDisk(url))
         changed()
     }
 
@@ -186,13 +359,13 @@ enum Library {
         if n == old { return }
         let src = folderURL(old), dest = root.appendingPathComponent(n, isDirectory: true)
         guard !FileManager.default.fileExists(atPath: dest.path) else { throw LibraryError(L("その名前はもう使われています")) }
-        try FileManager.default.moveItem(at: src, to: dest)
+        try coordinatedMove(src, to: dest)
         ShareStore.repath(from: src, to: dest)
         changed()
     }
 
     static func deleteFolder(_ name: String) throws {
-        try FileManager.default.removeItem(at: folderURL(name))
+        try coordinatedDelete(folderURL(name))
         changed()
     }
 
@@ -219,38 +392,97 @@ struct LibraryError: LocalizedError {
     var errorDescription: String? { message }
 }
 
-/// 開いている 1 つのテキスト。文字コード・改行はもとのまま保つ
+/// 開いている 1 つのテキスト。文字コード・改行はもとのまま保つ。
+///
+/// ほかの端末 (Mac・iCloud) で書き換えられたとき (checkDisk・保存の前に確かめる):
+/// - こちらで書き換えていなければ、読み直す。
+/// - こちらでも書き換えていたら、こちらの版をそのまま使い、ほかの端末の版は「名前 (別の端末).txt」として隣に残す。
 final class TextDocument {
     private(set) var url: URL
     var text: String
     private(set) var encoding: TextEncoding
     private(set) var lineEnding: LineEnding
     private var savedText: String
+    /// 最後に読んだ・書いたときのファイルの日時 (ほかの端末で書き換えられたかを見る)
+    private var diskDate: Date?
+    private var quiet = false
     var mode: String? {
-        didSet { Library.setMode(mode, for: url); Library.changed() }
+        didSet { if !quiet { Library.setMode(mode, for: url); Library.changed() } }
     }
+    /// ほかの端末の版を別のファイルに残したとき
+    var onKeptOtherVersion: ((URL) -> Void)?
+
+    enum DiskChange: Equatable { case none, reloaded, keptBoth(URL) }
 
     init(url: URL) throws {
         self.url = url
-        let data = try Data(contentsOf: url)
+        let data = try Library.coordinatedRead(url)
         let decoded = data.isEmpty ? DecodedText(text: "", encoding: .utf8, lineEnding: .lf) : try TextCodec.decode(data)
         text = decoded.text
         encoding = decoded.encoding
         lineEnding = decoded.lineEnding
         savedText = decoded.text
+        diskDate = Library.modificationDate(url)
         mode = Library.mode(of: url)
     }
 
     var isDirty: Bool { text != savedText }
 
+    /// ほかの端末で書き換えられていないか確かめる
+    @discardableResult
+    func checkDisk() -> DiskChange {
+        var result = DiskChange.none
+        // iCloud が見つけた食い違い (同時に書き換えた) は、ほかの版を別のファイルに残して片づける
+        if let others = NSFileVersion.unresolvedConflictVersionsOfItem(at: url), !others.isEmpty {
+            for v in others {
+                if let data = try? Data(contentsOf: v.url), let copy = keepOther(data) { result = .keptBoth(copy) }
+                v.isResolved = true
+            }
+            try? NSFileVersion.removeOtherVersionsOfItem(at: url)
+        }
+        if Library.needsDownload(url) { Library.requestDownload(url) }
+        guard let d = Library.modificationDate(url), d != diskDate,
+              let data = try? Library.coordinatedRead(url) else { return result }
+        diskDate = d
+        guard let decoded = data.isEmpty ? DecodedText(text: "", encoding: .utf8, lineEnding: .lf) : try? TextCodec.decode(data),
+              decoded.text != savedText else { return result }
+        if !isDirty {
+            text = decoded.text
+            savedText = decoded.text
+            encoding = decoded.encoding
+            lineEnding = decoded.lineEnding
+            quiet = true
+            mode = Library.mode(of: url)
+            quiet = false
+            return result == .none ? .reloaded : result
+        }
+        // 両方で書き換えた: こちらはそのまま、あちらは別のファイルに
+        savedText = decoded.text
+        if let copy = keepOther(data) { return .keptBoth(copy) }
+        return result
+    }
+
+    /// ほかの端末の版を「名前 (別の端末).txt」として隣に置く
+    private func keepOther(_ data: Data) -> URL? {
+        let base = url.deletingPathExtension().lastPathComponent + " " + L("(別の端末)")
+        let dest = Library.uniqueURL(base: base, ext: url.pathExtension, in: url.deletingLastPathComponent())
+        guard (try? Library.coordinatedWrite(data, to: dest, attributes: Library.appAttributes(of: url))) != nil else { return nil }
+        Library.changed()
+        onKeptOtherVersion?(dest)
+        return dest
+    }
+
     func save() {
+        guard isDirty else { return }
+        // 書く前に、ほかの端末で書き換えられていないか (書き換えられていたら、あちらの版を残す)
+        if Library.modificationDate(url) != diskDate { checkDisk() }
         guard isDirty else { return }
         do {
             let data = try TextCodec.encode(text, encoding: encoding, lineEnding: lineEnding)
-            try data.write(to: url, options: .atomic)
+            // 書き込むと拡張属性 (表示・Mac 版の変更履歴) が消えるので書き直す
+            try Library.coordinatedWrite(data, to: url)
             savedText = text
-            // 書き込むと拡張属性が消えることがあるので書き直す
-            Library.setMode(mode, for: url)
+            diskDate = Library.modificationDate(url)
             Library.changed()
         } catch {
             // 書けない文字があるときは UTF-8 で書く
@@ -265,7 +497,7 @@ final class TextDocument {
     func renameFromFirstLineIfNeeded() {
         guard Library.isBlankPlaceholder(url), let base = Library.baseName(for: text) else { return }
         let dest = Library.uniqueURL(base: base, ext: url.pathExtension, in: url.deletingLastPathComponent(), excluding: url)
-        guard dest != url, (try? FileManager.default.moveItem(at: url, to: dest)) != nil else { return }
+        guard dest != url, (try? Library.coordinatedMove(url, to: dest)) != nil else { return }
         ShareStore.repath(from: url, to: dest)
         url = dest
         Library.changed()

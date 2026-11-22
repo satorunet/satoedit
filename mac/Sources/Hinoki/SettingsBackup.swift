@@ -157,7 +157,7 @@ enum SettingsBackup {
         AIProvider.allCases.forEach { d.removeObject(forKey: "aiModel.\($0.rawValue)") }
         // 欄の開け閉め・幅・並び方
         let panelKeys = [
-            "libraryVisible", "libraryOneColumn", "libraryFolderWidth", "libraryListWidth", "libraryFolderExpanded", "librarySelectedGroup",
+            "libraryVisible", "libraryOneColumn", "libraryFolderPaneHeight", "libraryFolderWidth", "libraryListWidth", "libraryFolderExpanded", "librarySelectedGroup",
             "remoteTreeVisible", "remoteTreeWidth", "remoteTreeServer", "folderTreeVisible", "folderTreeWidth", "folderTreeExpanded",
             "aiPanelWidth", "diffPanelWidth",
         ]

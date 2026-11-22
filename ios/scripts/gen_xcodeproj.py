@@ -101,7 +101,7 @@ core_set = {"PRODUCT_NAME": "HinokiCore", "SKIP_INSTALL": "YES", "SWIFT_INSTALL_
 app_set = {
     "PRODUCT_NAME": "SatoruEditor", "PRODUCT_BUNDLE_IDENTIFIER": BUNDLE_ID, "INFOPLIST_FILE": "SatoruEditor/Info.plist",
     "MARKETING_VERSION": VERSION, "CURRENT_PROJECT_VERSION": BUILD, "DEVELOPMENT_TEAM": TEAM, "CODE_SIGN_STYLE": "Automatic",
-    '"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]"': '"-"', "LD_RUNPATH_SEARCH_PATHS": '"$(inherited) @executable_path/Frameworks"',
+    '"CODE_SIGN_IDENTITY[sdk=iphonesimulator*]"': '"-"', '"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]"': "SatoruEditor/SatoruEditor.entitlements", "LD_RUNPATH_SEARCH_PATHS": '"$(inherited) @executable_path/Frameworks"',
     "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon", "ENABLE_BITCODE": "NO",
 }
 cfgs = {}

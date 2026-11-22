@@ -375,6 +375,30 @@ app.closeTab = async function (tab, { noAsk } = {}) {
   return true;
 };
 
+/// 開いている文書のファイルを削除したとき: タブは閉じず、何も書いていない新しいテキストにする (サーバの文書などは閉じる)
+app.makeBlank = async function (tab) {
+  if (tab.remote || (tab.collab && tab.collab.active)) { await app.closeTab(tab, { noAsk: true }); return; }
+  app.rememberCaret(tab);
+  clearTimeout(tab.autosaveTimer);
+  if (tab.path) api.versionFlush(tab.path);
+  if (tab.paperMode !== 0) app.setPaperMode(tab, 0, { remember: false });
+  tab.path = null;
+  app.untitled += 1;
+  tab.name = t('(無題)') + (app.untitled > 1 ? ' ' + app.untitled : '');
+  tab.enc = null;
+  tab.mtime = 0;
+  tab.metaDirty = false;
+  tab.touched = false;
+  tab.plainChoice = false;
+  app.setLocked(tab, false);
+  app.resolveProfile(tab);
+  tab.editor.setText('', false);
+  tab.editor.configure(app.prefs, tab.profile);
+  tab.savedDoc = tab.editor.view.state.doc; tab.editor.clearEditMarks(); if (app.diff) app.diff.refresh(0);
+  app.updateTabs();
+  if (tab === app.active) { app.tree.highlight(null); app.updateStatus(); app.pushMenuState(); }
+};
+
 app.rememberCaret = function (tab) {
   if (!tab.path || !app.prefs.rememberCaret) return;
   const carets = Object.assign({}, app.prefs.carets || {});
@@ -1140,6 +1164,13 @@ const commands = {
   'file.close': () => app.closeTab(app.active),
   'file.save': () => app.save(app.active),
   'file.saveAs': () => app.save(app.active, { saveAs: true }),
+  // 元のファイルの名前を変える (名前のない文書・サーバの文書は「名前を付けて保存」と同じ)
+  'file.rename': () => {
+    const tab = app.active;
+    if (!tab) return;
+    if (!tab.path || tab.remote || !app.library) return app.save(tab, { saveAs: true });
+    return app.library.askRename(tab.path);
+  },
   'file.revert': () => app.revert(),
   'file.versions': () => { if (app.prefs.versionHistory !== false && app.prefs.libraryEnabled !== false) app.versions.showCurrent(); },
   'library.toggle': () => app.setPref('libraryVisible', app.prefs.libraryVisible === false),

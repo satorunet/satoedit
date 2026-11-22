@@ -11,6 +11,22 @@ import menuDef from '../../shared/menu';
 
 const { t } = i18n;
 const MAX_KNOWN = 500;
+/// 中身 (本文のはじめ・表示) を読むのは、新しい順にこの数まで (それより古いものはファイルの名前だけで出す)
+const CONTENT_LIMIT = 120;
+/// 新しく作ったファイル・フォルダに点を付けておく長さ (ミリ秒)
+const NEW_MS = 20000;
+/// 作ってからの残り時間 (新しくなければ 0)
+export function newRemaining(created, now = Date.now()) {
+  if (!created) return 0;
+  const age = now - created;
+  return age >= -5000 && age < NEW_MS ? NEW_MS - Math.max(0, age) : 0;
+}
+/// 「親 › 自分」を幅に入れる: 入りきらないときは親を後ろから縮めて「..」を付け、自分の名前は残す。fits(親の字) が入るかを答える
+export function shortenParent(parent, fits) {
+  if (!parent || fits(parent)) return parent;
+  for (let p = parent.slice(0, -1); p.length; p = p.slice(0, -1)) if (fits(p + '..')) return p + '..';
+  return fits('..') ? '..' : null;
+}
 
 /// 選べるフォルダの絵 (Mac 版の名前, 画面に出す名前, 絵文字)。名前は Mac 版と同じものを覚えるので、バックアップを Mac と行き来できる
 export const FOLDER_SYMBOLS = [
@@ -95,6 +111,10 @@ export class TextLibrary {
     this.pickedFolders = [];     // いくつも選んだフォルダ (キー)
     this.anchor = null;
     this.query = '';
+    this.extTree = [];
+    this.content = new Map();   // 読んだ中身 (パス → { modified, data })。data が null ならテキストではない
+    this.slid = new Set();      // 上からすべり込ませたもの (同じものは 2 回動かさない)
+    this.customName = null;     // 任意フォルダを基準にしているときの、そのフォルダの名前
     this.el = document.getElementById('library-pane');
     this.build();
     // 「5 分前」などを、1 分ごとに描き直す
@@ -105,7 +125,12 @@ export class TextLibrary {
   get selected() { return this.prefs.librarySelectedGroup || 'all'; }
 
   async init() {
-    try { const info = await this.api.libraryInfo(); this.root = info.root || ''; this.historyRoot = info.history || ''; } catch (e) { this.root = ''; }
+    try {
+      // 任意フォルダを選んでいれば、そこを基準にする (見つからなければローカル)
+      const info = await this.api.librarySetRoot(this.prefs.libraryCustomFolder || null);
+      this.applyInfo(info);
+      this.historyRoot = info.history || '';
+    } catch (e) { this.root = ''; }
     // はじめて使うとき: いままでの「最近使ったファイル」を一覧に入れておく
     if (!this.prefs.librarySeeded) {
       const known = (this.prefs.libraryFiles || []).slice();
@@ -118,6 +143,102 @@ export class TextLibrary {
   }
 
   setPref(key, value) { this.prefs[key] = value; this.api.setPref(key, value); }
+
+  applyInfo(info) {
+    this.root = (info && info.root) || '';
+    this.customName = info && info.custom ? info.name || pathUtil.base(info.root) : null;
+    this.refreshStorage();
+  }
+  /// いちばん上の階層の名前 (ふだんは「メモ」、任意フォルダのときはそのフォルダの名前)
+  get rootName() { return this.customName || t('メモ'); }
+
+  // ---------- 置き場所 (ローカル / 任意フォルダ) ----------
+
+  /// 任意フォルダを基準にして見る (開いたことのあるものは、新しい順に 8 つまで覚える)
+  async useCustom(path) {
+    const info = await this.api.librarySetRoot(path);
+    if (!info.custom) {
+      this.setPref('libraryCustomRecent', (this.prefs.libraryCustomRecent || []).filter(p => !samePath(p, path)));
+      await alertBox(t('フォルダが見つかりません'), path);
+      return;
+    }
+    this.applyInfo(info);
+    this.setPref('libraryCustomFolder', info.root);
+    this.setPref('libraryCustomRecent', [info.root].concat((this.prefs.libraryCustomRecent || []).filter(p => !samePath(p, info.root))).slice(0, 8));
+    this.select('all');
+    await this.reload();
+  }
+  async useLocal() {
+    const info = await this.api.librarySetRoot(null);
+    this.applyInfo(info);
+    this.setPref('libraryCustomFolder', null);
+    this.select('all');
+    await this.reload();
+  }
+  async pickCustom() {
+    const dirs = await this.api.openDialog({ directory: true, title: t('フォルダの欄の基準にする、この PC の中のフォルダを選んでください') });
+    if (dirs && dirs[0]) await this.useCustom(dirs[0]);
+  }
+  /// ▾ ボタン: ローカル / 任意フォルダ… / 開いたことのある任意フォルダ (✕ で履歴から消す)
+  storageMenu() {
+    const cur = this.customName ? this.root : null;
+    const recent = (this.prefs.libraryCustomRecent || []).slice();
+    if (cur && !recent.some(p => samePath(p, cur))) recent.unshift(cur);
+    const items = [
+      { label: t('ローカル'), icon: '💻', checked: !cur, tip: t('ドキュメント\\さとるエディタ'), action: () => { if (cur) this.useLocal(); } },
+      'sep',
+      { label: t('任意フォルダ…'), icon: '📁', action: () => this.pickCustom() },
+    ];
+    for (const p of recent) {
+      items.push({ label: pathUtil.base(p), icon: '📁', checked: !!cur && samePath(cur, p), tip: p, action: () => { if (!cur || !samePath(cur, p)) this.useCustom(p); },
+        remove: { tip: t('この履歴を消す (フォルダそのものは消しません)'), action: () => this.removeRecent(p) } });
+    }
+    const r = this.storageButton.getBoundingClientRect();
+    popupMenu(items, r.left, r.bottom + 2, { className: 'lib-storage-menu' });
+  }
+  async removeRecent(path) {
+    this.setPref('libraryCustomRecent', (this.prefs.libraryCustomRecent || []).filter(p => !samePath(p, path)));
+    // 今見ているフォルダを消したときは、ローカルに戻す
+    if (this.customName && samePath(this.root, path)) await this.useLocal();
+    this.refreshStorage();
+    this.storageMenu();
+  }
+  refreshStorage() {
+    if (!this.storageButton) return;
+    this.storageButton.textContent = '';
+    this.storageButton.append(h('span', { class: 'lib-storage-name' }, this.customName || t('ローカル')), h('span', { class: 'lib-storage-arrow' }, '▾'));
+    this.storageButton.title = t('見るテキストの置き場所: この PC・好きなフォルダ') + (this.root ? '\n' + this.root : '');
+  }
+
+  // ---------- 開いたほかの場所のフォルダ ----------
+
+  get externalFolders() { return (this.prefs.libraryExternalFolders || []).filter(Boolean); }
+  /// そのファイルが入っている、開いたフォルダ (なければ null)
+  externalRoot(path) {
+    const n = norm(path);
+    let best = null;
+    for (const e of this.externalFolders) if (n.startsWith(norm(e) + '\\') && (!best || e.length > best.length)) best = e;
+    return best;
+  }
+  async openExternalFolder() {
+    const dirs = await this.api.openDialog({ directory: true, title: t('一覧に出す、この PC の中のフォルダを選んでください (中のテキストが出ます)') });
+    const p = dirs && dirs[0];
+    if (!p) return;
+    // さとるエディタのフォルダ (とその中) は、もう出ているので足さない
+    if (samePath(p, this.root) || norm(p).startsWith(norm(this.root) + '\\')) { this.select(this.group(p + '\\x') ? 'sub:' + this.group(p + '\\x') : 'root'); return; }
+    if (!this.externalFolders.some(e => samePath(e, p))) {
+      this.setPref('libraryExternalFolders', this.externalFolders.concat([p]));
+      // 「ほかの場所」の記録から、開いたフォルダの中のものを外す (そちらで出るので、二重に出さない)
+      this.setPref('libraryFiles', (this.prefs.libraryFiles || []).filter(f => !norm(f).startsWith(norm(p) + '\\')));
+    }
+    this.select('ext:' + p);
+    await this.reload();
+  }
+  async removeExternalFolder(path) {
+    this.setPref('libraryExternalFolders', this.externalFolders.filter(e => !samePath(e, path)));
+    if (this.selectionKeys(this.selected).some(k => k.startsWith('ext:') && (samePath(k.slice(4), path) || norm(k.slice(4)).startsWith(norm(path) + '\\')))) this.select('all');
+    await this.reload();
+  }
 
   // ---------- 場所 ----------
 
@@ -155,9 +276,12 @@ export class TextLibrary {
   /// 開いた・保存したファイルを覚える (さとるエディタのフォルダの外のものだけ、一覧の「ほかの場所」に出る)
   remember(path) {
     if (!path || /\.(pdf|docx?|xlsx?|pptx?|zip|exe|png|jpe?g|gif|satorubackup)$/i.test(path)) return;
-    const list = [path].concat((this.prefs.libraryFiles || []).filter(p => !samePath(p, path))).slice(0, MAX_KNOWN);
-    this.setPref('libraryFiles', list);
-    this.changed();
+    const old = this.prefs.libraryFiles || [];
+    const known = old.some(p => samePath(p, path));
+    if (known && samePath(old[0], path)) return;
+    this.setPref('libraryFiles', [path].concat(old.filter(p => !samePath(p, path))).slice(0, MAX_KNOWN));
+    // 開くファイルを替えただけでは読み直さない (一覧に新しく入るときだけ)
+    if (!known && !this.itemFor(path)) this.changed();
   }
   forget(path) {
     this.setPref('libraryFiles', (this.prefs.libraryFiles || []).filter(p => !samePath(p, path)));
@@ -253,33 +377,86 @@ export class TextLibrary {
 
   async reload() {
     const gen = (this.gen = (this.gen || 0) + 1);
-    let items = [], tree = [];
+    // 時間がかかるときは、前の中身を消してから「読み込み中…」を出す
+    clearTimeout(this.loadingTimer);
+    this.loadingTimer = setTimeout(() => { if (gen === this.gen) this.setLoading(true); }, 250);
+    let scan = null;
     try {
-      [items, tree] = await Promise.all([
-        this.api.libraryItems(this.prefs.libraryFiles || [], this.prefs.libraryFolderOrder || []),
-        this.api.libraryTree(this.prefs.libraryFolderOrder || []),
-      ]);
+      // ファイルの場所と日時だけを集める (中身は読まない)。中身は、選んでいるフォルダの分だけあとで読む
+      scan = await this.api.libraryScan(this.prefs.libraryFiles || [], this.prefs.libraryFolderOrder || [], this.externalFolders);
     } catch (e) { console.warn(e); }
     if (gen !== this.gen) return;
+    clearTimeout(this.loadingTimer);
+    this.setLoading(false);
+    scan = scan || {};
+    if (scan.root) this.root = scan.root;
     const share = this.app.share;
-    for (const it of items || []) {
+    const items = [];
+    for (const it of scan.files || []) {
+      const c = this.content.get(norm(it.path));
+      if (c && c.modified === it.modified) {
+        if (!c.data) continue; // テキストではなかった
+        this.fill(it, c.data);
+      }
       it.pinned = this.isPinned(it.path);
-      if (!it.mode && !it.encrypted) it.mode = this.modeFallback(it.path);
       const r = share && this.prefs.shareEnabled !== false ? share.recordFor(it.path) : null;
       it.sharedURL = r ? r.url : null;
+      items.push(it);
     }
-    // 開いているタブの中身 (保存前でも、表示は今のもの)
-    for (const tab of this.app.tabs) {
-      const it = tab.path && (items || []).find(x => samePath(x.path, tab.path));
-      if (it) it.mode = this.app.modeString(tab);
-    }
-    this.items = (items || []).sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.modified - a.modified));
-    this.tree = tree || [];
+    this.items = items.sort((a, b) => (a.pinned !== b.pinned ? (a.pinned ? -1 : 1) : b.modified - a.modified));
+    this.tree = scan.tree || [];
+    this.extTree = scan.externals || [];
+    this.applyModes();
     // 消えたフォルダを選んでいたら「すべて」に戻す
     const keys = this.selectionKeys(this.selected);
-    if (keys.some(k => k.startsWith('sub:') && !this.findRel(k.slice(4)))) this.select('all');
+    if (keys.some(k => (k.startsWith('sub:') && !this.findRel(k.slice(4))) || (k.startsWith('ext:') && !this.findExt(k.slice(4))))) this.select('all');
     this.renderFolders();
     this.renderList();
+    await this.loadContents();
+  }
+
+  fill(it, d) {
+    it.snippet = d.snippet || '';
+    it.encrypted = !!d.encrypted;
+    it.fileMode = d.mode || null;
+    it.loaded = true;
+  }
+  /// 表示 (しるし): 開いているタブは今の表示、ほかはファイルに書いたもの (書けなかったものはアプリが覚えたもの)
+  applyModes() {
+    for (const it of this.items) it.mode = it.encrypted ? null : it.fileMode || this.modeFallback(it.path);
+    for (const tab of this.app.tabs) {
+      const it = tab.path && this.itemFor(tab.path);
+      if (it) it.mode = this.app.modeString(tab);
+    }
+  }
+
+  /// 選んでいるフォルダのテキストの中身を読む (新しい順に CONTENT_LIMIT 件まで。読んだものは覚えておく)
+  async loadContents() {
+    const sel = this.selected;
+    const want = this.items.filter(it => this.matches(it, sel)).sort((a, b) => b.modified - a.modified).slice(0, CONTENT_LIMIT).filter(it => !it.loaded);
+    if (!want.length) return;
+    let res = [];
+    try { res = await this.api.libraryRead(want.map(x => x.path)); } catch (e) { res = []; }
+    let dropped = false;
+    want.forEach((it, i) => {
+      const d = res && res[i];
+      if (d === undefined) return;
+      this.content.set(norm(it.path), { modified: it.modified, data: d ? { snippet: d.snippet, encrypted: d.encrypted, mode: d.mode } : null });
+      if (d) this.fill(it, d); else { it.notText = true; dropped = true; }
+    });
+    if (dropped) this.items = this.items.filter(it => !it.notText);
+    this.applyModes();
+    if (dropped) this.renderFolders();
+    this.renderList();
+  }
+
+  /// 読み込み中のしるし (ぐるぐると「読み込み中…」)。出すときは前の中身を消す
+  setLoading(on) {
+    if (!this.folderLoading) return;
+    this.loading = on;
+    this.folderLoading.hidden = !on;
+    this.listLoading.hidden = !on;
+    if (on) { this.folderList.textContent = ''; this.list.textContent = ''; }
   }
 
   itemFor(path) { return this.items.find(x => samePath(x.path, path)) || null; }
@@ -288,12 +465,18 @@ export class TextLibrary {
     return null;
   }
   allRels(nodes = this.tree, out = []) { for (const n of nodes) { out.push(n.rel); this.allRels(n.children || [], out); } return out; }
+  findExt(path, nodes = this.extTree) {
+    for (const n of nodes) { if (samePath(n.path, path)) return n; const c = this.findExt(path, n.children || []); if (c) return c; }
+    return null;
+  }
   selectionKeys(sel) { return sel.startsWith('multi:') ? sel.slice(6).split('\n').filter(Boolean) : [sel]; }
   matches(item, sel) {
     if (sel.startsWith('multi:')) return this.selectionKeys(sel).some(k => this.matches(item, k));
     if (sel === 'all') return true;
     if (sel === 'root') return item.group === '';
-    if (sel === 'other') return item.group === null || item.group === undefined;
+    if (sel === 'other') return (item.group === null || item.group === undefined) && !this.externalRoot(item.path);
+    if (sel === 'shared') return !!item.sharedURL;   // リンクで公開共有しているもの
+    if (sel.startsWith('ext:')) return norm(item.path).startsWith(norm(sel.slice(4)) + '\\');
     return sel.startsWith('sub:') && item.group === sel.slice(4);
   }
 
@@ -305,16 +488,34 @@ export class TextLibrary {
     this.picked.clear();
     this.renderFolders();
     this.renderList();
+    this.refreshDivider();
+    // 選んだフォルダの分の中身を読む
+    this.loadContents();
   }
 
   // ---------- 画面 ----------
 
   build() {
-    this.folderList = h('div', { class: 'lib-folders', role: 'tree', 'aria-label': t('フォルダ') });
+    this.folderList = h('div', { class: 'lib-folders', role: 'tree', tabindex: '0', 'aria-label': t('フォルダ') });
+    // Delete で、選んでいるフォルダを削除する (聞いてから)。「すべて」「メモ」などは消せない
+    this.folderList.addEventListener('keydown', e => {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && !e.isComposing && !e.altKey && !e.ctrlKey) {
+        e.preventDefault();
+        const rels = this.selectionKeys(this.selected).filter(k => k.startsWith('sub:')).map(k => k.slice(4));
+        if (!rels.length) { this.beep(); return; }
+        this.trashFolders(rels);
+      }
+    });
+    // 左上: 新規フォルダ (選んでいるフォルダの中に作る)。好きな場所のフォルダを開くのは右クリックと「…」から
+    this.newFolderButton = h('button', { class: 'icon-button lib-newfolder', title: t('新規フォルダ (選んでいるフォルダの中に作る)'), 'aria-label': t('新規フォルダ'),
+      onclick: () => this.newFolder(this.folderParent()) }, icon('newFolder', 15));
+    // 右上: 置き場所 (ローカル / 任意フォルダ) の ▾ ボタン
+    this.storageButton = h('button', { class: 'lib-storage', onclick: () => this.storageMenu() });
+    this.refreshStorage();
+    this.folderLoading = loadingMark();
     this.folderPane = h('div', { class: 'lib-folder-pane' },
-      h('div', { class: 'lib-head' }, h('span', { class: 'lib-title' }, t('フォルダ'))),
-      this.folderList,
-      h('button', { class: 'lib-add', title: t('新規フォルダ (選んでいるフォルダの中に作る)'), onclick: () => this.newFolder(this.selected.startsWith('sub:') ? this.selected.slice(4) : '') }, '＋ ' + t('フォルダ')));
+      h('div', { class: 'lib-head' }, this.newFolderButton, h('span', { class: 'lib-space' }), this.storageButton),
+      this.folderLoading, this.folderList);
     this.search = h('input', { type: 'search', class: 'lib-search', placeholder: t('題名・本文で絞り込み'), hidden: true });
     this.search.addEventListener('input', () => { this.query = this.search.value.trim().toLowerCase(); this.renderList(); });
     this.search.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); this.toggleSearch(); } });
@@ -325,25 +526,35 @@ export class TextLibrary {
         if (paths.length) { e.preventDefault(); this.trash(paths); }
       }
     });
+    // ふつうになぞると、そのファイルをつかむ (フォルダの上に置くと移る)。Shift を押しながらなぞったときだけ、続けて選ぶ
+    this.list.addEventListener('mousedown', e => this.shiftSweep(e));
     // 上下 (フォルダの欄が上、テキストの一覧が下) ⇔ 左右 (フォルダの欄が左) の切り替え
     this.layoutButton = h('button', { class: 'icon-button lib-layout', title: t('上下 / 左右に並べ替える'), 'aria-label': t('上下 / 左右に並べ替える'),
       onclick: () => { this.setPref('libraryOneColumn', !this.oneColumn); this.arrange(); } });
+    this.newTextButton = h('button', { class: 'icon-button', title: t('新しいテキスト'), 'aria-label': t('新しいテキスト'), onclick: () => this.createBlank() }, icon('new', 15));
+    this.moreButton = h('button', { class: 'icon-button', title: t('履歴の操作'), 'aria-label': t('履歴の操作'), onclick: () => this.moreMenu() }, icon('more', 15));
+    // ゴミ箱: 押すと選んだテキストを削除。ファイルやフォルダをつかんで置いても削除できる
+    this.trashButton = h('button', { class: 'icon-button lib-trash', title: t('ゴミ箱 (選んだテキストを削除。ファイルやフォルダをここに置いても削除できます)'), 'aria-label': t('削除'),
+      onclick: () => { const paths = this.pickedPaths(); if (!paths.length) { this.beep(); return; } this.trash(paths); } }, icon('trash', 15));
+    this.bindTrashDrop(this.trashButton);
+    this.listLoading = loadingMark();
     this.listPane = h('div', { class: 'lib-list-pane' },
       h('div', { class: 'lib-head' },
-        h('button', { class: 'icon-button', title: t('新しいテキスト'), onclick: () => this.createBlank() }, icon('new', 15)),
-        h('span', { class: 'lib-title' }, t('テキスト')),
+        this.newTextButton,
         h('span', { class: 'lib-space' }),
         h('button', { class: 'icon-button', title: t('検索'), onclick: () => this.toggleSearch() }, icon('find', 15)),
         this.layoutButton,
+        this.moreButton,
+        this.trashButton,
         h('button', { class: 'icon-button', title: t('テキスト一覧を閉じる'), onclick: () => this.app.setPref('libraryVisible', false) }, '✕')),
-      this.search, this.list);
+      this.search, this.listLoading, this.list);
     const resizer = (pane, key, min, max) => {
       const r = h('div', { class: 'lib-resizer', title: t('ドラッグで幅を変える') });
       r.addEventListener('mousedown', e => {
         e.preventDefault();
         const target = typeof pane === 'function' ? pane() : pane;
         const start = e.clientX, w0 = target.getBoundingClientRect().width;
-        const move = ev => { target.style.width = Math.max(min, Math.min(max, w0 + ev.clientX - start)) + 'px'; this.app.scheduleRuler(); };
+        const move = ev => { target.style.width = Math.max(min, Math.min(max, w0 + ev.clientX - start)) + 'px'; this.app.scheduleRuler(); this.refreshDivider(); };
         const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); this.setPref(key, Math.round(target.getBoundingClientRect().width)); };
         window.addEventListener('mousemove', move);
         window.addEventListener('mouseup', up);
@@ -351,11 +562,158 @@ export class TextLibrary {
       return r;
     };
     this.column = h('div', { class: 'lib-column' });
-    this.stackDivider = h('div', { class: 'lib-stack-divider', 'aria-hidden': 'true' }); // 上下のときの、フォルダの欄と一覧の間の細い仕切り
-    window.addEventListener('resize', () => this.fitFolders());
+    // 上下のときの、フォルダの欄と一覧の間のバー: 選んでいるフォルダの名前。つかんで上下に動かすと、フォルダの欄の高さが変わる (ダブルクリックで元に戻す)
+    this.dividerLabel = h('span', { class: 'lib-divider-label' });
+    this.stackDivider = h('div', { class: 'lib-stack-divider', title: '' }, this.dividerLabel);
+    this.bindDivider(this.stackDivider);
+    window.addEventListener('resize', () => { this.fitFolders(); this.refreshDivider(); });
     this.folderResizer = resizer(this.folderPane, 'libraryFolderWidth', 60, 420);
     this.listResizer = resizer(() => (this.oneColumn ? this.column : this.listPane), 'libraryListWidth', 110, 640);
     this.arrange();
+  }
+
+  beep() { try { this.api.beep(); } catch (e) { /* 鳴らせなくてもよい */ } }
+
+  /// 新規フォルダを作る場所 (左上のボタン・「…」から): 選んでいるフォルダ (「すべて」などなら、いちばん上)
+  folderParent() {
+    const sel = this.selected;
+    return sel.startsWith('sub:') ? sel.slice(4) : '';
+  }
+
+  /// 区切りのバーをつかんで上下に動かす: フォルダの欄の高さ (欄の半分まで。覚えておく)。ダブルクリックでフォルダの数に合わせた高さに戻す
+  bindDivider(bar) {
+    bar.addEventListener('mousedown', e => {
+      if (e.button !== 0 || e.detail > 1) return;
+      e.preventDefault();
+      const y0 = e.clientY, h0 = this.folderPane.getBoundingClientRect().height;
+      const move = ev => {
+        const max = this.column.clientHeight * 0.5;
+        const hgt = Math.round(Math.min(max, Math.max(50, h0 + ev.clientY - y0)));
+        this.prefs.libraryFolderPaneHeight = hgt;
+        this.folderPane.style.height = hgt + 'px';
+      };
+      const up = () => {
+        window.removeEventListener('mousemove', move);
+        window.removeEventListener('mouseup', up);
+        if (this.prefs.libraryFolderPaneHeight) this.setPref('libraryFolderPaneHeight', this.prefs.libraryFolderPaneHeight);
+      };
+      window.addEventListener('mousemove', move);
+      window.addEventListener('mouseup', up);
+    });
+    bar.addEventListener('dblclick', () => {
+      this.setPref('libraryFolderPaneHeight', null);
+      this.folderPane.classList.add('lib-animate-height');
+      this.fitFolders();
+      setTimeout(() => this.folderPane.classList.remove('lib-animate-height'), 250);
+    });
+  }
+
+  /// 区切りのバーの字: 選んでいるフォルダ (深いときは、ひとつ上の親と自分の名前だけ)。入りきらないときは親を「..」で縮める
+  refreshDivider() {
+    if (!this.dividerLabel) return;
+    const key = this.selected;
+    let badge, text, parent = '';
+    if (key === 'all') { badge = h('span', { class: 'lib-ficon' }, icon('library', 12)); text = t('すべて'); }
+    else if (key === 'root') { badge = this.folderBadge(null, 'folder'); text = this.rootName; }
+    else if (key === 'other') { badge = this.folderBadge(null, 'folder'); text = t('ほかの場所'); }
+    else if (key === 'shared') { badge = this.folderBadge(null, 'folder'); text = t('公開共有中'); }
+    else if (key.startsWith('sub:')) {
+      const rel = key.slice(4), parts = rel.split('/');
+      badge = this.folderBadge(rel);
+      text = parts[parts.length - 1];
+      if (parts.length > 1) parent = parts[parts.length - 2];
+    } else if (key.startsWith('ext:')) { badge = this.folderBadge(null, 'folder'); text = pathUtil.base(key.slice(4)); }
+    else if (key.startsWith('multi:')) { badge = this.folderBadge(null, 'folder'); text = t('{n} 個のフォルダ', { n: this.selectionKeys(key).length }); }
+    else { badge = this.folderBadge(null, 'folder'); text = ''; }
+    const label = this.dividerLabel;
+    this.stackDivider.title = t('下のテキストは「{name}」の中のものです', { name: parent ? parent + ' › ' + text : text });
+    const set = p => {
+      label.textContent = '';
+      label.append(badge, h('span', { class: 'lib-divider-text' }, (p ? p + ' › ' : '') + text));
+    };
+    set(parent);
+    if (!parent || !label.isConnected || !label.clientWidth) return;
+    const room = this.stackDivider.clientWidth - 16;
+    const fits = p => { set(p); return label.scrollWidth <= room; };
+    const best = shortenParent(parent, fits);
+    set(best || '');
+  }
+
+  /// Shift を押しながらなぞる: 押したところから続けて選ぶ (つかまない)
+  shiftSweep(e) {
+    if (e.button !== 0 || !e.shiftKey) return;
+    const start = e.target.closest && e.target.closest('.lib-row');
+    if (!start) return;
+    e.preventDefault();
+    this.list.focus({ preventScroll: true });
+    const indexOf = el => Number(el.dataset.index);
+    const from = this.anchor || (this.app.active && this.app.active.path);
+    let a = this.rows.findIndex(r => samePath(r.path, from));
+    if (a < 0) a = indexOf(start);
+    let last = -1;
+    const pick = b => {
+      if (b === last || b < 0 || b >= this.rows.length) return;
+      last = b;
+      this.picked.clear();
+      for (let i = Math.min(a, b); i <= Math.max(a, b); i++) this.picked.add(norm(this.rows[i].path));
+      this.renderList();
+    };
+    pick(indexOf(start));
+    const move = ev => {
+      const el = document.elementFromPoint(ev.clientX, ev.clientY);
+      const row = el && el.closest && el.closest('.lib-row');
+      if (row && this.list.contains(row)) pick(indexOf(row));
+    };
+    const up = () => { window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up); this.swept = true; setTimeout(() => { this.swept = false; }, 0); };
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', up);
+  }
+
+  /// ゴミ箱のボタンに、一覧のファイル・フォルダの欄のフォルダを置くと削除する (聞いてから)
+  bindTrashDrop(btn) {
+    const ok = e => { const ty = Array.from(e.dataTransfer.types); return ty.includes('application/x-satoru-texts') || ty.includes('application/x-satoru-folder'); };
+    btn.addEventListener('dragover', e => { if (!ok(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; btn.classList.add('drop-hot'); });
+    btn.addEventListener('dragleave', () => btn.classList.remove('drop-hot'));
+    btn.addEventListener('drop', e => {
+      btn.classList.remove('drop-hot');
+      if (!ok(e)) return;
+      e.preventDefault();
+      const texts = e.dataTransfer.getData('application/x-satoru-texts');
+      const folder = e.dataTransfer.getData('application/x-satoru-folder');
+      // ドラッグが終わってから聞く
+      setTimeout(() => {
+        if (texts) this.trash(JSON.parse(texts));
+        if (folder) this.trashFolders([folder]);
+      }, 0);
+    });
+  }
+
+  /// 「…」のメニュー
+  moreMenu() {
+    const r = this.moreButton.getBoundingClientRect();
+    popupMenu([
+      { label: t('新しいテキスト'), icon: '📝', action: () => this.createBlank() },
+      { label: t('新規フォルダ…'), icon: '📁', action: () => this.newFolder(this.folderParent()) },
+      { label: t('ほかの場所のフォルダを開く…'), icon: '📂', action: () => this.openExternalFolder() },
+      'sep',
+      { label: t('サムネで一覧'), icon: '▦', action: () => this.showGrid() },
+      { label: t('保存フォルダをエクスプローラーで開く'), icon: '📂', action: async () => { const p = await this.api.libraryFolderPath(''); this.api.openPath(p); } },
+      'sep',
+      { label: t('「ほかの場所」の履歴をクリア…'), action: () => this.clearOtherPlaces() },
+      'sep',
+      { label: t('版の履歴・バックアップの設定…'), icon: '⚙', action: () => this.app.run('settings.open:backup') },
+    ], r.left, r.bottom + 2);
+  }
+
+  /// 「ほかの場所」(さとるエディタのフォルダの外) のテキストを、一覧から外す (ファイルは消さない)
+  async clearOtherPlaces() {
+    const others = this.items.filter(it => (it.group === null || it.group === undefined) && !this.externalRoot(it.path));
+    if (!others.length) { this.beep(); return; }
+    const ok = await confirmBox(t('「ほかの場所」の履歴をクリアしますか？'),
+      t('一覧から {n} 件を外します。ファイルそのものは消しません。さとるエディタのフォルダの中のテキストはそのままです。', { n: others.length }), t('クリア'));
+    if (!ok) return;
+    this.setPref('libraryFiles', (this.prefs.libraryFiles || []).filter(p => !others.some(o => samePath(o.path, p))));
+    await this.reload();
   }
 
   /// 上下に並べるか (はじめは上下。Mac 版と同じ「libraryOneColumn」)
@@ -377,6 +735,7 @@ export class TextLibrary {
       this.column.append(this.folderPane, this.stackDivider, this.listPane);
       this.el.append(this.column, this.listResizer);
       this.fitFolders();
+      requestAnimationFrame(() => this.refreshDivider());
     } else {
       this.column.style.width = '';
       this.folderPane.style.height = '';
@@ -404,48 +763,88 @@ export class TextLibrary {
   // ---------- フォルダの欄 ----------
 
   renderFolders() {
+    if (this.loading) return;
     const counts = {};
-    let other = 0;
-    for (const it of this.items) { if (it.group === null || it.group === undefined) other++; else counts[it.group] = (counts[it.group] || 0) + 1; }
+    let other = 0, shared = 0;
+    for (const it of this.items) {
+      if (it.group === null || it.group === undefined) { if (!this.externalRoot(it.path)) other++; } else counts[it.group] = (counts[it.group] || 0) + 1;
+      if (it.sharedURL) shared++;
+    }
     const expanded = new Set(this.prefs.libraryFolderExpanded || []);
     const keys = new Set(this.selectionKeys(this.selected));
     const list = this.folderList;
     const scroll = list.scrollTop;
+    const animate = this.folderRendered && list.isConnected;
     list.textContent = '';
+    let soonest = 0;
     const row = (key, name, badge, count, depth, node) => {
       const hasKids = node && node.children && node.children.length;
       const open = hasKids && expanded.has(key);
+      // 新しく作ったフォルダ: 名前のすぐ右に小さな点 (少しのあいだだけ)。はじめて出るときは上からすべり込む
+      const left = key.startsWith('sub:') && node ? newRemaining(node.created) : 0;
+      if (left && (!soonest || left < soonest)) soonest = left;
+      const fresh = left && !this.slid.has(key);
+      if (fresh) this.slid.add(key);
       const el = h('div', {
-        class: 'lib-frow' + (keys.has(key) ? ' current' : ''), role: 'treeitem', 'data-key': key, draggable: key.startsWith('sub:') ? 'true' : null,
+        class: 'lib-frow' + (keys.has(key) ? ' current' : '') + (fresh && animate ? ' lib-slide-in' : ''), role: 'treeitem', 'data-key': key, draggable: key.startsWith('sub:') ? 'true' : null,
         style: { paddingLeft: (4 + depth * 10) + 'px' },
-        onclick: e => this.folderClicked(key, e),
+        onclick: e => { list.focus({ preventScroll: true }); this.folderClicked(key, e); },
         oncontextmenu: e => { e.preventDefault(); this.folderMenu(key, e.clientX, e.clientY); },
       },
       h('span', { class: 'lib-twist' + (open ? ' open' : ''), onclick: e => { if (!hasKids) return; e.stopPropagation(); this.toggleExpand(key); } }, hasKids ? icon('chevron', 10) : ''),
-      badge, h('span', { class: 'lib-fname' }, name), h('span', { class: 'lib-count' }, String(count)));
+      badge, h('span', { class: 'lib-fname', title: node && node.path ? node.path : null }, name), left ? newDot() : null, h('span', { class: 'lib-space' }),
+      h('span', { class: 'lib-count' }, count > 0 ? String(count) : ''));   // 0 件は出さない
       this.bindFolderDrag(el, key);
       list.append(el);
-      if (open) for (const c of node.children) row('sub:' + c.rel, c.name, this.folderBadge(c.rel), counts[c.rel] || 0, depth + 1, c);
+      if (open) {
+        for (const c of node.children) {
+          if (key.startsWith('ext:')) row('ext:' + c.path, c.name, this.folderBadge(null, 'folder'), this.countUnder(c.path), depth + 1, c);
+          else row('sub:' + c.rel, c.name, this.folderBadge(c.rel), counts[c.rel] || 0, depth + 1, c);
+        }
+      }
     };
     row('all', t('すべて'), h('span', { class: 'lib-ficon' }, icon('library', 14)), this.items.length, 0, null);
-    row('root', t('メモ'), this.folderBadge(null, 'folder'), counts[''] || 0, 0, null);
+    row('root', this.rootName, this.folderBadge(null, 'folder'), counts[''] || 0, 0, null);
     for (const n of this.tree) row('sub:' + n.rel, n.name, this.folderBadge(n.rel), counts[n.rel] || 0, 0, n);
+    for (const n of this.extTree) row('ext:' + n.path, n.name, this.folderBadge(null, 'folder'), this.countUnder(n.path), 0, n);
     row('other', t('ほかの場所'), h('span', { class: 'lib-ficon' }, '📄'), other, 0, null);
+    // リンクで公開共有しているテキスト (あるときだけ出す)
+    if (shared > 0) row('shared', t('公開共有中'), h('span', { class: 'lib-ficon' }, '🔗'), shared, 0, null);
+    // 自分で作ったフォルダがまだ無いときは、並びのすぐ下に作り方の案内を出す
+    if (!this.tree.length) {
+      list.append(h('div', { class: 'lib-folder-hint' }, hintText(t('「左上のボタン」で新規フォルダ'), () => this.newFolder(this.folderParent()), on => hop(this.newFolderButton, on))));
+    }
     list.scrollTop = scroll;
+    this.folderRendered = true;
+    this.scheduleNewExpiry(soonest);
     this.fitFolders();
+    this.refreshDivider();
   }
 
-  /// 上下のとき、フォルダの欄の高さを中身 (見出し + 見えているフォルダの行) に合わせる。80px 以上、欄の高さの半分まで
+  countUnder(path) { const p = norm(path) + '\\'; return this.items.filter(it => norm(it.path).startsWith(p)).length; }
+
+  /// 新しいしるしの点を、時間が来たら消す (描き直す)
+  scheduleNewExpiry(ms) {
+    if (!ms) return;
+    const at = Date.now() + ms + 50;
+    if (this.newExpiryAt && this.newExpiryAt <= at && this.newExpiryAt > Date.now()) return;
+    clearTimeout(this.newExpiryTimer);
+    this.newExpiryAt = at;
+    this.newExpiryTimer = setTimeout(() => { this.newExpiryAt = 0; this.renderFolders(); this.renderList(); }, ms + 50);
+  }
+
+  /// 上下のとき、フォルダの欄の高さを中身 (見出し + 見えているフォルダの行) に合わせる。80px 以上、欄の高さの半分まで。
+  /// 区切りのバーで高さを決めたときは、その高さ (欄の半分まで)
   fitFolders() {
     if (!this.oneColumn || !this.folderPane || !this.folderPane.isConnected) return;
     const pane = this.folderPane;
-    const head = pane.querySelector('.lib-head');
-    const add = pane.querySelector('.lib-add');
-    const addStyle = add ? getComputedStyle(add) : null;
-    const addH = add ? add.offsetHeight + parseFloat(addStyle.marginTop) + parseFloat(addStyle.marginBottom) : 0;
-    const natural = (head ? head.offsetHeight : 0) + this.folderList.scrollHeight + addH;
     const total = this.column.clientHeight;
-    if (!total || !natural) return; // まだ画面に出ていない
+    if (!total) return; // まだ画面に出ていない
+    const manual = Number(this.prefs.libraryFolderPaneHeight) || 0;
+    if (manual) { pane.style.height = Math.round(Math.max(50, Math.min(manual, total * 0.5))) + 'px'; return; }
+    const head = pane.querySelector('.lib-head');
+    const natural = (head ? head.offsetHeight : 0) + this.folderList.scrollHeight + 6;
+    if (!natural) return;
     const height = Math.round(Math.max(80, Math.min(natural, total * 0.5)));
     pane.style.height = height + 'px';
   }
@@ -494,6 +893,7 @@ export class TextLibrary {
   // ドラッグ: フォルダは線の位置で並べ替え、フォルダの上でその中へ。テキストをフォルダに落とすと移動
   bindFolderDrag(el, key) {
     el.addEventListener('dragstart', e => {
+      if (!key.startsWith('sub:')) { e.preventDefault(); return; }
       e.dataTransfer.setData('application/x-satoru-folder', key.slice(4));
       e.dataTransfer.effectAllowed = 'move';
     });
@@ -506,7 +906,10 @@ export class TextLibrary {
       const types = Array.from(e.dataTransfer.types);
       const folder = types.includes('application/x-satoru-folder'), texts = types.includes('application/x-satoru-texts');
       if (!folder && !texts) return;
-      const w = texts ? (key === 'root' || key.startsWith('sub:') ? 'into' : null) : where(e);
+      // ファイルは、自分で作ったフォルダ (とメモ) にだけ置ける。もう全部そのフォルダにあるときは置けない
+      const into = key === 'root' || key.startsWith('sub:');
+      const rel = key === 'root' ? '' : key.slice(4);
+      const w = texts ? (into && (this.dragPaths || []).some(p => this.group(p) !== rel) ? 'into' : null) : where(e);
       if (!w) return;
       e.preventDefault();
       el.classList.remove('drop-before', 'drop-after', 'drop-into');
@@ -519,7 +922,12 @@ export class TextLibrary {
       const targetRel = key === 'root' ? '' : key.startsWith('sub:') ? key.slice(4) : null;
       if (texts) {
         e.preventDefault();
-        if (targetRel !== null) this.moveTexts(JSON.parse(texts), targetRel);
+        // ロックしたものは動かさない
+        const paths = JSON.parse(texts).filter(p => this.group(p) !== targetRel);
+        const locked = paths.filter(p => (this.itemFor(p) || {}).locked);
+        if (locked.length) this.beep();
+        const free = paths.filter(p => !locked.includes(p));
+        if (targetRel !== null && free.length) this.moveTexts(free, targetRel);
         return;
       }
       const dragged = e.dataTransfer.getData('application/x-satoru-folder');
@@ -567,14 +975,39 @@ export class TextLibrary {
     await this.reload();
   }
 
-  async newFolder(parent) {
-    const name = await promptBox(t('新しいフォルダ'), parent ? t('「{name}」の中に作るフォルダの名前', { name: parent.split('/').pop() }) : t('フォルダの名前'), '');
+  /// 新規フォルダ。fromMenu = 右クリックの「この中に新規フォルダ…」(場所は決まっている)。
+  /// 左上のボタン・「…」からで、自分で作ったフォルダを選んでいるときは、その中に作るか、いちばん上に作るかを選べる
+  async newFolder(parent, fromMenu = false) {
+    let name;
+    if (!fromMenu && parent) {
+      const r = await this.askPlace(parent);
+      if (!r) return;
+      name = r.name;
+      if (!r.inside) parent = '';
+    } else {
+      name = await promptBox(t('新しいフォルダ'), parent ? t('「{name}」の中に作るフォルダの名前', { name: parent.split('/').pop() }) : t('フォルダの名前'), '');
+    }
     if (name === null || !name.trim()) return;
     const r = await this.api.libraryCreateFolder(name, parent);
     if (r.status !== 'ok') { await alertBox(t('フォルダを作れませんでした'), r.message); return; }
     this.expand(parent);
     await this.reload();
     this.select('sub:' + r.rel);
+  }
+
+  /// 新規フォルダの名前と、作る場所 (選んでいるフォルダの中 / いちばん上に別のフォルダとして)
+  async askPlace(parent) {
+    const input = h('input', { type: 'text', class: 'wide', autofocus: true });
+    const inside = h('input', { type: 'radio', name: 'lib-place', checked: true });
+    const top = h('input', { type: 'radio', name: 'lib-place' });
+    const ok = await modal({
+      title: t('新しいフォルダ'),
+      body: h('div', { class: 'lib-place' }, h('div', { class: 'modal-line' }, t('フォルダの名前')), input,
+        h('label', { class: 'check-row top-gap' }, inside, t('「{name}」の中に作る', { name: parent.split('/').pop() })),
+        h('label', { class: 'check-row' }, top, t('別のフォルダとして、いちばん上に作る'))),
+      buttons: [{ label: 'OK', value: true, primary: true }, { label: t('キャンセル'), value: false, cancel: true }],
+    });
+    return ok ? { name: input.value, inside: inside.checked } : null;
   }
 
   folderMenu(key, x, y) {
@@ -593,12 +1026,22 @@ export class TextLibrary {
     }
     const rel = key === 'root' ? '' : key.startsWith('sub:') ? key.slice(4) : null;
     const items = [];
+    if (key.startsWith('ext:')) {
+      const path = key.slice(4);
+      items.push({ label: t('エクスプローラーで表示'), action: () => this.api.openPath(path) });
+      // 開いたフォルダそのもの (いちばん上) だけ、一覧から外せる
+      if (this.externalFolders.some(e => samePath(e, path))) items.push({ label: t('一覧から外す (フォルダは消さない)'), action: () => this.removeExternalFolder(path) });
+      items.push('sep', { label: t('ほかの場所のフォルダを開く…'), action: () => this.openExternalFolder() });
+      popupMenu(items, x, y);
+      return;
+    }
     if (rel !== null) {
-      items.push({ label: rel ? t('この中に新規フォルダ…') : t('新規フォルダ…'), action: () => this.newFolder(rel) });
+      items.push({ label: rel ? t('この中に新規フォルダ…') : t('新規フォルダ…'), action: () => this.newFolder(rel, true) });
       items.push({ label: t('エクスプローラーで表示'), action: async () => { const p = await this.api.libraryFolderPath(rel); this.api.openPath(p); } });
     } else {
-      items.push({ label: t('新規フォルダ…'), action: () => this.newFolder('') });
+      items.push({ label: t('新規フォルダ…'), action: () => this.newFolder('', true) });
     }
+    items.push({ label: t('ほかの場所のフォルダを開く…'), action: () => this.openExternalFolder() });
     if (key.startsWith('sub:')) {
       const cur = this.folderIcon(rel);
       items.push('sep');
@@ -640,13 +1083,13 @@ export class TextLibrary {
   async trashFolders(rels) {
     const tops = rels.filter(r => !rels.some(o => r !== o && r.startsWith(o + '/')));
     if (!tops.length) return;
-    const body = t('中のテキストとフォルダも一緒にごみ箱に入ります。') + (tops.length > 1 ? '\n\n' + tops.slice(0, 8).map(r => '・' + r).join('\n') : '');
+    const body = withNames(t('中のテキストとフォルダも一緒にごみ箱に入ります。'), tops);
     const ok = await confirmBox(tops.length === 1 ? t('フォルダ「{name}」をごみ箱に入れますか？', { name: tops[0].split('/').pop() }) : t('{n} 個のフォルダをごみ箱に入れますか？', { n: tops.length }), body, t('ごみ箱に入れる'));
     if (!ok) return;
-    // 中の文書を開いていれば閉じる
+    // 中の文書を開いていれば、タブは閉じずに空の新しいテキストにする
     for (const tab of this.app.tabs.slice()) {
       const g = tab.path ? this.group(tab.path) : null;
-      if (g !== null && tops.some(r => g === r || g.startsWith(r + '/'))) await this.app.closeTab(tab, { noAsk: true });
+      if (g !== null && tops.some(r => g === r || g.startsWith(r + '/'))) await this.app.makeBlank(tab);
     }
     const paths = await Promise.all(tops.map(r => this.api.libraryFolderPath(r)));
     const r = await this.api.libraryTrash(paths);
@@ -659,19 +1102,23 @@ export class TextLibrary {
   // ---------- テキストの一覧 ----------
 
   renderList() {
-    if (!this.list) return;
+    if (!this.list || this.loading) return;
     const sel = this.selected;
     const inGroup = this.items.filter(it => this.matches(it, sel));
     const q = this.query;
     this.rows = q ? inGroup.filter(it => String(it.title).toLowerCase().includes(q) || String(it.snippet || '').toLowerCase().includes(q)) : inGroup;
-    const showFolder = sel === 'all' || sel.startsWith('multi:');
+    const showFolder = sel === 'all' || sel === 'other' || sel === 'shared' || sel.startsWith('multi:');
     const cur = this.app.active && this.app.active.path;
     const scroll = this.list.scrollTop;
+    const animate = this.listRendered && this.list.isConnected;
     this.list.textContent = '';
     if (!this.rows.length) {
-      this.list.append(h('div', { class: 'lib-empty' }, q ? t('見つかりません') : t('まだテキストがありません')));
+      // 空のときは、文ではなくアイコンで (検索で見つからないときは虫めがね)
+      this.list.append(q ? emptyState('find', 'NO MATCH')
+        : emptyState('tray', 'NO DATA', hintText(t('「左上のボタン」で新規ファイル'), () => this.createBlank(), on => hop(this.newTextButton, on))));
     }
-    for (const it of this.rows) {
+    let soonest = 0;
+    this.rows.forEach((it, index) => {
       const isCur = cur && samePath(cur, it.path);
       const picked = this.picked.size > 1 ? this.picked.has(norm(it.path)) : isCur;
       // 1 行目: しるしとファイルの名前 (拡張子なし)、右はしに拡張子を小さく
@@ -686,24 +1133,36 @@ export class TextLibrary {
       // 2 行目: 左にフォルダ名 (「すべて」などを見ているとき)、右に時間。本文のはじめは出さない
       const detail = h('div', { class: 'lib-rdetail' });
       if (showFolder) {
-        const name = it.group === null || it.group === undefined ? pathUtil.base(pathUtil.dir(it.path)) || t('ほかの場所') : it.group === '' ? t('メモ') : it.group;
-        detail.append(h('span', { class: 'lib-ftag', title: it.group === null || it.group === undefined ? pathUtil.dir(it.path) : name }, name.split('/').pop()));
+        const outside = it.group === null || it.group === undefined;
+        const name = outside ? pathUtil.base(pathUtil.dir(it.path)) || t('ほかの場所') : it.group === '' ? this.rootName : it.group;
+        detail.append(h('span', { class: 'lib-ftag', title: outside ? pathUtil.dir(it.path) : name }, name.split('/').pop()));
       }
       detail.append(h('span', { class: 'lib-space' }), h('span', { class: 'lib-time' }, dateText(it.modified)));
+      // 新しく作ったファイル: アイコンの左に小さな点。はじめて出るときは上からすべり込む
+      const left = newRemaining(it.created);
+      if (left && (!soonest || left < soonest)) soonest = left;
+      const fresh = left && !this.slid.has(norm(it.path));
+      if (fresh) this.slid.add(norm(it.path));
       const row = h('div', {
-        class: 'lib-row' + (picked ? ' current' : ''), role: 'option', 'aria-selected': picked ? 'true' : 'false', draggable: 'true',
+        class: 'lib-row' + (picked ? ' current' : '') + (fresh && animate ? ' lib-slide-in' : ''), role: 'option', 'aria-selected': picked ? 'true' : 'false', draggable: 'true',
+        'data-index': String(index),
         title: it.path + (it.sharedURL ? '\n' + t('公開中: {url}', { url: it.sharedURL }) : ''),
         onclick: e => this.rowClicked(it, e),
         oncontextmenu: e => { e.preventDefault(); this.rowMenu(it, e.clientX, e.clientY); },
-      }, title, detail);
+      }, left ? newDot() : null, title, detail);
       row.addEventListener('dragstart', e => {
+        if (e.shiftKey) { e.preventDefault(); return; }
         const paths = this.picked.size > 1 && this.picked.has(norm(it.path)) ? this.pickedPaths() : [it.path];
+        this.dragPaths = paths;
         e.dataTransfer.setData('application/x-satoru-texts', JSON.stringify(paths));
         e.dataTransfer.effectAllowed = 'move';
       });
+      row.addEventListener('dragend', () => { this.dragPaths = null; });
       this.list.append(row);
-    }
+    });
     this.list.scrollTop = scroll;
+    this.listRendered = true;
+    this.scheduleNewExpiry(soonest);
   }
 
   pickedPaths() {
@@ -714,6 +1173,7 @@ export class TextLibrary {
 
   rowClicked(it, e) {
     this.list.focus({ preventScroll: true });
+    if (this.swept && e.shiftKey) return; // Shift でなぞって選んだところ
     if (e.ctrlKey || e.metaKey) {
       if (this.picked.size === 0) { const cur = this.app.active && this.app.active.path; if (cur && this.rows.some(r => samePath(r.path, cur))) this.picked.add(norm(cur)); }
       const k = norm(it.path);
@@ -803,6 +1263,7 @@ export class TextLibrary {
     items.push('sep',
       { label: it.pinned ? t('ピン固定を外す') : t('ピン固定 (いちばん上に)'), icon: '📌', action: () => this.setPinned(!it.pinned, it.path) },
       { label: it.locked ? t('ロックを外す') : t('ロック (書き換え・削除を防ぐ)'), icon: '🔒', action: () => this.setLocked([it.path], !it.locked) },
+      { label: t('名前を変更…'), disabled: it.locked, action: () => this.askRename(it.path) },
       { label: t('複製'), action: () => this.duplicate(it.path) },
       vOn ? { label: t('版の履歴…'), disabled: it.encrypted, action: () => app.versions.show(it.path) } : null,
       { label: t('移動'), disabled: it.locked, submenu: [
@@ -857,6 +1318,51 @@ export class TextLibrary {
     await this.reload();
   }
 
+  /// 名前を聞いて、元のファイルの名前を変える (ファイル > 名前を変更…・一覧の右クリック)。中身はそのまま
+  async askRename(path) {
+    const name = pathUtil.base(path);
+    const input = h('input', { type: 'text', class: 'wide', value: name, autofocus: true });
+    const dot = name.lastIndexOf('.');
+    const ok = await modal({
+      title: t('ファイルの名前を変更'),
+      body: h('div', {}, h('div', { class: 'modal-line' }, t('元のファイルの名前を変えます (中身はそのまま)。')), input),
+      // 拡張子の前までを選んでおく (すぐ打ち直せるように)
+      onOpen: () => setTimeout(() => { try { input.setSelectionRange(0, dot > 0 ? dot : name.length); } catch (e) { /* そのまま */ } }, 0),
+      buttons: [{ label: t('変更'), value: true, primary: true }, { label: t('キャンセル'), value: false, cancel: true }],
+    });
+    if (!ok) return null;
+    return this.renameTo(path, input.value);
+  }
+
+  /// 名前を変える。拡張子を書かなければ前のものを付ける。開いているタブは、そのまま新しい名前で編集を続けられる。
+  /// ピン・表示・公開の記録・版の履歴もついていく。変えたら新しいパス
+  async renameTo(path, newName) {
+    let name = Array.from(String(newName || '').trim()).filter(c => c >= ' ' && c !== '/' && c !== ':' && c !== '\\').join('');
+    if (!name || name.startsWith('.')) { this.beep(); return null; }
+    const base = pathUtil.base(path);
+    const oldDot = base.lastIndexOf('.');
+    if (name.lastIndexOf('.') <= 0 && oldDot > 0) name += base.slice(oldDot);
+    if (name === base) return path;
+    const to = pathUtil.join(pathUtil.dir(path), name);
+    if (!samePath(to, path)) {
+      const info = await this.api.fileInfo(to);
+      if (info && info.exists) { await alertBox(t('「{name}」はもうあります', { name }), t('ほかの名前にしてください。')); return null; }
+    }
+    const tab = this.app.tabs.find(x => x.path && samePath(x.path, path));
+    if ((this.itemFor(path) || {}).locked || (tab && tab.locked)) { await alertBox(t('ロックしているので名前を変えられません'), ''); return null; }
+    if (tab && tab.isDirty()) await this.app.save(tab);
+    if (tab) clearTimeout(tab.autosaveTimer);
+    const r = await this.api.renameEntry(path, name);
+    if (r.status !== 'ok') { await alertBox(t('名前を変えられませんでした'), r.message); return null; }
+    await this.api.versionRepath(path, r.path);
+    const known = (this.prefs.libraryFiles || []).some(p => samePath(p, path));
+    this.relocate(path, r.path);
+    if (!known && !this.isInFolder(r.path)) this.remember(r.path);
+    if (tab && tab === this.app.active) this.app.updateTabs();
+    await this.reload();
+    return r.path;
+  }
+
   async moveTexts(paths, rel) {
     const dir = await this.api.libraryFolderPath(rel);
     await this.moveTo(paths, dir);
@@ -892,16 +1398,15 @@ export class TextLibrary {
       await alertBox(t('ロックしているので削除できません'), t('右クリックの「ロックを外す」で外してから削除してください。'));
       return;
     }
-    const body = t('ごみ箱に入れます。ごみ箱から戻すこともできます。')
-      + (targets.length > 1 ? '\n\n' + targets.slice(0, 8).map(p => '・' + pathUtil.base(p)).join('\n') + (targets.length > 8 ? '\n…' : '') : '')
-      + (locked.length ? '\n\n' + t('ロックしている {n} 件は削除しません。', { n: locked.length }) : '');
+    const body = withNames(t('ごみ箱に入れます。ごみ箱から戻すこともできます。')
+      + (locked.length ? '\n\n' + t('ロックしている {n} 件は削除しません。', { n: locked.length }) : ''), targets.map(p => pathUtil.base(p)));
     const ok = await modal({
       title: targets.length === 1 ? t('「{name}」を削除しますか？', { name: pathUtil.base(targets[0]) }) : t('{n} 件のテキストを削除しますか？', { n: targets.length }),
       body, buttons: [{ label: t('削除'), value: true, primary: true }, { label: t('キャンセル'), value: false, cancel: true }],
     });
     if (!ok) return;
-    // 開いている文書なら先に閉じる (保存は聞かない。ごみ箱から戻せる)
-    for (const tab of this.app.tabs.slice()) if (tab.path && targets.some(p => samePath(p, tab.path))) await this.app.closeTab(tab, { noAsk: true });
+    // 開いている文書は、タブを閉じずに空の新しいテキストにする (保存は聞かない。ごみ箱から戻せる)
+    for (const tab of this.app.tabs.slice()) if (tab.path && targets.some(p => samePath(p, tab.path))) await this.app.makeBlank(tab);
     const r = await this.api.libraryTrash(targets);
     for (const p of r.done || []) {
       this.forget(p);
@@ -985,4 +1490,45 @@ function folderSVG() {
   svg.setAttribute('height', '14');
   svg.innerHTML = '<path d="M1.5 4V12.5a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1V5.5a1 1 0 0 0-1-1H7.5L6 3H2.5a1 1 0 0 0-1 1z" fill="var(--fc)" fill-opacity="0.22" stroke="var(--fc)" stroke-width="1.2"/>';
   return svg;
+}
+
+/// 新しく作ったものの小さな点 (強調色)
+function newDot() { return h('span', { class: 'lib-new-dot', title: t('新しく作りました') }); }
+
+/// 読み込み中のしるし: ぐるぐると「読み込み中…」(時間がかかるときだけ出す)
+function loadingMark() {
+  return h('div', { class: 'lib-loading', hidden: true }, h('span', { class: 'lib-spinner', 'aria-hidden': 'true' }), h('span', {}, t('読み込み中…')));
+}
+
+/// ボタンをぴょんぴょん跳ねさせて場所を知らせる (on = false で止める)
+function hop(btn, on) { if (btn) btn.classList.toggle('lib-hop', !!on); }
+
+/// 案内の文: 「」で囲んだところは強調色の下線付きで見せる (「」は出さない)。押すと onClick、マウスを乗せると onHover(true/false)
+export function hintText(text, onClick, onHover) {
+  const el = h('div', { class: 'lib-hint' });
+  String(text).split('「').forEach((part, i) => {
+    const end = part.indexOf('」');
+    if (i > 0 && end >= 0) {
+      el.append(h('span', { class: 'lib-hint-link', role: 'button', tabindex: '0', onclick: onClick,
+        onkeydown: e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } },
+        onmouseenter: () => onHover && onHover(true), onmouseleave: () => onHover && onHover(false) }, part.slice(0, end)));
+      el.append(part.slice(end + 1));
+    } else el.append(part);
+  });
+  return el;
+}
+
+/// 空のときのしるし: 大きめのアイコンと、小さな英字 (NO DATA など)。その下に案内
+function emptyState(iconName, caption, hint) {
+  return h('div', { class: 'lib-empty-state', 'aria-label': caption }, h('span', { class: 'lib-empty-icon' }, icon(iconName, 28)),
+    h('div', { class: 'lib-empty-caption' }, caption), hint || null);
+}
+
+/// 確認の窓の本文: 説明と、いくつもあるときは左寄せの名前の並び (8 件まで + …)
+function withNames(text, names) {
+  const body = h('div', {}, ...String(text).split('\n').map(line => h('div', { class: 'modal-line' }, line || ' ')));
+  if (names.length > 1) {
+    body.append(h('div', { class: 'lib-names' }, ...names.slice(0, 8).map(n => h('div', {}, '・' + n)), names.length > 8 ? h('div', {}, '…') : null));
+  }
+  return body;
 }

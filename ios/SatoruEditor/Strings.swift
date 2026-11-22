@@ -367,5 +367,84 @@ The text changed after you asked. Copy the answer and paste it instead.
 
 開けませんでした
 Could not open
+
+# iCloud
+保存場所
+Storage
+
+(別の端末)
+(other device)
+
+Mac のさとるエディタと同じテキストが見られます。ファイル App では iCloud Drive の「さとるエディタ」にあります。一覧の上のタブで「ローカル」に切り替えられます。
+You see the same texts as Satoru Editor on your Mac. In the Files app they are in iCloud Drive › さとるエディタ. Use the tabs at the top of the list to switch to "Local".
+
+iCloud Drive の「さとるエディタ」
+iCloud Drive › さとるエディタ
+
+iCloud からまだ届いていません。通信の状態を確かめて、あとでもう一度開いてください。
+It hasn't arrived from iCloud yet. Check your connection and try opening it again later.
+
+iCloud から読み込んでいます…
+Downloading from iCloud…
+
+iCloud が使えないので、この iPhone の中に保存しています。iPhone の設定で iCloud にサインインし、iCloud Drive をオンにすると、Mac と同じテキストが見られます。
+iCloud isn't available, so texts are saved on this device. Sign in to iCloud and turn on iCloud Drive in Settings to see the same texts as on your Mac.
+
+iCloud が使えません
+iCloud isn't available
+
+iCloud が使えません。iPhone の設定で iCloud にサインインし、iCloud Drive をオンにすると、Mac と同じテキストが見られます。
+iCloud isn't available. Sign in to iCloud and turn on iCloud Drive in Settings to see the same texts as on your Mac.
+
+iCloud にあります
+In iCloud
+
+iCloud にあります (開くと読み込みます)
+In iCloud (downloads when opened)
+
+iCloud に移しました
+Moved to iCloud
+
+iCloud に移す
+Move to iCloud
+
+iCloud を確かめています…
+Checking iCloud…
+
+いまの場所
+Current location
+
+こちらで書いたものはそのまま残し、ほかの端末の版は「{0}」として保存しました。
+Your version here was kept, and the other device's version was saved as "{0}".
+
+この iPad の中
+On this iPad
+
+この iPhone の中
+On this iPhone
+
+ほかの端末でも書き換えられていました
+It was also changed on another device
+
+ほかの端末で書き換えられたので、読み直しました
+Changed on another device, so it was reloaded
+
+ファイル App の「iCloud Drive」>「さとるエディタ」にあります。
+In the Files app under iCloud Drive › さとるエディタ.
+
+一覧の上のタブで iCloud に切り替えられます。
+Use the tabs at the top of the list to switch to iCloud.
+
+移せませんでした
+Couldn't move it
+
+ローカル
+Local
+
+ローカルに移す
+Move to Local
+
+ローカルに移しました
+Moved to Local
 """
 }

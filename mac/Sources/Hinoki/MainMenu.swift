@@ -63,6 +63,7 @@ enum MainMenu {
          item("閉じる", "performClose:", "w"),
          item("保存", "saveDocument:", "s"),
          item("別名で保存…", "saveDocumentAs:", "s", [.command, .shift]),
+         item("名前を変更…", "renameFileHM:"),
          item("保存時の状態に戻す", "revertDocumentToSaved:"),
          item("版の履歴…", "versionHistoryHM:"),
          item("巨大ファイル: 読み込む範囲を変える…", "changePartialRangeHM:"),

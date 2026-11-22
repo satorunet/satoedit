@@ -298,11 +298,11 @@ final class BackupSettingsPane: NSObject, SettingsPane {
     override init() {
         super.init()
         let col = NSStackView(views: [
-            SettingsUI.label(L("テキスト一覧のファイルを、パスワードで鍵をかけた 1 つのファイルに書き出します。読み込むと、別の Mac にも戻せます。")),
+            SettingsUI.label(L("テキストを、パスワード付きの 1 つのファイルにまとめて保存します。別の Mac にも戻せます。")),
             SettingsUI.row([SettingsUI.button(L("テキストをバックアップ (書き出す)…"), self, #selector(exportBackup(_:))),
                             SettingsUI.button(L("バックアップから戻す (読み込む)…"), self, #selector(importBackup(_:)))]),
-            SettingsUI.note(L("入るもの: さとるエディタのフォルダのファイルすべて (フォルダの形のまま)、一覧に出ている「ほかの場所」のテキスト、表示 (作文など)・ピン・ロック・日時、版の履歴、フォルダのアイコンと並び、公開したリンクの記録。")),
-            SettingsUI.note(L("戻すときは、今あるファイルは消しません。同じ名前で中身が違うものは「(バックアップ)」を付けて別に置きます。パスワードを忘れると、このバックアップは開けません。")),
+            SettingsUI.note(L("テキスト・フォルダ・版の履歴などが、まるごと入ります。")),
+            SettingsUI.note(L("戻しても、今あるファイルは消えません。パスワードを忘れると開けないので注意。")),
         ])
         col.orientation = .vertical
         col.alignment = .leading
@@ -312,8 +312,7 @@ final class BackupSettingsPane: NSObject, SettingsPane {
         versions.action = #selector(versionsChanged(_:))
         let vcol = NSStackView(views: [
             versions,
-            SettingsUI.note(L("保存するたびに、そのテキストの中身を記録します (自動保存が続くあいだは 20 秒ごとに 1 つにまとめます。⌘S で保存したときは、すぐ記録します)。ファイル > 版の履歴… や、テキスト一覧の右クリックから、前の版を見たり、今との違いを見たり、戻したりできます。")),
-            SettingsUI.note(L("記録はこの Mac の中 (~/.satoruEditor/history) に、テキストごとの git で置きます。あなたのフォルダには何も作りません。Finder で動かしたり名前を変えたりしても履歴はついていき、テキストを削除すると履歴も消えます。暗号化した文書は記録しません。")),
+            SettingsUI.note(L("保存するたびに版を残します。テキスト一覧の右クリックから、前の版を見たり戻したりできます。")),
             SettingsUI.row([SettingsUI.label(L("テキストごとに残す版の数")), maxPopup,
                             SettingsUI.label(L("(それより古い版は消えます)"), small: true)]),
             SettingsUI.row([SettingsUI.button(L("記録の場所を Finder で開く"), self, #selector(revealVersions(_:)))]),
@@ -324,8 +323,65 @@ final class BackupSettingsPane: NSObject, SettingsPane {
         vcol.orientation = .vertical
         vcol.alignment = .leading
         vcol.spacing = 8
-        _ = SettingsUI.fill(view, with: [SettingsUI.box(L("テキストのバックアップ"), col), SettingsUI.box(L("版の記録 (git)"), vcol), NSView()])
+        // 置き場所 (iCloud Drive に置くと、iPhone 版でも同じテキストが見られる)
+        storageButton.target = self
+        storageButton.action = #selector(toggleStorage(_:))
+        let scol = NSStackView(views: [
+            storageLabel,
+            SettingsUI.row([storageButton, SettingsUI.button(L("Finder で開く"), self, #selector(revealStorage(_:)))]),
+            SettingsUI.note(L("iCloud に置くと、iPhone / iPad のさとるエディタでも同じテキストが使えます。")),
+        ])
+        scol.orientation = .vertical
+        scol.alignment = .leading
+        scol.spacing = 8
+        _ = SettingsUI.fill(view, with: [SettingsUI.box(L("テキストの置き場所 (iCloud)"), scol), SettingsUI.box(L("テキストのバックアップ"), col),
+                                         SettingsUI.box(L("版の履歴"), vcol), NSView()])
         willShow()
+    }
+
+    private let storageLabel = NSTextField(wrappingLabelWithString: "")
+    private let storageButton = NSButton(title: "", target: nil, action: nil)
+
+    private func refreshStorage() {
+        let icloud = TextLibrary.usesICloud
+        let path = (TextLibrary.folder.path as NSString).abbreviatingWithTildeInPath
+        storageLabel.stringValue = icloud ? L("いまの置き場所: iCloud Drive の「さとるエディタ」") : L("いまの置き場所: この Mac の書類フォルダ")
+        storageLabel.toolTip = path
+        storageButton.title = icloud ? L("この Mac に戻す…") : L("iCloud Drive に置く…")
+        storageButton.isEnabled = icloud || TextLibrary.iCloudDriveRoot != nil
+        if !icloud && TextLibrary.iCloudDriveRoot == nil {
+            storageLabel.stringValue += "\n" + L("この Mac では iCloud Drive がオフです (システム設定 > Apple ID > iCloud で iCloud Drive をオンにしてください)。")
+        }
+    }
+
+    @objc private func toggleStorage(_ sender: Any?) {
+        let toICloud = !TextLibrary.usesICloud
+        let a = NSAlert()
+        a.messageText = toICloud ? L("テキストを iCloud Drive に置きますか？") : L("テキストをこの Mac に戻しますか？")
+        a.informativeText = toICloud
+            ? L("今のテキストを iCloud Drive の「さとるエディタ」フォルダに写して、これからはそこに保存します。この Mac の書類フォルダのファイルは消しません。")
+            : L("iCloud Drive の「さとるエディタ」フォルダのテキストを、この Mac の書類フォルダに写して、これからはそこに保存します。iCloud Drive のファイルは消しません。")
+        a.addButton(withTitle: toICloud ? L("iCloud Drive に置く") : L("この Mac に戻す"))
+        a.addButton(withTitle: L("キャンセル"))
+        guard a.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            let n = try TextLibrary.switchStorage(toICloud: toICloud)
+            let done = NSAlert()
+            done.messageText = L("置き場所を変えました")
+            done.informativeText = L("{0} 個のファイルを写しました。", n)
+            done.runModal()
+        } catch {
+            let e = NSAlert()
+            e.messageText = L("置き場所を変えられませんでした")
+            e.informativeText = error.localizedDescription
+            e.runModal()
+        }
+        refreshStorage()
+    }
+
+    @objc private func revealStorage(_ sender: Any?) {
+        try? FileManager.default.createDirectory(at: TextLibrary.folder, withIntermediateDirectories: true)
+        NSWorkspace.shared.activateFileViewerSelecting([TextLibrary.folder])
     }
 
     private let versions = NSButton(checkboxWithTitle: L("保存のたびに、テキストごとの版を残す"), target: nil, action: nil)
@@ -338,6 +394,7 @@ final class BackupSettingsPane: NSObject, SettingsPane {
     }()
 
     func willShow() {
+        refreshStorage()
         versions.state = VersionStore.isOn ? .on : .off
         versions.isEnabled = VersionStore.gitAvailable
         maxPopup.selectItem(at: VersionStore.maxChoices.firstIndex(of: VersionStore.maxVersions) ?? 1)

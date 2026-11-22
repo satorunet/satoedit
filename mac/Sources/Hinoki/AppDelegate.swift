@@ -122,6 +122,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         // 設定で選んだ色のアイコンにする (Finder 側は選んだときに変えてあるので、ここでは Dock だけ)
         AppIcon.apply(updateFinder: false)
         AppUpdater.shared.start()   // 自動アップデート (配布用のアプリのときだけ動く)
+        TextLibrary.autoICloud()    // iCloud Drive が使えるなら、最初から iCloud にテキストを置く
         NSApp.activate(ignoringOtherApps: true)
         // Finder の右クリックメニュー (サービス) から呼ばれる
         NSApp.servicesProvider = FinderServices.shared

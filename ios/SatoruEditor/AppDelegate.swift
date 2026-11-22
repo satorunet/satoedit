@@ -10,6 +10,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         Prefs.registerDefaults()
         IOSStrings.applyLanguage()
         SelfTest.prepare()
+        LibraryLocation.start()
         let w = UIWindow(frame: UIScreen.main.bounds)
         window = w
         rebuildUI()
@@ -29,7 +30,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
 
     /// ファイル App などから .txt を渡されたとき: 書類フォルダの外なら、書類フォルダに写してから開く
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        let inside = url.standardizedFileURL.path.hasPrefix(Library.root.standardizedFileURL.path + "/")
+        // iCloud (アプリのコンテナ) か ローカル の中なら、そのまま開く
+        let roots = [Library.root, Library.localRoot] + (LibraryLocation.iCloudDocuments.map { [$0] } ?? [])
+        let inside = roots.contains { url.standardizedFileURL.path.hasPrefix($0.standardizedFileURL.path + "/") }
         var target = url
         if !inside {
             let access = url.startAccessingSecurityScopedResource()

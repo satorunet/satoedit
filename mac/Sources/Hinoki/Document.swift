@@ -95,6 +95,19 @@ final class Document: NSDocument {
         return true
     }
 
+    /// 開いているファイルを削除したとき: タブ (ウインドウ) は閉じず、何も書いていない新しいテキストにする
+    func becomeBlank() {
+        editor?.saveCaretPosition()
+        switchingFile = true
+        defer { switchingFile = false }
+        fileURL = nil
+        fileType = DocumentController.textType
+        try? read(from: Data(), ofType: DocumentController.textType)
+        fileModificationDate = nil
+        updateChangeCount(.changeCleared)
+        touched = false
+    }
+
     /// ⌘S で保存したところ (版をすぐ作る)
     private var userSaved = false
     /// 版の履歴の番号 (保存で拡張属性が消えても、付け直すため)

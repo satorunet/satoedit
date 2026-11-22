@@ -4384,6 +4384,160 @@ Data Encryption Settings…
 Share via Link Settings…
 アップデートを確認…
 Check for Updates…
+「みんなのメモ」に掲載 OK (サイトの一覧に載ります)
+OK to list in “Everyone's Memos” (shown on the site)
+ファイルの名前を変更
+Rename File
+元のファイルの名前を変えます (中身はそのまま)。
+Renames the original file (its contents stay the same).
+「{0}」はもうあります
+“{0}” already exists
+ほかの名前にしてください。
+Please choose another name.
+ロックしているので名前を変えられません
+This file is locked, so it can't be renamed
+今日まで
+Until End of Today
+明日まで
+Until End of Tomorrow
+3 日
+3 days
+期間を指定…
+Set a Duration…
+期日を指定…
+Set an End Date…
+期間: {0}
+Duration: {0}
+期日: {0} まで
+Until {0}
+日
+days
+時間
+hours
+分
+min
+秒
+sec
+0 秒
+0 sec
+公開の期間
+Publishing Duration
+公開してから、どれだけのあいだ読めるようにするかを決めます。
+Choose how long the page stays readable after publishing.
+期間は 10 秒以上にしてください
+Make the duration at least 10 seconds
+公開の期日
+Publishing End Date
+この日時まで読めるようにします。
+The page stays readable until this date and time.
+時刻
+Time
+今より後の日時を選んでください
+Choose a date and time in the future
+「左上のボタン」で新規フォルダ
+New folder with the 「button at the top left」
+「左上のボタン」で新規ファイル
+New file with the 「button at the top left」
+公開共有中
+Shared by Link
+履歴から消す
+Remove from history
+この履歴を消す (フォルダそのものは消しません)
+Remove from this list (the folder itself is not deleted)
+読み込み中…
+Loading…
+フォルダの欄の基準にする、この Mac の中のフォルダを選んでください
+Choose a folder on this Mac to use as the base of the folder list
+一覧に出す、この Mac の中のフォルダを選んでください (中のテキストが出ます)
+Choose a folder on this Mac to show in the list (its texts will appear)
+iCloud Drive の中のフォルダは選べません
+Folders in iCloud Drive can't be chosen
+この Mac の中のフォルダを選んでください。iCloud のテキストは、▾ ボタンの「iCloud」で見られます。
+Choose a folder on this Mac. To see iCloud texts, pick “iCloud” from the ▾ button.
+任意フォルダ…
+Any Folder…
+見るテキストの置き場所: iCloud (iPhone 版と同じ)・この Mac・好きなフォルダ
+Where to see texts from: iCloud (same as iPhone), this Mac, or any folder
+見つかりませんでした
+Nothing found
+このフォルダには、まだテキストがありません
+This folder has no texts yet
+左上のボタンで新しく作れます
+Use the button at the top left to create one
+まだテキストがありません
+No texts yet
+この公開をやめる鍵が合いませんでした。
+The key to stop this publication did not match.
+ページはまだ公開されたままです。
+The page is still published.
+新しく作りました
+Newly created
+{0} 個のフォルダ
+{0} folders
+下のテキストは「{0}」の中のものです
+The texts below are in “{0}”
+「{0}」の中に作る
+Inside “{0}”
+別のフォルダとして、いちばん上に作る
+As a separate folder at the top level
+ほかの場所のフォルダを開く…
+Open a Folder from Elsewhere…
+ゴミ箱 (選んだテキストを削除。ファイルやフォルダをここに置いても削除できます)
+Trash (deletes the selected texts. You can also drop files or folders here to delete them)
+版の履歴
+Version History
+iCloud に置くと、iPhone / iPad のさとるエディタでも同じテキストが使えます。
+Store texts in iCloud to use the same texts in Satoru Editor on your iPhone / iPad.
+保存するたびに版を残します。テキスト一覧の右クリックから、前の版を見たり戻したりできます。
+Keeps a version each time you save. Right-click a text in the list to view or restore earlier versions.
+戻しても、今あるファイルは消えません。パスワードを忘れると開けないので注意。
+Restoring never deletes existing files. If you forget the password, the backup can't be opened.
+テキスト・フォルダ・版の履歴などが、まるごと入ります。
+Includes texts, folders, version history and more.
+テキストを、パスワード付きの 1 つのファイルにまとめて保存します。別の Mac にも戻せます。
+Saves all your texts into one password-protected file. You can restore it on another Mac too.
+この Mac
+This Mac
+ローカル
+Local
+どちらに置いたテキストを見るか (iCloud は iPhone 版と同じ)
+Which texts to show (iCloud is shared with the iPhone app)
+Finder で開く
+Open in Finder
+iCloud Drive に置く
+Store in iCloud Drive
+iCloud Drive に置く…
+Store in iCloud Drive…
+iCloud Drive が使える Mac では、はじめから iCloud Drive の「さとるエディタ」に置きます。同じ Apple ID の iPhone / iPad のさとるエディタでも、同じテキストを読んだり書いたりできます。
+On a Mac with iCloud Drive, texts are stored in “さとるエディタ” in iCloud Drive from the start. Satoru Editor on an iPhone / iPad with the same Apple ID can read and write the same texts.
+iCloud Drive の「さとるエディタ」フォルダのテキストを、この Mac の書類フォルダに写して、これからはそこに保存します。iCloud Drive のファイルは消しません。
+Copies the texts in the “さとるエディタ” folder in iCloud Drive to this Mac's Documents folder and saves there from now on. Files in iCloud Drive are not deleted.
+{0} 個のファイルを写しました。
+Copied {0} files.
+この Mac では iCloud Drive がオフです (システム設定 > Apple ID > iCloud で iCloud Drive をオンにしてください)。
+iCloud Drive is off on this Mac (turn it on in System Settings > Apple ID > iCloud).
+この Mac に戻す
+Move Back to This Mac
+この Mac に戻す…
+Move Back to This Mac…
+テキストを iCloud Drive に置きますか？
+Store your texts in iCloud Drive?
+テキストをこの Mac に戻しますか？
+Move your texts back to this Mac?
+今のテキストを iCloud Drive の「さとるエディタ」フォルダに写して、これからはそこに保存します。この Mac の書類フォルダのファイルは消しません。
+Copies your current texts to the “さとるエディタ” folder in iCloud Drive and saves there from now on. Files in this Mac's Documents folder are not deleted.
+いまの置き場所: iCloud Drive の「さとるエディタ」
+Current location: “さとるエディタ” in iCloud Drive
+いまの置き場所: この Mac の書類フォルダ
+Current location: this Mac's Documents folder
+テキストの置き場所 (iCloud)
+Where Texts Are Stored (iCloud)
+置き場所を変えました
+Storage location changed
+置き場所を変えられませんでした
+Couldn't change the storage location
+置き場所を変えると、今のテキストを新しい場所に写します。前の場所のファイルは消しません。版の記録はこの Mac の中のままです。
+Changing the location copies your current texts to the new place. Files in the old place are not deleted. Version history stays on this Mac.
 アップデートを自動で確認
 Automatically Check for Updates
 この版ではアップデートを確認できません

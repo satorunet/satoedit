@@ -10,6 +10,14 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
     private var folders: [String] = []
     private let search = UISearchController(searchResultsController: nil)
     private var timer: Timer?
+    /// 見えている間、ほかの端末 (Mac・iCloud) の変更を拾うために数秒ごとに見直す
+    private var refreshTimer: Timer?
+    private var requestedDownloads: Set<String> = []
+    private var downloadWait: (timer: Timer, alert: UIAlertController)?
+    /// 一覧の上のタブ: iCloud / ローカル (どちらの場所を見せるか)
+    private let placeTabs = UISegmentedControl(items: ["iCloud", LibraryLocation.deviceName])
+    private let placeNote = UILabel()
+    private let placeHeader = UIView()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -49,6 +57,7 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
         nc.addObserver(self, selector: #selector(reload), name: Library.didChange, object: nil)
         nc.addObserver(self, selector: #selector(reload), name: ShareStore.didChange, object: nil)
         nc.addObserver(self, selector: #selector(reload), name: UIApplication.didBecomeActiveNotification, object: nil)
+        setUpPlaceTabs()
         refreshControl = UIRefreshControl()
         refreshControl?.addTarget(self, action: #selector(pulled), for: .valueChanged)
         reload()
@@ -62,9 +71,21 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
         reload()
     }
 
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        refreshTimer?.invalidate()
+        refreshTimer = Timer.scheduledTimer(withTimeInterval: 4, repeats: true) { [weak self] _ in self?.refreshIfChanged() }
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setToolbarHidden(true, animated: animated)
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        refreshTimer?.invalidate()
+        refreshTimer = nil
     }
 
     @objc private func pulled() {
@@ -72,11 +93,96 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
         refreshControl?.endRefreshing()
     }
 
+    // MARK: iCloud / ローカル のタブ
+
+    private func setUpPlaceTabs() {
+        placeTabs.accessibilityIdentifier = "placeTabs"
+        placeTabs.addAction(UIAction { [weak self] _ in self?.placeTabChanged() }, for: .valueChanged)
+        placeNote.font = .systemFont(ofSize: 13)
+        placeNote.textColor = .secondaryLabel
+        placeNote.numberOfLines = 0
+        let stack = UIStackView(arrangedSubviews: [placeTabs, placeNote])
+        stack.axis = .vertical
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        placeHeader.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.leadingAnchor.constraint(equalTo: placeHeader.layoutMarginsGuide.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: placeHeader.layoutMarginsGuide.trailingAnchor),
+            stack.topAnchor.constraint(equalTo: placeHeader.topAnchor, constant: 8),
+        ])
+        tableView.tableHeaderView = placeHeader
+    }
+
+    private func placeTabChanged() {
+        LibraryLocation.prefersICloud = placeTabs.selectedSegmentIndex == 0
+        filter = nil
+        SelfTest.log("tab \(LibraryLocation.isICloud ? "icloud" : "local")")
+    }
+
+    private func updatePlaceTabs() {
+        placeTabs.setEnabled(LibraryLocation.iCloudAvailable, forSegmentAt: 0)
+        placeTabs.selectedSegmentIndex = LibraryLocation.isICloud ? 0 : 1
+        switch LibraryLocation.iCloud {
+        case .unavailable:
+            placeNote.text = L("iCloud が使えません。iPhone の設定で iCloud にサインインし、iCloud Drive をオンにすると、Mac と同じテキストが見られます。")
+        case .checking where LibraryLocation.prefersICloud:
+            placeNote.text = L("iCloud を確かめています…")
+        default:
+            placeNote.text = nil
+        }
+        placeNote.isHidden = placeNote.text == nil
+        let width = tableView.bounds.width > 0 ? tableView.bounds.width : view.bounds.width
+        let noteHeight = placeNote.isHidden ? 0 : placeNote.sizeThatFits(CGSize(width: width - 40, height: 400)).height + 6
+        let h = 8 + 32 + noteHeight + 8
+        if abs(placeHeader.frame.height - h) > 0.5 || placeHeader.frame.width != width {
+            placeHeader.frame = CGRect(x: 0, y: 0, width: width, height: h)
+            tableView.tableHeaderView = placeHeader
+        }
+    }
+
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if placeHeader.frame.width != tableView.bounds.width { updatePlaceTabs() }
+    }
+
+    /// iCloud ⇄ ローカル に移す
+    func moveToOtherPlace(_ item: Library.Item) {
+        Library.moveToOtherPlace(item.url) { [weak self] r in
+            switch r {
+            case .success(let u):
+                SelfTest.log("moved-place \(u.path)")
+                self?.toast(LibraryLocation.isICloud ? L("ローカルに移しました") : L("iCloud に移しました"))
+            case .failure(let e):
+                SelfTest.log("FAIL moved-place \(e.localizedDescription)")
+                self?.showMessage(L("移せませんでした"), e.localizedDescription)
+            }
+        }
+    }
+
     @objc func reload() {
+        updatePlaceTabs()
         items = Library.items()
         folders = Library.folders()
         if let f = filter, !f.isEmpty, !folders.contains(f) { filter = nil }
+        requestDownloads()
         applyFilter()
+    }
+
+    /// 変わったときだけ表を作り直す (スワイプ中などを邪魔しない)
+    private func refreshIfChanged() {
+        guard UIApplication.shared.applicationState == .active, !tableView.isEditing, !tableView.isDragging else { return }
+        let newItems = Library.items(), newFolders = Library.folders()
+        guard newItems != items || newFolders != folders else { return }
+        reload()
+    }
+
+    /// iCloud にだけあるものは、一覧に出たら落とし始める
+    private func requestDownloads() {
+        for i in items where i.isPlaceholder && !requestedDownloads.contains(i.url.path) {
+            requestedDownloads.insert(i.url.path)
+            Library.requestDownload(i.url)
+        }
     }
 
     private var query: String { search.searchBar.text?.trimmingCharacters(in: .whitespaces) ?? "" }
@@ -139,6 +245,10 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
 
     @discardableResult
     func open(_ url: URL) -> EditorViewController? {
+        if Library.needsDownload(url) {
+            waitForDownload(url)
+            return nil
+        }
         do {
             let doc = try TextDocument(url: url)
             let vc = EditorViewController(doc: doc)
@@ -150,6 +260,40 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
             showMessage(L("開けませんでした"), error.localizedDescription)
             return nil
         }
+    }
+
+    /// iCloud からまだ落としていないテキスト: 落とし終わるのを待ってから開く
+    private func waitForDownload(_ url: URL) {
+        cancelDownloadWait()
+        Library.requestDownload(url)
+        let name = url.deletingPathExtension().lastPathComponent
+        let alert = UIAlertController(title: L("iCloud から読み込んでいます…"), message: name, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: L("キャンセル"), style: .cancel) { [weak self] _ in self?.cancelDownloadWait(dismiss: false) })
+        let started = Date()
+        let t = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            if !Library.needsDownload(url) && FileManager.default.fileExists(atPath: url.path) {
+                self.cancelDownloadWait(dismiss: false)
+                alert.dismiss(animated: false) { self.open(url) }
+            } else if Date().timeIntervalSince(started) > 90 {
+                self.cancelDownloadWait(dismiss: false)
+                alert.dismiss(animated: true) {
+                    self.showMessage(L("読み込めませんでした"), L("iCloud からまだ届いていません。通信の状態を確かめて、あとでもう一度開いてください。"))
+                }
+            } else {
+                Library.requestDownload(url)
+            }
+        }
+        downloadWait = (t, alert)
+        present(alert, animated: true)
+        SelfTest.log("waiting-download \(url.lastPathComponent)")
+    }
+
+    private func cancelDownloadWait(dismiss: Bool = true) {
+        guard let w = downloadWait else { return }
+        w.timer.invalidate()
+        downloadWait = nil
+        if dismiss { w.alert.dismiss(animated: false) }
     }
 
     @objc private func openSettings() {
@@ -170,7 +314,8 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
 
     override func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         if section == 0 { return showsFolders ? L("フォルダ") : nil }
-        return shown.isEmpty ? nil : (showsFolders ? L("すべて") + "  " + L("{0} 件", shown.count) : L("{0} 件", shown.count))
+        let place = LibraryLocation.shortName.map { "  ·  " + $0 } ?? ""
+        return shown.isEmpty ? nil : (showsFolders ? L("すべて") + "  " + L("{0} 件", shown.count) : L("{0} 件", shown.count)) + place
     }
 
     override func tableView(_ tableView: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {
@@ -210,16 +355,21 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
         }
         move.image = UIImage(systemName: "folder")
         move.backgroundColor = .systemTeal
-        return UISwipeActionsConfiguration(actions: [del, move])
+        return UISwipeActionsConfiguration(actions: item.isPlaceholder ? [del] : [del, move])
     }
 
     override func tableView(_ tableView: UITableView, contextMenuConfigurationForRowAt ip: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         guard ip.section == 1 else { return nil }
         let item = shown[ip.row]
+        // iCloud からまだ落としていないものは、名前を変える・移すはできない (消すことはできる)
+        let off: UIMenuElement.Attributes = item.isPlaceholder ? .disabled : []
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
             UIMenu(children: [
-                UIAction(title: L("名前を変える"), image: UIImage(systemName: "pencil")) { _ in self?.renameItem(item) },
-                UIAction(title: L("フォルダへ移す"), image: UIImage(systemName: "folder")) { _ in self?.moveItem(item, from: ip) },
+                UIAction(title: L("名前を変える"), image: UIImage(systemName: "pencil"), attributes: off) { _ in self?.renameItem(item) },
+                UIAction(title: L("フォルダへ移す"), image: UIImage(systemName: "folder"), attributes: off) { _ in self?.moveItem(item, from: ip) },
+                UIAction(title: LibraryLocation.isICloud ? L("ローカルに移す") : L("iCloud に移す"),
+                         image: UIImage(systemName: LibraryLocation.isICloud ? "iphone" : "icloud"),
+                         attributes: item.isPlaceholder || !LibraryLocation.iCloudAvailable ? .disabled : []) { _ in self?.moveToOtherPlace(item) },
                 UIAction(title: L("消す"), image: UIImage(systemName: "trash"), attributes: .destructive) { _ in self?.confirmDelete(item) },
             ])
         }
@@ -295,7 +445,7 @@ final class LibraryViewController: UITableViewController, UISearchResultsUpdatin
 extension Library.Item {
     /// 本文の中も探す (小さいファイルだけ)
     func fullTextContains(_ q: String) -> Bool {
-        guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size < 2_000_000,
+        guard !isPlaceholder, let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize, size < 2_000_000,
               let data = try? Data(contentsOf: url), let t = try? TextCodec.decode(data) else { return false }
         return t.text.localizedCaseInsensitiveContains(q)
     }
@@ -309,6 +459,7 @@ final class TextCell: UITableViewCell {
     private let folderLabel = UILabel()
     private let timeLabel = UILabel()
     private let snippetLabel = UILabel()
+    private let cloudMark = UIImageView(image: UIImage(systemName: "icloud.and.arrow.down"))
 
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
@@ -331,7 +482,12 @@ final class TextCell: UITableViewCell {
         snippetLabel.font = .systemFont(ofSize: 14)
         snippetLabel.textColor = .secondaryLabel
         snippetLabel.numberOfLines = 2
-        let top = UIStackView(arrangedSubviews: [nameLabel, extLabel, folderLabel, UIView(), timeLabel])
+        cloudMark.tintColor = .secondaryLabel
+        cloudMark.contentMode = .scaleAspectFit
+        cloudMark.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 13)
+        cloudMark.setContentHuggingPriority(.required, for: .horizontal)
+        cloudMark.accessibilityLabel = L("iCloud にあります")
+        let top = UIStackView(arrangedSubviews: [nameLabel, extLabel, folderLabel, UIView(), cloudMark, timeLabel])
         top.spacing = 6
         top.alignment = .center
         let text = UIStackView(arrangedSubviews: [top, snippetLabel])
@@ -367,7 +523,8 @@ final class TextCell: UITableViewCell {
         }
         folderLabel.isHidden = !showFolder || item.folder == nil
         timeLabel.text = Library.dateText(item.modified)
-        snippetLabel.text = item.snippet.isEmpty ? " " : item.snippet
+        cloudMark.isHidden = !item.isPlaceholder
+        snippetLabel.text = item.isPlaceholder ? L("iCloud にあります (開くと読み込みます)") : item.snippet.isEmpty ? " " : item.snippet
         accessibilityIdentifier = "row-" + item.name
     }
 }
