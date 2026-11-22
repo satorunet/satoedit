@@ -3600,6 +3600,20 @@ Listen
 
 聞き取り中… 話してください (もう一度押すと止まります)
 Listening… speak now (press again to stop)
+聞こえています…
+Listening…
+止める
+Stop
+音声入力を止めます (esc キーでも止まります)
+Stop dictation (esc also stops it)
+うまく聞き取れませんでした ({0})
+Couldn't recognize speech ({0})
+聞き取り中… 話してください
+Listening… speak now
+音声認識の回数の上限に達しました
+Speech recognition limit reached
+Apple の音声認識は、短い時間に使える回数が決まっています。少し時間をおいてから、もう一度お試しください。
+Apple's speech recognition can only be used a limited number of times in a short period. Please wait a while and try again.
 
 「システム設定 > プライバシーとセキュリティ」で、さとるエディタに {0} を許可してください。
 Allow {0} for Satoru Editor in "System Settings > Privacy & Security".
@@ -4384,6 +4398,14 @@ Data Encryption Settings…
 Share via Link Settings…
 アップデートを確認…
 Check for Updates…
+公開中のページにも反映しますか？
+Update the published page too?
+このテキストはリンクで公開中です。保存した内容を、公開中のページにも反映できます。
+This text is published by link. You can apply what you saved to the published page too.
+反映する
+Update Page
+今はしない
+Not Now
 「みんなのメモ」に掲載 OK (サイトの一覧に載ります)
 OK to list in “Everyone's Memos” (shown on the site)
 ファイルの名前を変更

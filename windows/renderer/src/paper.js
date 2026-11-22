@@ -283,8 +283,11 @@ export class GenkoEditor {
   }
 
   fit() {
-    const w = this.dom.clientWidth;
+    // 幅は、スクロールバーの分を除かない全体の幅で決める (スクロールバーが出ても紙の大きさを変えない)
+    const w = this.dom.offsetWidth;
     if (!w) return;
+    if (this.fitWidth && Math.abs(w - this.fitWidth) < 2) return;
+    this.fitWidth = w;
     const u = Math.max(2.2, Math.min(4.6, (w - 56) / (this.horizontal ? SHEET.height : SHEET.width)));
     this.u = u;
     this.dom.style.setProperty('--u', u.toFixed(3) + 'px');

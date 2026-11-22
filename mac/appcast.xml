@@ -5,24 +5,22 @@
     <link>https://github.com/satorunet/satoedit</link>
     <language>ja</language>
     <item>
-      <title>さとるエディタ 1.0.2</title>
-      <pubDate>Sun, 22 Nov 2026 02:37:17 +0000</pubDate>
-      <sparkle:version>1.0.2</sparkle:version>
-      <sparkle:shortVersionString>1.0.2</sparkle:shortVersionString>
+      <title>さとるエディタ 1.0.3</title>
+      <pubDate>Sun, 22 Nov 2026 12:44:08 +0000</pubDate>
+      <sparkle:version>1.0.3</sparkle:version>
+      <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.2</sparkle:fullReleaseNotesLink>
-      <description><![CDATA[<h2>さとるエディタ 1.0.2 (β)</h2>
+      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.3</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>さとるエディタ 1.0.3 (β)</h2>
 <ul>
-<li>テキスト一覧: ファイルやフォルダをドラッグで移動、ゴミ箱ボタン、Delete キーで削除</li>
-<li>置き場所を ▼ で切り替え (ローカル / iCloud / 任意フォルダ)</li>
-<li>新しく作ったファイル・フォルダに目じるし、空のフォルダの案内</li>
-<li>フォルダとテキストの境目をドラッグで高さ調整、選んでいるフォルダ名を表示</li>
-<li>ファイル &gt; 名前を変更…</li>
-<li>公開の期限: 今日まで・明日まで・3 日、期間や期日を自由に指定</li>
-<li>公開するとき「みんなのメモ」に載せられるように</li>
-<li>フォルダの読み込みを速く</li>
+<li>音声入力: 話しているそばから文字が入るように。話し始めで止まる問題を直しました</li>
+<li>音声入力: 声に反応して動く印と「止める」ボタン (esc でも止まります)</li>
+<li>起動したときの画面を標準エディタに</li>
+<li>公開中のテキストを保存したとき、公開ページにも反映するか確認</li>
+<li>Windows: ポータブル版 (インストール不要) を追加</li>
+<li>Windows: 原稿用紙でスクロールバーが出たり消えたりする問題を直しました</li>
 </ul>]]></description>
-      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.2/SatoruEditor-1.0.2-mac.dmg" sparkle:edSignature="vdaKKYg/WwBLFw57PiAIe0ueiDoj0ysQf1muzdWqzMZudZXpdS0b0phN9RKSTqam/Q6knPifVcAXz82P4EQSCg==" length="7309735" type="application/octet-stream"/>
+      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.3/SatoruEditor-1.0.3-mac.dmg" sparkle:edSignature="Z7nHB8HPkKarv3o+Y7BXO2KwDmEET9dRGmcRZsBaLM1VjmCV/llYqFUrbeemTB6wmJxRXR6tE17Lnu9HPxPACQ==" length="7338835" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>

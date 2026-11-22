@@ -100,13 +100,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @objc func tileWindowsStackedHM(_ sender: Any?) { WindowTiling.tile(.stacked) }
 
     /// 起動したとき (と、ウインドウがないときに Dock から開いたとき) の白紙の表示。
-    /// 設定「起動したときの表示」で決める。「前回と同じ」なら最後に使っていた表示 (はじめては原稿用紙)
+    /// 設定「起動したときの表示」で決める (はじめは標準エディタ)。「前回と同じ」なら最後に使っていた表示
     func applicationOpenUntitledFile(_ sender: NSApplication) -> Bool {
         guard let doc = try? NSDocumentController.shared.openUntitledDocumentAndDisplay(true) else { return false }
         if let editor = doc.windowControllers.first as? EditorWindowController, EditorExtension.paper.isOn {
             let d = UserDefaults.standard
-            var mode = d.string(forKey: "startPaperMode") ?? "last"
-            if mode == "last" { mode = d.string(forKey: "lastPaperMode") ?? "genko" }
+            var mode = d.string(forKey: "startPaperMode") ?? "normal"
+            if mode == "last" { mode = d.string(forKey: "lastPaperMode") ?? "normal" }
             switch mode {
             case "normal": break
             case "a4": editor.applyPaperMode(.a4)

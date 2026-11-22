@@ -110,6 +110,8 @@ final class Document: NSDocument {
 
     /// ⌘S で保存したところ (版をすぐ作る)
     private var userSaved = false
+    /// 自分で保存した (⌘S・メニュー) とき: 公開中なら、ページにも反映するか聞く
+    private var askPublishAfterSave = false
     /// 版の履歴の番号 (保存で拡張属性が消えても、付け直すため)
     private var versionID: String?
 
@@ -307,7 +309,9 @@ final class Document: NSDocument {
                     VersionStore.noteSaved(url, now: self.userSaved)
                 }
                 self.userSaved = false
+                if self.askPublishAfterSave { DispatchQueue.main.async { self.offerPublishUpdate(url) } }
             }
+            self.askPublishAfterSave = false
             completionHandler(error)
         }
     }
@@ -435,10 +439,28 @@ final class Document: NSDocument {
         return true
     }
 
+    /// 公開中のファイルを保存した: 公開中のページの中身と違えば「ページにも反映しますか？」と聞く
+    private func offerPublishUpdate(_ url: URL) {
+        guard EditorExtension.publish.isOn, let r = ShareLink.record(for: url),
+              let (text, _, mode) = TextLibraryActions.shareContent(url), ShareLink.needsUpdate(r, text: text, mode: mode) else { return }
+        let w = editor?.window
+        let a = NSAlert()
+        a.messageText = L("公開中のページにも反映しますか？")
+        a.informativeText = L("このテキストはリンクで公開中です。保存した内容を、公開中のページにも反映できます。") + "\n\n" + r.url
+        a.addButton(withTitle: L("反映する"))
+        a.addButton(withTitle: L("今はしない"))
+        let handle: (NSApplication.ModalResponse) -> Void = { resp in
+            guard resp == .alertFirstButtonReturn else { return }
+            ShareLink.confirmPrivacy(text, window: w, file: url) { ShareLink.update(r, text: text, mode: mode, window: w) }
+        }
+        if let w = w, w.attachedSheet == nil { a.beginSheetModal(for: w, completionHandler: handle) } else { handle(a.runModal()) }
+    }
+
     /// 保存 (⌘S): テキスト一覧で作った「新規テキスト」は、名前を付けて保存にする
     override func save(_ sender: Any?) {
         guard let u = fileURL, TextLibrary.isBlankPlaceholder(u) else {
             userSaved = true   // ⌘S: 保存が終わったら、すぐ版を作る
+            askPublishAfterSave = sender != nil   // アプリの中から呼んだ保存 (sender なし) では聞かない
             return super.save(sender)
         }
         placeholderBeforeSave = u

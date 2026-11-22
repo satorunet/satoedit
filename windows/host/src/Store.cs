@@ -43,7 +43,7 @@ namespace SatoEdit {
   ""defaultEncoding"": ""utf8"", ""defaultLineEnding"": ""crlf"",
   ""backupOnSave"": false, ""trimTrailingOnSave"": false,
   ""encryptAlways"": false, ""aiEnabled"": true, ""encryptionEnabled"": false, ""paperEnabled"": true, ""folderTreeEnabled"": false,
-  ""lineCounting"": ""logical"", ""lineSpacing"": 2, ""genkoFullWidth"": false, ""genkoFurigana"": true, ""genkoAutoIndent"": true, ""genkoHorizontal"": false, ""startPaperMode"": ""last"", ""lastPaperMode"": ""genko"", ""genkoAutoFormat"": true, ""a4AutoFormat"": true, ""linkURLs"": true, ""paperSavePDF"": true,
+  ""lineCounting"": ""logical"", ""lineSpacing"": 2, ""genkoFullWidth"": false, ""genkoFurigana"": true, ""genkoAutoIndent"": true, ""genkoHorizontal"": false, ""startPaperMode"": ""normal"", ""lastPaperMode"": ""normal"", ""genkoAutoFormat"": true, ""a4AutoFormat"": true, ""linkURLs"": true, ""paperSavePDF"": true,
   ""encDefaultKind"": ""device"", ""aiProvider"": ""openai"", ""aiModels"": {}, ""aiCustomBaseURL"": ""http://localhost:11434/v1"", ""aiVerified"": {},
   ""folderTreeVisible"": false, ""folderTreeRoot"": """", ""folderTreeWidth"": 240, ""aiVisible"": false, ""diffVisible"": false, ""remotePlaces"": {}, ""remoteTreeVisible"": false, ""remoteTreeWidth"": 260, ""pluginsDisabled"": [], ""pluginSources"": {}, ""pluginStorage"": {}, ""diffWidth"": 360, ""aiWidth"": 340, ""iconColor"": ""ai"",
   ""recent"": [], ""carets"": {}, ""lastKeyFileDir"": """", ""windowBounds"": null, ""language"": ""auto"",

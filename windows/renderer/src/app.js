@@ -1463,10 +1463,10 @@ async function start() {
   app.newTab();
   app.applyPrefs();
   app.version = init.version;
-  // 起動したときの白紙の表示 (設定「起動したときの表示」。「前回と同じ」は最後に使っていた表示、はじめては原稿用紙)
+  // 起動したときの白紙の表示 (設定「起動したときの表示」。はじめは標準エディタ。「前回と同じ」は最後に使っていた表示)
   if (app.prefs.paperEnabled) {
-    let mode = app.prefs.startPaperMode || 'last';
-    if (mode === 'last') mode = app.prefs.lastPaperMode || 'genko';
+    let mode = app.prefs.startPaperMode || 'normal';
+    if (mode === 'last') mode = app.prefs.lastPaperMode || 'normal';
     if (mode === 'genko') app.setPaperMode(app.active, app.prefs.genkoHorizontal ? 3 : 1, { remember: false });
     else if (mode === 'a4') app.setPaperMode(app.active, 2, { remember: false });
   }

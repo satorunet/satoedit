@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # 版: 上げるときはここを変える (自動アップデートは CFBundleVersion で新旧を比べるので、版と同じにする)
-VERSION="${VERSION:-1.0.2}"
+VERSION="${VERSION:-1.0.3}"
 BUILD_NUMBER="$VERSION"
 BUNDLE_ID="${BUNDLE_ID:-net.satoru.satoruEditor}"
 

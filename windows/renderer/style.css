@@ -246,7 +246,8 @@ body.no-toolbar #toolbar { display: none; }
 .keyfile-path { word-break: break-all; user-select: text; -webkit-user-select: text; }
 
 /* 原稿用紙 */
-.genko-scroll { position: relative; flex: 1; overflow: auto; background: #8a8f96; --u: 3.4px; }
+/* スクロールバーの場所をいつも空けておく (出る・消えるで幅が変わり、紙の大きさが変わって、また出る・消えるをくり返さないように) */
+.genko-scroll { position: relative; flex: 1; overflow: auto; scrollbar-gutter: stable; background: #8a8f96; --u: 3.4px; }
 .genko-sheets { display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 20px 0 28px; min-width: max-content; }
 .genko-sheet { box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35); cursor: text; }
 .gk.sel { background: rgba(60, 130, 255, 0.3); }
@@ -258,7 +259,7 @@ body.no-toolbar #toolbar { display: none; }
 .genko-input { position: absolute; width: 1.2em; height: 1.2em; padding: 0; border: none; outline: none !important; resize: none; opacity: 0; overflow: hidden; background: transparent; color: transparent; caret-color: transparent; pointer-events: none; font-size: 16px; min-height: 0; }
 
 /* A4 用紙 */
-.a4-scroll { flex: 1; overflow: auto; background: #8a8f96; padding: 20px 0 28px; }
+.a4-scroll { flex: 1; overflow: auto; scrollbar-gutter: stable; background: #8a8f96; padding: 20px 0 28px; }
 .a4-paper { width: 800px; min-height: 1168px; margin: 0 auto; padding: 80px; background: #fff; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
   background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 1087px, #c9d3e0 1087px, #c9d3e0 1088px); background-origin: content-box; background-clip: padding-box; background-size: 100% 1008px; }
 .a4-text { min-height: 1008px; outline: none; color: #111; font: 16px/28px "Yu Mincho", "YuMincho", "MS Mincho", "Hiragino Mincho ProN", serif; white-space: pre-wrap; word-break: break-all; line-break: strict; user-select: text; -webkit-user-select: text; caret-color: #111; cursor: text; }

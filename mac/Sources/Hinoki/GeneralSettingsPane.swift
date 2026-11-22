@@ -140,7 +140,7 @@ final class GeneralSettingsPane: NSObject, SettingsPane {
 
     private func refresh() {
         for (b, key) in checks { b.state = Prefs.bool(key) ? .on : .off }
-        let start = UserDefaults.standard.string(forKey: "startPaperMode") ?? "last"
+        let start = UserDefaults.standard.string(forKey: "startPaperMode") ?? "normal"
         startModePopup.selectItem(at: Self.startModes.firstIndex { $0.id == start } ?? 0)
         countingPopup.selectItem(at: UserDefaults.standard.string(forKey: "lineCounting") == "visual" ? 1 : 0)
         let sp = UserDefaults.standard.double(forKey: "lineSpacing")
