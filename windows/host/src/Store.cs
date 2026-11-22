@@ -9,14 +9,14 @@ namespace SatoEdit {
   /// 設定ファイル (~/.satoruEditor。前の名前は ~/.sakubunEditor・~/.satomaru) と、秘密の置き場。Electron 版と同じ場所・同じ形なので、設定はそのまま引き継がれる
   static class Store {
     public static readonly string Home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-    public static readonly string ConfigDir = Path.Combine(Home, ".satoruEditor");
+    public static readonly string ConfigDir = Portable.On ? Path.Combine(Portable.Data, "config") : Path.Combine(Home, ".satoruEditor");
     /// 前の名前 (新しいものから順に)
     static readonly string[] OldConfigDirs = { Path.Combine(Home, ".sakubunEditor"), Path.Combine(Home, ".satomaru") };
 
     /// 前の名前の設定フォルダ (~/.satomaru) があり、新しいほうがまだ無ければ、名前を変えて移す (main.js と同じ)
     public static void MigrateConfigDir() {
       try {
-        if (Directory.Exists(ConfigDir)) return;
+        if (Portable.On || Directory.Exists(ConfigDir)) return;
         foreach (var old in OldConfigDirs) {
           if (!Directory.Exists(old)) continue;
           Directory.Move(old, ConfigDir);

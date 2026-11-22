@@ -25,6 +25,7 @@ namespace SatoEdit {
         var o = Environment.GetEnvironmentVariable("SATORU_LIBRARY_DIR");
         if (!string.IsNullOrEmpty(o)) return Path.GetFullPath(o);
         // 表示の言語を変えても同じ場所を使うよう、名前は訳さない
+        if (Portable.On) return Path.Combine(Portable.Data, "さとるエディタ"); // ポータブル版は exe の横
         return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "さとるエディタ");
       }
     }

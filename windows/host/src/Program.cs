@@ -27,13 +27,13 @@ namespace SatoEdit {
       }
     }
 
-    static string PipeName => "satoruEditor-" + Environment.UserName.Replace('\\', '_') + "-open";
+    static string PipeName => "satoruEditor-" + Environment.UserName.Replace('\\', '_') + Portable.Tag + "-open";
 
     [STAThread]
     static void Main(string[] args) {
       var selftest = args.FirstOrDefault(a => a.StartsWith("--selftest="));
       // 自己点検のときは、ほかに起動していても動く (そのときは受け取り口は作らない)
-      mutex = new Mutex(true, "Local\\satoruEditor-single-instance", out bool first);
+      mutex = new Mutex(true, "Local\\satoruEditor-single-instance" + Portable.Tag, out bool first);
       if (!first && selftest == null && Forward(args)) return;
       Store.MigrateConfigDir();
       Application.EnableVisualStyles();
@@ -104,9 +104,27 @@ namespace SatoEdit {
     }
   }
 
-  /// うまく動かなかったことの記録 (%LOCALAPPDATA%\satoruEditor\host.log)。小さく保つ
+  /// ポータブル版: exe の横に portable.txt があれば、設定・テキスト・記録をすべて exe の横の data フォルダに置く
+  /// (USB メモリなどに入れて、その場ですぐ動かす。この PC には何も残さない)
+  static class Portable {
+    public static readonly string ExeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
+    public static readonly bool On = File.Exists(Path.Combine(ExeDir, "portable.txt"));
+    public static string Data => Path.Combine(ExeDir, "data");
+    /// インストール版や、別の場所のポータブル版と同時に動かせるよう、1 つだけ起動の印に場所を混ぜる
+    public static string Tag {
+      get {
+        if (!On) return "";
+        uint h = 2166136261;
+        foreach (var c in ExeDir.ToLowerInvariant()) { h ^= c; h *= 16777619; }
+        return "-p" + h.ToString("x8");
+      }
+    }
+  }
+
+  /// うまく動かなかったことの記録 (%LOCALAPPDATA%\satoruEditor\host.log。ポータブル版は data\local)。小さく保つ
   static class Log {
-    public static string Dir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "satoruEditor");
+    public static string Dir => Portable.On ? Path.Combine(Portable.Data, "local")
+      : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "satoruEditor");
     public static void Error(string where, Exception e) => Write(where + ": " + e);
     public static void Write(string line) {
       try {

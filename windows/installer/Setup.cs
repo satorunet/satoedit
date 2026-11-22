@@ -58,6 +58,22 @@ namespace SatoEditSetup
                     Process.Start(new ProcessStartInfo(tmp, "/uninstall-from \"" + Path.GetDirectoryName(self) + "\"" + (silent ? " /S" : "")) { UseShellExecute = false });
                     return 0;
                 }
+                // ポータブル版のアップデート: その場所の中身だけ入れ替えて、起動し直す (ショートカットやアンインストールの登録は作らない)
+                var portableArg = args.FirstOrDefault(a => a.StartsWith("/portable=", StringComparison.OrdinalIgnoreCase));
+                if (portableArg != null)
+                {
+                    var pidArg = args.FirstOrDefault(a => a.StartsWith("/wait-pid=", StringComparison.OrdinalIgnoreCase));
+                    if (pidArg != null && int.TryParse(pidArg.Substring("/wait-pid=".Length), out var pid)) WaitForExit(pid, 60000);
+                    var dir = Path.GetFullPath(portableArg.Substring("/portable=".Length).Trim('"')).TrimEnd('\\');
+                    if (!File.Exists(Path.Combine(dir, "portable.txt"))) throw new InvalidOperationException(T("ポータブル版のフォルダではありません: ", "Not a portable folder: ") + dir);
+                    for (int i = 0; ; i++)
+                    {
+                        try { Extract(dir, true); break; }
+                        catch (IOException) when (i < 10) { Thread.Sleep(500); } // まだ閉じきっていない
+                    }
+                    if (!silent) Process.Start(new ProcessStartInfo(Path.Combine(dir, ExeName)) { UseShellExecute = true, WorkingDirectory = dir });
+                    return 0;
+                }
                 if (args.Any(a => a.Equals("/update", StringComparison.OrdinalIgnoreCase)))
                 {
                     var pidArg = args.FirstOrDefault(a => a.StartsWith("/wait-pid=", StringComparison.OrdinalIgnoreCase));
@@ -108,6 +124,30 @@ namespace SatoEditSetup
             }
         }
 
+        /// 中身 (payload.zip) を dir に広げる。portable なら data フォルダと portable.txt には触れない
+        static void Extract(string dir, bool portable)
+        {
+            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip"))
+            using (var zip = new ZipArchive(s, ZipArchiveMode.Read))
+            {
+                foreach (var e in zip.Entries)
+                {
+                    // zip の中は「satoruEditor/…」。先頭のフォルダは外して入れる
+                    var rel = e.FullName.Replace('/', '\\');
+                    var cut = rel.IndexOf('\\');
+                    if (cut < 0) continue;
+                    rel = rel.Substring(cut + 1);
+                    if (rel.Length == 0) continue;
+                    var target = Path.GetFullPath(Path.Combine(dir, rel));
+                    if (!target.StartsWith(dir + "\\", StringComparison.OrdinalIgnoreCase)) continue; // 外へ書き出すものは入れない
+                    if (portable && (rel.StartsWith("data\\", StringComparison.OrdinalIgnoreCase) || rel.Equals("portable.txt", StringComparison.OrdinalIgnoreCase))) continue;
+                    if (rel.EndsWith("\\")) { Directory.CreateDirectory(target); continue; }
+                    Directory.CreateDirectory(Path.GetDirectoryName(target));
+                    e.ExtractToFile(target, true);
+                }
+            }
+        }
+
         /// 入れる: zip を広げ、ショートカットとアンインストールの登録を作る
         public static void Install(bool desktop, bool launch, Action<string> progress)
         {
@@ -125,25 +165,9 @@ namespace SatoEditSetup
             }
             Directory.CreateDirectory(dir);
             progress?.Invoke(T("ファイルを入れています…", "Copying files…"));
-            using (var s = Assembly.GetExecutingAssembly().GetManifestResourceStream("payload.zip"))
-            using (var zip = new ZipArchive(s, ZipArchiveMode.Read))
-            {
-                foreach (var e in zip.Entries)
-                {
-                    // zip の中は「satoruEditor/…」。先頭のフォルダは外して入れる
-                    var rel = e.FullName.Replace('/', '\\');
-                    var cut = rel.IndexOf('\\');
-                    if (cut < 0) continue;
-                    rel = rel.Substring(cut + 1);
-                    if (rel.Length == 0) continue;
-                    var target = Path.GetFullPath(Path.Combine(dir, rel));
-                    if (!target.StartsWith(dir + "\\", StringComparison.OrdinalIgnoreCase)) continue; // 外へ書き出すものは入れない
-                    if (rel.EndsWith("\\")) { Directory.CreateDirectory(target); continue; }
-                    Directory.CreateDirectory(Path.GetDirectoryName(target));
-                    e.ExtractToFile(target, true);
-                }
-            }
+            Extract(dir, false);
             var uninstaller = Path.Combine(dir, "uninstall.exe");
+
             File.Copy(Assembly.GetExecutingAssembly().Location, uninstaller, true);
             var exe = Path.Combine(dir, ExeName);
 

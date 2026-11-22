@@ -484,7 +484,11 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
         Expect(viaUI?.Str("status") == "ok" && viaUI.Num("progress") > 0, "画面からのダウンロード " + Json.Stringify(viaUI));
         Expect(!File.Exists(file + ".part"), "途中のファイルを残さない");
         var args = Updater.InstallerArgs(Updater.InstallDir, 1234) + " | " + Updater.InstallerArgs(Path.GetTempPath(), 1234);
-        Expect(args == "/update /wait-pid=1234 | ", "インストーラーに渡す引数 " + args);
+        var tmp = Path.GetFullPath(Path.GetTempPath()).TrimEnd('\\');
+        var want = Portable.On // ポータブル版は、今の場所のまま入れ替える
+          ? "/portable=\"" + Path.GetFullPath(Updater.InstallDir).TrimEnd('\\') + "\" /wait-pid=1234 | /portable=\"" + tmp + "\" /wait-pid=1234"
+          : "/update /wait-pid=1234 | ";
+        Expect(args == want, "インストーラーに渡す引数 " + args);
         try { File.Delete(file); } catch { }
         return new JObj { { "file", Path.GetFileName(file) }, { "bytes", (double)payload.Length }, { "same", same2 }, { "badSize", bad }, { "ui", viaUI }, { "installerArgs", args } };
       });

@@ -136,6 +136,8 @@ namespace SatoEdit {
     /// インストーラーに渡す引数: 入れた先 (%LOCALAPPDATA%\Programs\satoruEditor) から動いているなら、画面を出さずに入れ替えて起動し直す (/update)。
     /// zip を広げた所から動いているときは、ふつうのインストールの画面を出す (入れる先を見てもらう)
     public static string InstallerArgs(string exeDir, int pid) {
+      // ポータブル版: 今の場所のまま中身だけ入れ替える (data と portable.txt はそのまま)
+      if (Portable.On) return "/portable=\"" + Path.GetFullPath(exeDir).TrimEnd('\\') + "\" /wait-pid=" + pid;
       var installed = string.Equals(Path.GetFullPath(exeDir).TrimEnd('\\'), Path.GetFullPath(InstallDir).TrimEnd('\\'), StringComparison.OrdinalIgnoreCase);
       return installed ? "/update /wait-pid=" + pid : "";
     }
