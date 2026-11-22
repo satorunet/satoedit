@@ -1,6 +1,6 @@
 # さとるエディタ (Windows 版)
 
-Windows 用の軽いテキストエディタです。Mac 版 (さとるエディタ) と同じ色・同じ使い心地で、日本語のテキストやプログラムを手早く編集できます。表示は日本語と英語を切り替えられます。
+Windows 用の軽いテキストエディタです。本体は C# (.NET Framework 4.8) と Microsoft Edge WebView2 で動きます (Electron は使っていません。配布物は約 2.5 MB)。Mac 版 (さとるエディタ) と同じ色・同じ使い心地で、日本語のテキストやプログラムを手早く編集できます。表示は日本語と英語を切り替えられます。
 
 - タブで複数のファイルを開ける
 - 行番号、桁ルーラー、改行・タブ・全角スペース・半角スペースの記号、[EOF] の表示
@@ -33,7 +33,12 @@ Mac 版の機能は、Windows 版にもひととおり入っています。
 
 ## 使い方
 
-`satoruEditor-1.0.1-win-x64-lite.zip` を好きな場所に展開して、`satoruEditor.exe` をダブルクリックします。インストールは要りません。
+[docs.satoru.net](https://docs.satoru.net/) か [Releases](https://github.com/satorunet/satoedit/releases) から、どちらかをダウンロードします。
+
+- インストール版: `SatoruEditor-<版>-win-x64-setup.exe` を実行します (管理者の許可は要りません。入れる先は `%LOCALAPPDATA%\Programs\satoruEditor`)。
+- ポータブル版: `SatoruEditor-<版>-win-x64-portable.zip` を好きな場所に展開して、`satoruEditor.exe` をダブルクリックします。設定やテキストは、すべてそのフォルダの中の `data` に入ります (exe の横の `portable.txt` が目印)。
+
+Windows 10 / 11 に最初から入っている .NET Framework 4.8 と WebView2 ランタイムを使います。
 
 署名をしていないので、初回は「Windows によって PC が保護されました」と出ることがあります。「詳細情報」→「実行」で起動できます。
 
@@ -52,7 +57,7 @@ Mac 版の機能は、Windows 版にもひととおり入っています。
 
 ## 設定ファイル
 
-`%USERPROFILE%\.satoruEditor\` にあります。`theme.json` (色・フォント)・`profiles.json` (言語)・`ai-usage.json` (AI の利用の記録) は Mac 版と同じ形なので、そのまま持ち運べます。
+`%USERPROFILE%\.satoruEditor\` にあります (ポータブル版は `data\config\`)。`theme.json` (色・フォント)・`profiles.json` (言語)・`ai-usage.json` (AI の利用の記録) は Mac 版と同じ形なので、そのまま持ち運べます。
 
 AI の料金の目安は、アプリに入っている一覧表 (`shared/aimodels.js`、各社の公式の料金ページを 2026-11-18 に確認) を使います。各社のモデル一覧の API は料金を返さないためです。値段が変わったときは、`ai-prices.json` に `{ "モデル名": [入力, 出力] }` (US ドル / 100 万トークン) を書くと、そちらが優先されます。
 
@@ -60,18 +65,17 @@ SFTP で初めてつないだサーバの鍵は `known-hosts.json` に覚え、�
 
 ## ソースからビルド
 
-Node.js が必要です (Mac の上でも Windows 用を作れます)。
+Node.js と .NET SDK が必要です (Mac の上でも Windows 用を作れます)。
 
 ```sh
 npm install
-npm test                       # 部品のテスト
-node scripts/build.js          # 画面側を renderer/dist/app.js にまとめる
-node scripts/package-win.js    # build/satoruEditor-win32-x64/ と配布用の zip を作る
+npm test                                # 部品のテスト
+node scripts/package-host.js            # 本体 (host/) と画面 (renderer/) をまとめて build/satoruEditor-lite/ と zip を作る
+node scripts/package-installer.js       # インストーラー build/satoruEditor-<版>-win-x64-setup.exe
+node scripts/package-portable.js        # ポータブル版 build/SatoruEditor-<版>-win-x64-portable.zip
 ```
 
-`package-win.js` は Electron (Windows x64) を公式の配布元から取ってきて、ハッシュを確かめてから組み込みます。
-
-実機での確認は、Windows で次を実行すると、画面の画像と結果 (report.json) がフォルダに書き出されます。Parallels の Windows を使うなら `./scripts/vm-selftest.sh` が、作る → VM にコピー → 点検 → 結果の取り込みまでを行います。
+実機での確認は、Windows で次を実行すると、画面の画像と結果 (report.json) がフォルダに書き出されます。Parallels の Windows を使うなら `./scripts/vm-host.sh` が、VM にコピー → 点検 → 結果の取り込みまでを行います (インストーラーは `./scripts/vm-installer.sh`)。
 
 ```
 satoruEditor.exe --selftest=C:\Users\<名前>\satoruEditor-selftest
@@ -81,10 +85,12 @@ satoruEditor.exe --selftest=C:\Users\<名前>\satoruEditor-selftest
 
 | 場所 | 内容 |
 |---|---|
-| `main.js`, `preload.js` | 本体側 (ウインドウ、メニューバー、ファイル、暗号化、印刷) |
+| `host/` | 本体 (C# / .NET Framework 4.8 + WebView2)。ウインドウ、メニュー、ファイル、暗号化、印刷、アップデート、自己点検 |
+| `installer/` | インストーラー (C#。本体の zip を中に抱えた 1 つの exe) |
 | `core/` | 文字コード、暗号化、ワンタイム認証、grep、ふりがな、AI への通信と利用の記録、SFTP / FTP、共同編集の通信と暗号、PDF の読み込み、関連付け (テストあり) |
 | `shared/` | 本体側と画面側の両方で使うもの (メニュー、テーマ、言語定義、原稿用紙の決まり、英語の対応表) |
 | `renderer/` | 画面側 (エディタは CodeMirror 6) |
+| `main.js`, `preload.js`, `scripts/package-win.js` | 前の Electron 版の本体 (いまは配布していません。画面側の開発・テスト用に残しています) |
 | `test/` | テスト。`test/fixtures` は Mac 版が作った見本 (暗号化ファイル・文字コード・共同編集の通信。相互に読めることの確認用)。`test/servers.js` はテスト用の小さな SFTP / FTP サーバ。`test/ui/` は画面の確認の手順 |
 
 自動ふりがなの辞書は kuromoji (IPADIC) です。読みは辞書まかせなので、人名などは外れることがあります。
