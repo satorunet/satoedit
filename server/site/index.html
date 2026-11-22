@@ -160,7 +160,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .cust-dots i.on{background:var(--a)}
 .cust{position:relative}
 .cust-hl{position:absolute;left:0;width:18.6%;border-radius:6px;background:rgba(29,155,240,.28);box-shadow:inset 0 0 0 2px rgba(29,155,240,.85);pointer-events:none;z-index:1;transition:top .08s}
-.memos{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin:14px 0 8px}
+.memos{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:14px 0 8px}
 .memo{display:block;background:var(--card,#fff);border:1px solid var(--ln);border-radius:12px;padding:14px 16px;color:inherit;text-decoration:none;transition:box-shadow .15s,transform .15s}
 .memo:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-1px)}
 .memo{padding:0 0 14px;overflow:hidden}.memo b,.memo span,.memo small{margin-left:16px;margin-right:16px}
@@ -373,8 +373,8 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   function esc(s){return String(s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
   fetch("/api/memos").then(function(r){return r.ok?r.json():[]}).then(function(list){
     if(!list.length){box.innerHTML='<p class="memo-empty">まだありません。公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>';return}
-    box.innerHTML=list.slice(0,6).map(function(m){
-      return '<a class="memo" href="'+esc(m.url)+'" target="_blank" rel="noopener">'+(m.thumb?'<img class="memo-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy">':'')+'<b>'+esc(m.title)+'</b><span>'+esc(m.date)+' ・ '+esc(m.kind)+'</span><small>'+esc(m.snippet)+'</small></a>';
+    box.innerHTML=list.slice(0,8).map(function(m){
+      return '<a class="memo" href="'+esc(m.url)+'" target="_blank" rel="noopener">'+(m.thumb?'<img class="memo-thumb" src="'+esc(m.thumb)+'" alt="" loading="lazy">':'')+'<b>'+esc(m.title)+'</b></a>';
     }).join("");
   }).catch(function(){box.innerHTML='<p class="memo-empty">読み込めませんでした。</p>'});
 })();

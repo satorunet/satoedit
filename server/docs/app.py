@@ -1173,22 +1173,27 @@ def memo_items(limit=60):
 
 def memos_page():
     esc = html.escape
-    rows = []
-    for m in memo_items(100):
-        rows.append(f'<a class="row" href="{esc(m["url"])}"><img src="{esc(m["thumb"])}" alt="" loading="lazy"><div><b>{esc(m["title"])}</b><span>{esc(m["date"])} ・ {esc(m["kind"])}</span><small>{esc(m["snippet"])}</small></div></a>')
-    body = "".join(rows) or '<p class="empty">まだありません。さとるエディタで公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>'
+    cards = []
+    for m in memo_items(120):
+        cards.append(f'<a class="card" href="{esc(m["url"])}" title="{esc(m["title"])}"><span class="th"><img src="{esc(m["thumb"])}" alt="" loading="lazy"></span>'
+                     f'<b>{esc(m["title"])}</b></a>')
+    body = f'<div class="grid">{"".join(cards)}</div>' if cards else '<p class="empty">まだありません。さとるエディタで公開するときに「みんなのメモに掲載 OK」をチェックすると、ここに並びます。</p>'
     return f"""<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>みんなのメモ — さとるエディタβ</title><meta name="description" content="さとるエディタで書いて、みんなのメモに載せてくれたテキスト・作文">
+<meta property="og:title" content="みんなのメモ — さとるエディタβ"><meta property="og:image" content="{esc(BASE_URL)}/site/og-beta.jpg?v=20261122m">
 <style>body{{margin:0;font-family:-apple-system,"Hiragino Sans",sans-serif;background:#efe9dc;color:#222}}
-main{{max-width:760px;margin:0 auto;padding:28px 16px 48px}}h1{{font-size:22px}}
-.row{{display:flex;gap:14px;align-items:center;background:#fffdf7;border-radius:8px;padding:10px 12px;margin:10px 0;color:inherit;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.1)}}
-.row img{{width:150px;height:100px;object-fit:cover;object-position:top;border-radius:6px;border:1px solid rgba(0,0,0,.08);flex:none;background:#eee}}
-.row div{{min-width:0;flex:1}}
-@media (max-width:520px){{.row img{{width:96px;height:72px}}}}
-.row:hover{{box-shadow:0 2px 10px rgba(0,0,0,.18)}}
-.row b{{display:block;font-size:16px}}.row span{{color:#888;font-size:12px}}.row small{{display:block;color:#555;margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
+main{{max-width:1200px;margin:0 auto;padding:24px 16px 48px}}h1{{font-size:22px;margin:4px 0 16px}}.lead{{color:#666;margin:0 0 18px;font-size:14px}}
+.grid{{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px}}
+.card{{display:block;background:#fffdf7;border-radius:10px;overflow:hidden;color:inherit;text-decoration:none;box-shadow:0 1px 4px rgba(0,0,0,.1);transition:box-shadow .15s,transform .15s}}
+.card:hover{{box-shadow:0 6px 18px rgba(0,0,0,.16);transform:translateY(-2px)}}
+.th{{position:relative;display:block;aspect-ratio:4/3;background:#e6e0d3;overflow:hidden;border-bottom:1px solid rgba(0,0,0,.06)}}
+.th img{{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}}
+.th i{{position:absolute;left:8px;bottom:8px;font-style:normal;font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px;background:rgba(0,0,0,.62);color:#fff}}
+.card b{{display:block;font-size:14px;margin:9px 11px 10px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}}
+.card small{{display:block;color:#888;font-size:11px;margin:0 11px 10px}}
+@media (max-width:520px){{.grid{{grid-template-columns:repeat(2,1fr);gap:10px}}}}
 .empty{{color:#888}}a.home{{color:#666}}footer{{text-align:center;color:#888;font-size:12px;padding:0 16px 32px}}footer a{{color:inherit}}</style></head>
-<body><main><h1>みんなのメモ</h1><p><a class="home" href="https://docs.satoru.net/">さとるエディタ</a> で書いて、「みんなのメモに掲載 OK」にしてくれたものです。</p>{body}</main>
+<body><main><h1>みんなのメモ</h1>{body}</main>
 <footer><a href="https://docs.satoru.net/">さとるエディタβ</a></footer></body></html>"""
 
 
