@@ -29,7 +29,14 @@ nav.top .logo img{width:28px;height:28px}
 nav.top a.l{color:var(--mut);text-decoration:none;font-size:.9rem}
 nav.top a.l:hover{color:var(--fg)}
 nav.top .dl-s{background:var(--a);color:#fff;text-decoration:none;font-weight:700;font-size:.85rem;padding:6px 14px;border-radius:999px}
-@media (max-width:640px){nav.top a.l{display:none}}
+/* スマホ: 上の行にロゴとダウンロード、下の行にタブ (できること・みんなのメモ・ご意見) */
+@media (max-width:640px){
+  nav.top .w{flex-wrap:wrap;height:auto;gap:6px 8px;padding-top:8px;padding-bottom:8px}
+  nav.top .logo{order:1;flex:1 1 calc(100% - 140px)}
+  nav.top .dl-s{order:2}
+  nav.top a.l{order:3;display:inline-block;font-size:.85rem;font-weight:600;padding:5px 14px;border-radius:999px;background:var(--card);border:1px solid var(--ln);color:var(--fg)}
+  nav.top a.l.memo-tab{background:var(--a);border-color:var(--a);color:#fff}
+}
 header.hero{padding:56px 0 24px;text-align:center}
 .kicker{display:inline-block;font-size:.8rem;font-weight:700;letter-spacing:.06em;color:var(--a2);background:var(--code);border-radius:999px;padding:3px 14px}
 h1{font-size:clamp(2rem,5.6vw,3.2rem);line-height:1.25;margin:16px 0 14px;letter-spacing:-.01em}
@@ -177,7 +184,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 <nav class="top"><div class="w">
   <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタβ</a>
   <a class="l" href="#features">できること</a>
-  <a class="l" href="#memos">みんなのメモ</a>
+  <a class="l memo-tab" href="#memos">みんなのメモ</a>
   <a class="l" href="#feedback">ご意見</a>
   <a class="dl-s" href="#download">ダウンロード</a>
 </div></nav>
