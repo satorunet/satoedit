@@ -992,7 +992,7 @@ def page(doc, i, rev=None, links=True, view=None):
 {'' if public else '<meta name="robots" content="noindex">'}
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=BIZ+UDGothic&display=swap" rel="stylesheet">
 <style>{PAGE_CSS}</style></head>
-<body><header><h1>{esc(title)}</h1><span>{esc(created)}</span>{txt_link}{switcher}<button class="copy speak" type="button" id="speak" title="読み上げ (ずんだもん)" aria-label="読み上げ" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></button><span class="copywrap"><button class="copy" type="button" id="copy" title="コピー" aria-label="コピー" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="copymenu" id="copymenu" role="menu" hidden><button type="button" role="menuitem" data-k="text">テキストとしてコピー</button>{shot_item}</span></span></header>
+<body><header><h1>{esc(title)}</h1><span>{esc(created)}</span>{txt_link}{switcher}<button class="copy speak" type="button" id="speak" title="読み上げ (ずんだもん)" aria-label="読み上げ" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg></button><button class="copy" type="button" id="copylink" title="リンクをコピー" aria-label="リンクをコピー"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button><span class="copywrap"><button class="copy" type="button" id="copy" title="コピー" aria-label="コピー" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></button><span class="copymenu" id="copymenu" role="menu" hidden><button type="button" role="menuitem" data-k="text">テキストとしてコピー</button>{shot_item}</span></span></header>
 {'<p class="oldrev">これは第%d版 (前の版) です。<a href="/r/%s">最新の版を見る</a></p>' % (rev, esc(i)) if rev else ''}
 {body}
 {history_html(full, i, rev, links)}
@@ -1093,6 +1093,16 @@ def page(doc, i, rev=None, links=True, view=None):
     }});
     window.addEventListener("pagehide",function(){{stopSpeak()}});
   }}
+  // リンクをコピー: このページの URL (前の版・表示の指定は付けない) をクリップボードへ
+  var linkUrl={json.dumps(BASE_URL + "/r/" + i)};
+  document.getElementById("copylink").addEventListener("click",function(){{
+    var ok=false,a=document.createElement("textarea");
+    a.value=linkUrl;a.setAttribute("readonly","");a.style.position="fixed";a.style.top="0";a.style.opacity="0";document.body.appendChild(a);a.select();
+    try{{ok=document.execCommand("copy")}}catch(e){{}}
+    document.body.removeChild(a);
+    if(!ok&&navigator.clipboard)navigator.clipboard.writeText(linkUrl).catch(function(){{}});
+    show("リンクをコピーしました");
+  }});
   // コピーのアイコン: 押すと「テキストとして / 画像として」を選ぶメニュー
   var menu=document.getElementById("copymenu"),shotUrl={json.dumps(shot_url)};
   function closeMenu(){{menu.hidden=true;b.setAttribute("aria-expanded","false")}}
