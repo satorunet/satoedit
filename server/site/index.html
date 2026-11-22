@@ -135,6 +135,9 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 .gk-swap{position:relative;margin-bottom:10px}.gk-swap img{display:block;margin-bottom:0}
 .gk-swap .gk-b{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .8s}
 .gk-swap.h .gk-b{opacity:1}
+.sample-shot{position:relative;display:block}
+.sample-pill{position:absolute;right:10px;bottom:20px;font-size:.8rem;font-weight:700;padding:6px 16px;border-radius:999px;background:var(--a);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.18);transition:background .15s}
+.sample-shot:hover .sample-pill{background:var(--a2)}
 .gk-tabs{position:absolute;right:10px;bottom:10px;z-index:2;display:flex;gap:4px;padding:3px;border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.15)}
 .gk-tabs button{font:inherit;font-size:.8rem;font-weight:700;padding:3px 14px;border-radius:999px;border:1.5px solid var(--ln);background:var(--bg);color:var(--mut);cursor:pointer;transition:background .2s,color .2s,border-color .2s}
 .gk-tabs button[aria-selected="true"][data-k="v"]{background:var(--shu);border-color:var(--shu);color:#fff}
@@ -201,7 +204,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
     <div><img src="/site/shot-editor.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="標準エディタの画面"><b>エディタ表示</b><p>行番号つきの軽いエディタ。書いたものは一覧にまとまり、版の履歴も残ります。</p></div>
     <div><div class="gk-swap" id="gk-swap"><div class="gk-tabs" id="gk-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-k="v">縦書き</button><button type="button" role="tab" aria-selected="false" data-k="h">横書き</button></div><img src="/site/shot-genko.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (縦書き) の画面"><img class="gk-b" src="/site/shot-genkoH.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (横書き) の画面"></div><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
     <div><img src="/site/shot-ai-proof.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="AI に誤字を直してもらっている画面"><b>AI 補正 <i class="badge">実験中</i></b><p>誤字直し・要約・続きを書く などを、横から出る欄で頼めます。</p></div>
-    <div><a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="公開した作文のページ"></a><b>共有機能 <i class="badge">実験中</i></b><p>URL ひとつで、そのままの見た目で公開。<a href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener">見本を見る</a></p></div>
+    <div><a class="sample-shot" href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="公開した作文のページ"><span class="sample-pill">見本を見る ↗</span></a><b>共有機能 <i class="badge">実験中</i></b><p>URL ひとつで、そのままの見た目で公開。</p></div>
     <div class="wide">
       <div class="cust" id="cust">
         <span class="cust-hl" id="cust-hl" hidden></span>
