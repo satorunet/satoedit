@@ -452,10 +452,10 @@ function menuPane(app) {
 function toolbarPane(app) {
   const pane = h('div', {});
   const buttons = app.TOOLBAR.filter(b => Array.isArray(b));
-  const defaults = () => app.TOOLBAR.map(b => (Array.isArray(b) ? b[0] : b));
+  const defaults = () => app.TOOLBAR_DEFAULT.slice();
   const render = () => {
-    const layout = Array.isArray(app.prefs.toolbarItems) ? app.prefs.toolbarItems.slice() : defaults();
-    const save = next => { app.setPref('toolbarItems', next); render(); };
+    const layout = Array.isArray(app.prefs[app.TOOLBAR_PREF]) ? app.prefs[app.TOOLBAR_PREF].slice() : defaults();
+    const save = next => { app.setPref(app.TOOLBAR_PREF, next); render(); };
     const move = (i, d) => { const j = i + d; if (j < 0 || j >= layout.length) return; const x = layout[i]; layout[i] = layout[j]; layout[j] = x; save(layout); };
     const nameOf = n => (n === '-' ? t('― 区切り ―') : n === 'space' ? t('― 余白 (ここから右寄せ) ―') : t((buttons.find(b => b[0] === n) || [n, n])[1]));
     const list = h('div', { class: 'key-list' }, layout.map((n, i) => h('div', { class: 'key-row' },
@@ -492,14 +492,14 @@ function assocPane(app) {
     const result = h('div', { class: 'ai-test', role: 'status' });
     pane.append(
       box(t('エクスプローラーの右クリックメニュー'),
-        h('label', { class: 'check-row' }, fileMenu, t('ファイルの右クリックに「さとるエディタで開く」を出す')),
-        h('label', { class: 'check-row' }, folderMenu, t('フォルダの右クリックに「さとるエディタで grep」を出す'))),
-      box(t('「プログラムから開く」の一覧にさとるエディタを出す拡張子'),
+        h('label', { class: 'check-row' }, fileMenu, t('ファイルの右クリックに「エディタβで開く」を出す')),
+        h('label', { class: 'check-row' }, folderMenu, t('フォルダの右クリックに「エディタβで grep」を出す'))),
+      box(t('「プログラムから開く」の一覧にエディタβを出す拡張子'),
         exts,
         h('div', { class: 'form-row' },
           h('button', { onclick: () => { exts.value = st.defaults.join(' '); } }, t('よく使う拡張子を入れる')),
           h('button', { onclick: () => { exts.value = ''; } }, t('空にする'))),
-        h('div', { class: 'dim' }, t('ダブルクリックで開く「既定のアプリ」は、Windows が守っているのでここからは変えられません。ファイルを右クリック →「プログラムから開く」→「別のプログラムを選択」でさとるエディタを選び、「常にこのアプリを使って開く」にチェックしてください。'))),
+        h('div', { class: 'dim' }, t('ダブルクリックで開く「既定のアプリ」は、Windows が守っているのでここからは変えられません。ファイルを右クリック →「プログラムから開く」→「別のプログラムを選択」でエディタβを選び、「常にこのアプリを使って開く」にチェックしてください。'))),
       h('div', { class: 'form-row' }, h('button', { class: 'primary', onclick: async () => {
         result.textContent = t('設定しています…');
         result.className = 'ai-test';

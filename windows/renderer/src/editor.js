@@ -1,5 +1,5 @@
 // エディタ本体 (CodeMirror 6)。行番号・記号の表示・色分け・リンク・桁ルーラー・上下分割
-import { EditorState, Compartment, StateField, StateEffect, RangeSetBuilder, Annotation, Transaction, Facet, EditorSelection, countColumn } from '@codemirror/state';
+import { EditorState, Compartment, StateField, StateEffect, RangeSet, RangeSetBuilder, Annotation, Transaction, Facet, EditorSelection, countColumn } from '@codemirror/state';
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection, gutter, GutterMarker, gutterLineClass,
   rectangularSelection, crosshairCursor, Decoration, ViewPlugin, MatchDecorator, WidgetType, dropCursor,
@@ -15,33 +15,61 @@ import { showTooltip } from '@codemirror/view';
 import completion from '../../shared/completion';
 import { makeScanner, KINDS, displayWidth } from '../../shared/scanner';
 
-const MAX_HIGHLIGHT_LENGTH = 2000000; // これより長い文書は色分けしない (重くなるため)
+const MAX_HIGHLIGHT_LENGTH = 3000000; // これより長い文書は色分けしない (Mac 版と同じ)
 export const LINK_PATTERN = /https?:\/\/[^\s<>"'`　「」『』（）、。]+|[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
 
 // ---------- 色分け ----------
+// 大きな文書でも打つ手を止めないように (Mac 版の AOI と同じ考え方: 見ている所の近くだけ処理する):
+// - 書き換えたら、書き換えた行より前の切り出し結果は残し、そこから後ろだけを切り出し直す
+// - 切り出すのは、画面に見えている範囲とその先 (少なくとも 2000 字・1 画面ぶん) まで。スクロールしたら続きを切り出す
+// - 文書全体を文字列にしない (切り出す所だけを取り出す)
 
 const scannerFacet = Facet.define({ combine: values => (values.length ? values[0] : null) });
 
-function computeTokens(state) {
-  const scan = state.facet(scannerFacet);
-  if (!scan || state.doc.length > MAX_HIGHLIGHT_LENGTH) return null;
-  return scan(state.doc.toString());
-}
+/// 1 つの画面の、切り出し結果の覚え。tok は [開始, 終了, 種類, …]、done はここまで切り出した位置 (いつもトークンの外)
+export class TokenCache {
+  constructor(scan) { this.scan = scan; this.tok = []; this.done = 0; }
 
-const tokenField = StateField.define({
-  create: computeTokens,
-  update(value, tr) {
-    if (tr.docChanged || tr.reconfigured) return computeTokens(tr.state);
-    return value;
-  },
-});
+  /// 文書の pos (行の頭) から後ろが変わった: そこから後ろを捨てる (行をまたぐコメントなどは、その頭から)
+  cut(pos) {
+    const tok = this.tok;
+    let lo = 0, hi = tok.length / 3;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (tok[mid * 3 + 1] <= pos) lo = mid + 1; else hi = mid; }
+    let at = pos;
+    if (lo < tok.length / 3 && tok[lo * 3] < pos) at = tok[lo * 3];
+    tok.length = lo * 3;
+    this.done = Math.min(this.done, at);
+  }
+
+  /// limit まで切り出す (もう切り出した所はそのまま)
+  ensure(doc, limit) {
+    const len = doc.length;
+    limit = Math.min(limit, len);
+    if (!this.scan || this.done >= limit) return;
+    const from = this.done, ctx = from > 0 ? 1 : 0; // 数字の判定が 1 字前を見るので、1 字前から渡す
+    let end = Math.min(len, limit + 4096);
+    for (;;) {
+      const s = doc.sliceString(from - ctx, end);
+      const out = this.scan(s, ctx, limit - from + ctx);
+      // 取り出した端までトークンが続いていたら (長いコメント・文字列)、もっと広く取り出してやり直す
+      if (out.stop >= s.length && end < len) { end = Math.min(len, end + Math.max(65536, (end - from) * 3)); continue; }
+      const base = from - ctx;
+      for (let i = 0; i < out.length; i += 3) this.tok.push(out[i] + base, out[i + 1] + base, out[i + 2]);
+      this.done = out.stop >= s.length ? len : base + out.stop;
+      return;
+    }
+  }
+}
 
 const tokenMarks = KINDS.map(k => Decoration.mark({ class: 'tok-' + k }));
 
-function buildTokenDecorations(view) {
-  const tokens = view.state.field(tokenField);
+function buildTokenDecorations(view, cache) {
   const builder = new RangeSetBuilder();
-  if (!tokens) return builder.finish();
+  if (!cache.scan || view.state.doc.length > MAX_HIGHLIGHT_LENGTH) return builder.finish();
+  const vp = view.viewport;
+  // 見えている所の先まで切り出しておく (少しスクロールしても、すぐ色が付いているように)
+  cache.ensure(view.state.doc, vp.to + Math.max(2000, vp.to - vp.from));
+  const tokens = cache.tok;
   const count = tokens.length / 3;
   let last = -1;
   for (const { from, to } of view.visibleRanges) {
@@ -60,11 +88,46 @@ function buildTokenDecorations(view) {
 }
 
 const tokenPlugin = ViewPlugin.fromClass(class {
-  constructor(view) { this.decorations = buildTokenDecorations(view); }
+  constructor(view) {
+    this.cache = new TokenCache(view.state.facet(scannerFacet));
+    this.decorations = buildTokenDecorations(view, this.cache);
+  }
   update(u) {
-    if (u.docChanged || u.viewportChanged || u.startState.field(tokenField) !== u.state.field(tokenField)) {
-      this.decorations = buildTokenDecorations(u.view);
+    const scan = u.state.facet(scannerFacet);
+    if (scan !== this.cache.scan) this.cache = new TokenCache(scan);
+    else if (u.docChanged) {
+      // いちばん前の書き換えの、行の頭から後ろを捨てる (前の文書での位置。そこより前は位置が変わらない)
+      let min = -1;
+      u.changes.iterChangedRanges(fromA => { if (min < 0 || fromA < min) min = fromA; });
+      if (min >= 0) this.cache.cut(u.startState.doc.lineAt(min).from);
+    } else if (!u.viewportChanged) return;
+    this.decorations = buildTokenDecorations(u.view, this.cache);
+  }
+}, { decorations: v => v.decorations });
+
+// ---------- 選択範囲: 字のあるところだけを塗る (改行のぶんや、行の右端までの空きは塗らない。Mac 版と同じ) ----------
+// カーソルは drawSelection が描き、選択の四角 (cm-selectionBackground) は出さない。見えている所の選択した字に色を付ける
+
+const selectedText = Decoration.mark({ class: 'cm-sel-text' });
+
+function buildSelectionMarks(view) {
+  const builder = new RangeSetBuilder();
+  const ranges = view.state.selection.ranges.filter(r => !r.empty).sort((a, b) => a.from - b.from);
+  if (!ranges.length) return builder.finish();
+  let last = 0;
+  for (const { from, to } of view.visibleRanges) {
+    for (const r of ranges) {
+      const a = Math.max(r.from, from, last), b = Math.min(r.to, to);
+      if (b > a) { builder.add(a, b, selectedText); last = b; }
     }
+  }
+  return builder.finish();
+}
+
+const selectionMarks = ViewPlugin.fromClass(class {
+  constructor(view) { this.decorations = buildSelectionMarks(view); }
+  update(u) {
+    if (u.selectionSet || u.docChanged || u.viewportChanged) this.decorations = buildSelectionMarks(u.view);
   }
 }, { decorations: v => v.decorations });
 
@@ -152,7 +215,9 @@ const baseTheme = EditorView.theme({
   '.cm-content': { caretColor: 'var(--c-caret)', padding: '2px 0' },
   '.cm-line': { padding: '0 4px 0 6px' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--c-caret)', borderLeftWidth: '2px' },
-  '.cm-selectionBackground': { backgroundColor: 'var(--c-selection) !important' },
+  // 選択は字のところだけを塗る (cm-sel-text)。行の右端まで伸びる四角は出さない
+  '.cm-selectionLayer': { display: 'none' },
+  '.cm-sel-text': { backgroundColor: 'var(--c-selection)' },
   '.cm-activeLine': { backgroundColor: 'var(--c-currentLine)' },
   '.cm-gutters': { backgroundColor: 'var(--c-gutterBackground)', color: 'var(--c-gutterText)', border: 'none', borderRight: '1px solid var(--c-gutterSeparator)' },
   '.cm-lineNumbers .cm-gutterElement': { padding: '0 8px 0 10px', minWidth: '3ch' },
@@ -180,37 +245,47 @@ const addedMark = Decoration.mark({ class: 'cm-added' });
 const editPoint = Decoration.mark({ class: '' });
 const editedLineMarker = new (class extends GutterMarker { constructor() { super(); this.elementClass = 'cm-edited-line'; } })();
 
-/// { added: 足した字の範囲, points: 書き換えた場所 (消しただけの所も含む) }
+/// { added: 足した字の範囲, lines: 書き換えた行 (消しただけの行も含む) の頭の印 }。
+/// 打つたびに全部を数え直さないよう、前の印を書き換えに合わせて動かし、書き換えた行の印だけを足す
+const noEdits = { added: Decoration.none, lines: RangeSet.empty };
 const editMarksField = StateField.define({
-  create: () => ({ added: Decoration.none, points: [] }),
+  create: () => noEdits,
   update(value, tr) {
-    for (const e of tr.effects) if (e.is(clearEditMarks)) return { added: Decoration.none, points: [] };
-    if (!tr.docChanged || tr.annotation(loadAnnotation)) return value;
+    for (const e of tr.effects) if (e.is(clearEditMarks)) return noEdits;
+    if (!tr.docChanged) return value;
+    if (tr.annotation(loadAnnotation)) return noEdits;
+    const doc = tr.state.doc;
     let added = value.added.map(tr.changes);
-    let points = value.points.map(p => tr.changes.mapPos(p, 1));
-    const ranges = [];
+    let lines = value.lines.map(tr.changes);
+    const ranges = [], marks = [];
+    let single = 0;
+    tr.changes.iterChangedRanges(() => { single += 1; });
     tr.changes.iterChangedRanges((fromA, toA, fromB, toB) => {
-      if (toB > fromB) ranges.push(addedMark.range(fromB, toB));
-      points.push(fromB, toB);
+      if (toB > fromB) {
+        // 続けて打っているとき (前に足した字のすぐ後ろ) は、前の範囲を伸ばす (範囲が字の数だけ増えないように)
+        let prev = -1;
+        if (single === 1) added.between(fromB, fromB, (f, t) => { if (t === fromB) prev = f; });
+        if (prev >= 0) {
+          added = added.update({ filter: (f, t) => !(f === prev && t === fromB), filterFrom: fromB, filterTo: fromB });
+          ranges.push(addedMark.range(prev, toB));
+        } else ranges.push(addedMark.range(fromB, toB));
+      }
+      // 書き換えた行の頭に印 (もう印があれば足さない)。とても長い貼り付けでも 20 万行まで
+      const first = doc.lineAt(fromB).number, last = Math.min(doc.lineAt(toB).number, first + 200000);
+      for (let n = first; n <= last; n++) {
+        const from = doc.line(n).from;
+        let has = false;
+        lines.between(from, from, f => { if (f === from) { has = true; return false; } return undefined; });
+        if (!has) marks.push(editedLineMarker.range(from));
+      }
     });
     if (ranges.length) added = added.update({ add: ranges, sort: true });
-    if (points.length > 5000) points = points.slice(-5000);
-    return { added, points };
+    if (marks.length) lines = lines.update({ add: marks, sort: true });
+    return { added, lines };
   },
   provide: f => [
     EditorView.decorations.from(f, v => v.added),
-    gutterLineClass.compute([f], state => {
-      const { added, points } = state.field(f);
-      const lines = new Set();
-      const doc = state.doc;
-      for (const p of points) lines.add(doc.lineAt(Math.min(p, doc.length)).from);
-      added.between(0, doc.length, (from, to) => {
-        for (let pos = from; pos <= to; ) { const l = doc.lineAt(pos); lines.add(l.from); pos = l.to + 1; }
-      });
-      const b = new RangeSetBuilder();
-      for (const from of Array.from(lines).sort((a, c) => a - c)) b.add(from, from, editedLineMarker);
-      return b.finish();
-    }),
+    gutterLineClass.from(f, v => v.lines),
   ],
 });
 /// 開いた・読み直したときの文字の入れ替え (目印は付けない)
@@ -220,15 +295,28 @@ export const loadAnnotation = Annotation.define();
 
 const KIND_TYPE = { function: 'function', keyword: 'keyword', type: 'type', property: 'property', tag: 'class', word: 'variable', snippet: 'text' };
 const KIND_BOOST = { function: 4, keyword: 3, type: 2, property: 2, tag: 3, snippet: 1, word: 0 };
-/// 文書の単語・関数は、文字が変わったときだけ数え直す (大きな文書で打つたびに数えないよう、少し古くても使う)
+/// 文書の単語・関数は、文字が変わったときだけ数え直す。
+/// 大きな文書 (5 万字より長い) では、打つたびに数えないよう 1 秒のあいだは前の結果を使い (少し古くても使う)、
+/// 20 万字より長ければ、カーソルの前後 10 万字だけから集める (Mac 版と同じ: 見ている所の近くだけ)
 const symbolCache = new WeakMap();
+const SYMBOL_EXACT = 50000, SYMBOL_WINDOW = 100000;
+let symbolLast = null;
 function docSymbols(state, profile) {
   const doc = state.doc;
   let c = symbolCache.get(doc);
   if (c) return c;
-  const text = doc.toString();
+  const pos = state.selection.main.head;
+  const key = profile ? profile.name : '';
+  const now = Date.now();
+  if (doc.length > SYMBOL_EXACT && symbolLast && symbolLast.key === key && now - symbolLast.at < 1000 && Math.abs(symbolLast.pos - pos) < SYMBOL_WINDOW / 4) {
+    return symbolLast.c;
+  }
+  const text = doc.length > SYMBOL_WINDOW * 2
+    ? doc.sliceString(Math.max(0, pos - SYMBOL_WINDOW), Math.min(doc.length, pos + SYMBOL_WINDOW))
+    : doc.toString();
   c = { words: completion.words(text), functions: profile ? completion.definedFunctions(text) : [] };
   symbolCache.set(doc, c);
+  if (doc.length > SYMBOL_EXACT) symbolLast = { key, at: now, pos, c };
   return c;
 }
 
@@ -481,7 +569,7 @@ export class Editor {
       EditorState.allowMultipleSelections.of(true),
       bracketMatching(),
       search({ createPanel: () => ({ dom: document.createElement('div') }) }),
-      tokenField, tokenPlugin, baseTheme, remoteCursorsField, editMarksField,
+      tokenPlugin, selectionMarks, baseTheme, remoteCursorsField, editMarksField,
       c.wrap.of(p.wrap ? EditorView.lineWrapping : []),
       c.numbers.of(self.numbersExtension(p)),
       c.invisibles.of(invisiblesPlugin(!!p.invisibles, !!p.showEOF)),

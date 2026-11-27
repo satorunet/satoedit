@@ -1,5 +1,5 @@
 'use strict';
-// さとるエディタ (Windows 版) の本体側: ウインドウ、メニューバー、ファイルの読み書き、暗号化、grep、AI への通信、PDF・印刷
+// エディタβ (Windows 版) の本体側: ウインドウ、メニューバー、ファイルの読み書き、暗号化、grep、AI への通信、PDF・印刷
 const { app, BrowserWindow, Menu, dialog, ipcMain, shell, safeStorage, nativeTheme, clipboard, nativeImage, protocol } = require('electron');
 // 拡張機能 (Web Worker) から本体を呼ぶための通り道。同期の呼び出し (本文を読む など) にも使える
 protocol.registerSchemesAsPrivileged([{ scheme: 'satoplug', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true } }]);
@@ -31,7 +31,7 @@ const { t } = i18n;
 const APP_ID = 'satoruEditor';   // フォルダ名などに使う名前
 const OLD_APP_IDS = ['sakubunEditor', 'satoedit'];   // 前の名前 (この名前の設定を、初めて起動したときに引き継ぐ)
 /// 画面に出す名前 (言語に合わせる)
-const appName = () => t('さとるエディタ');
+const appName = () => t('エディタβ');
 const CONFIG_DIR = path.join(os.homedir(), '.satoruEditor');
 const OLD_CONFIG_DIRS = [path.join(os.homedir(), '.sakubunEditor'), path.join(os.homedir(), '.satomaru')];
 
@@ -474,7 +474,7 @@ function existingFiles(args) {
   return out;
 }
 
-/// エクスプローラーの右クリック「さとるエディタで grep」から渡されるフォルダ (--grep=フォルダ)
+/// エクスプローラーの右クリック「エディタβで grep」から渡されるフォルダ (--grep=フォルダ)
 function grepArg(argv) {
   const a = argv.find(x => x.startsWith('--grep='));
   if (!a) return '';
@@ -668,7 +668,7 @@ const handlers = {
     const r = await dialog.showOpenDialog(win, { title: t('設定内容の復元'), properties: ['openFile'], filters: [{ name: t('設定ファイル'), extensions: ['json'] }] });
     if (r.canceled || !r.filePaths[0]) return { status: 'cancel' };
     const o = readJSON(r.filePaths[0], null);
-    if (!o || o.app !== 'satoru-editor') return { status: 'error', message: t('さとるエディタの設定ファイルではありません。') };
+    if (!o || o.app !== 'satoru-editor') return { status: 'error', message: t('エディタβの設定ファイルではありません。') };
     for (const k of Object.keys(PREF_DEFAULTS)) {
       if (o.prefs && k in o.prefs && !['recent', 'carets', 'windowBounds'].includes(k)) prefs[k] = o.prefs[k];
     }
@@ -989,7 +989,7 @@ const handlers = {
   assocStatus() { return winassoc.status(); },
   async assocApply(o) {
     const r = await winassoc.apply({ exe: process.execPath, extensions: o.extensions, fileMenu: !!o.fileMenu, folderMenu: !!o.folderMenu,
-      labels: { open: t('さとるエディタで開く'), grep: t('さとるエディタで grep') } });
+      labels: { open: t('エディタβで開く'), grep: t('エディタβで grep') } });
     return r.ok ? { status: 'ok' } : { status: 'error', message: r.message };
   },
 
@@ -1057,7 +1057,7 @@ const handlers = {
   quit() { if (win) win.close(); return true; },
   async about() {
     const r = await dialog.showMessageBox(win, {
-      type: 'info', title: t('さとるエディタについて'), message: `${appName()} ${app.getVersion()}`,
+      type: 'info', title: t('エディタβについて'), message: `${appName()} ${app.getVersion()}`,
       detail: t('Windows 用の軽いテキストエディタです。\n\nMIT License')
         + '\n\n' + t('公式サイト') + ': ' + OFFICIAL_URL,
       buttons: ['OK', t('公式サイトを開く')], defaultId: 0, cancelId: 0,

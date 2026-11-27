@@ -1,20 +1,20 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>さとるエディタβ — みんなで育てるテキストエディタ</title>
-<meta name="description" content="さとるエディタは、書く・まとめる・共有するがサクサクできるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ改善していきます。Mac / Windows 対応、無料、オープンソース (MIT)。">
-<meta property="og:site_name" content="さとるエディタ">
-<meta property="og:title" content="さとるエディタβ — みんなで育てるテキストエディタ">
+<title>エディタβ — シンプルで速いテキストエディタ</title>
+<meta name="description" content="書く・まとめる・共有するがサクサクできるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ改善していきます。Mac / Windows 対応、無料、オープンソース (MIT)。">
+<meta property="og:site_name" content="エディタβ">
+<meta property="og:title" content="エディタβ — シンプルで速いテキストエディタ">
 <meta property="og:description" content="編集・管理・共有をサクッとできるテキストエディタ。原稿用紙・AI アシスト・リンクで公開共有も。いまは β テスト版で、みんなの意見をもとに改善中。Mac / Windows・無料・オープンソース。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://docs.satoru.net/">
-<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261122m">
+<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261127beta">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="さとるエディタβ — みんなで育てるテキストエディタ">
-<meta name="twitter:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261122m">
-<link rel="icon" href="/site/icon.png?v=4">
+<meta name="twitter:title" content="エディタβ — シンプルで速いテキストエディタ">
+<meta name="twitter:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261127beta">
+<link rel="icon" href="/site/icon.png?v=7">
 <style>
 :root{color-scheme:light;--bg:#fff;--fg:#0f1419;--mut:#536471;--ln:#e5e9eb;--a:#1d9bf0;--a2:#0b7bc4;--card:#f7f9f9;--code:#eef3f6;--shu:#c0392b;--mid:#2f8f57}
 *{box-sizing:border-box}
@@ -184,7 +184,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 </head>
 <body>
 <nav class="top"><div class="w">
-  <a class="logo" href="/"><img src="/site/icon.png?v=4" alt="">さとるエディタβ</a>
+  <a class="logo" href="/"><img src="/site/icon.png?v=7" alt="">エディタβ</a>
   <a class="l" href="#features">できること</a>
   <a class="l" href="#feedback">ご意見</a>
   <a class="dl-s" href="#download">ダウンロード</a>
@@ -192,16 +192,16 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 
 <header class="hero"><div class="w">
   <span class="kicker beta">β テスト版 ・ 実験中</span>
-  <h1>みんなで<em>育てる</em>エディタ。</h1>
-  <p class="lead">編集・管理・共有をサクッとできるテキストエディタ。いまは β テスト版です。</p>
+  <h1>シンプルで、<em>速い</em>エディタ。</h1>
+  <p class="lead">画面はシンプル、動きは軽快。書くことに集中できるテキストエディタ。いまは β テスト版です。</p>
   <div class="dls">
     <a class="dl" href="#download">⬇ 無料でダウンロード <small>Mac / Windows</small></a>
     <a class="dl ghost" href="#feedback">💬 意見を送る</a>
   </div>
   <div class="beta-note"><span class="ic">🧪</span><div><b>実験中です。</b> みんなの意見で、どんどん変わります。</div></div>
   <div class="hero-shot" id="hero-shot">
-    <img id="hero-a" src="/site/demo-editor.jpg?v=20261122m" width="1800" height="1520" alt="さとるエディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
-    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261122m" width="1800" height="1520" alt="" aria-hidden="true">
+    <img id="hero-a" src="/site/demo-editor.jpg?v=20261127mado" width="1800" height="1520" alt="テキストエディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
+    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261127mado" width="1800" height="1520" alt="" aria-hidden="true">
     <label class="hero-label" id="hero-label-box"><span id="hero-label">標準エディタ</span> ▼
       <select id="hero-pick" aria-label="表示を選ぶ"><option value="auto">自動で切り替え</option><option value="0">標準エディタ</option><option value="1">原稿用紙 (縦書き)</option><option value="2">原稿用紙 (横書き)</option><option value="3">A4用紙</option></select></label>
   </div>
@@ -213,9 +213,17 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   <h2>できること</h2>
   <div class="four">
     <div><img src="/site/shot-editor.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="標準エディタの画面"><b>エディタ表示</b><p>行番号つきの軽いエディタ。書いたものは一覧にまとまり、版の履歴も残ります。</p></div>
-    <div><div class="gk-swap" id="gk-swap"><div class="gk-tabs" id="gk-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-k="v">縦書き</button><button type="button" role="tab" aria-selected="false" data-k="h">横書き</button></div><img src="/site/shot-genko.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (縦書き) の画面"><img class="gk-b" src="/site/shot-genkoH.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (横書き) の画面"></div><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
+    <div><div class="gk-swap" id="gk-swap"><div class="gk-tabs" id="gk-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-k="v">縦書き</button><button type="button" role="tab" aria-selected="false" data-k="h">横書き</button></div><img src="/site/shot-genko.jpg?v=20261127b" width="1800" height="1520" loading="lazy" alt="原稿用紙 (縦書き) の画面"><img class="gk-b" src="/site/shot-genkoH.jpg?v=20261127b" width="1800" height="1520" loading="lazy" alt="原稿用紙 (横書き) の画面"></div><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
     <div><img src="/site/shot-ai-proof.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="AI に誤字を直してもらっている画面"><b>AI 補正 <i class="badge">実験中</i></b><p>誤字直し・要約・続きを書く などを、横から出る欄で頼めます。</p></div>
     <div><a class="sample-shot" href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="公開した作文のページ"><span class="sample-pill">見本を見る ↗</span></a><b>共有機能 <i class="badge">実験中</i></b><p>URL ひとつで、そのままの見た目で公開。</p></div>
+    <div class="wide">
+      <img src="/site/shot-mado.jpg?v=20261127a" width="1800" height="1520" loading="lazy" alt="窓割り: 左に原稿用紙の作文、右にそのメモを並べた画面">
+      <div><b>窓割り <i class="badge">NEW</i></b><p>ちがう文書を、1 つのウインドウの中に左右・上下に並べられます。作文を書きながら横でメモを見る、資料を見ながら書く、がこれ 1 つで。</p><p class="meta">タブを窓の端へドラッグするか、⌃⌘→ (左右) / ⌃⌘↓ (上下) で並べます。次の更新で入ります。</p></div>
+    </div>
+    <div class="wide">
+      <img src="/site/huge.gif?v=20261127a" width="800" height="589" loading="lazy" alt="379 MB のログを 0.5 秒で開き、スクロールや途中への移動もすぐにできる様子">
+      <div><b>大きなファイルも一瞬で <i class="badge">NEW</i></b><p>数百 MB〜数 GB のログやデータも、全部は読み込まずに、見ている所の近くだけをその場で読みます。開くのは一瞬、スクロールすると続きを読み足し、% を指定して途中へもすぐ飛べます。</p><p class="meta">379 MB のログが 0.5 秒で開きました (この Mac で計測)。次の更新で入ります。</p></div>
+    </div>
     <div class="wide">
       <div class="cust" id="cust">
         <span class="cust-hl" id="cust-hl" hidden></span>
@@ -256,7 +264,7 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
 
 <footer class="ft"><div class="w ft-in">
   <div class="ft-brand">
-    <div class="ft-logo"><img src="/site/icon.png?v=4" alt="" width="40" height="40"><div><b>さとるエディタ</b><span>β テスト版 ・ Mac / Windows ・ 無料 ・ MIT ライセンス</span></div></div>
+    <div class="ft-logo"><img src="/site/icon.png?v=7" alt="" width="40" height="40"><div><b>エディタβ</b><span>β テスト版 ・ Mac / Windows ・ 無料 ・ MIT ライセンス</span></div></div>
     <p>書いて、まとめて、リンクで共有。<br>みんなの声で、少しずつ育てていきます。</p>
   </div>
   <nav class="ft-col"><h3>リンク</h3>
@@ -275,11 +283,11 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
   var views=[["editor","標準エディタ","#334"],["genko","原稿用紙 (縦書き)","#c0392b"],["genkoH","原稿用紙 (横書き)","#2f8f57"],["a4","A4用紙","#555"]];
   var a=document.getElementById("hero-a"),b=document.getElementById("hero-b"),label=document.getElementById("hero-label"),box=document.getElementById("hero-label-box"),pick=document.getElementById("hero-pick");
   if(!a||!b)return;
-  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261122m"});
+  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261127mado"});
   var n=0,timer=null;
   function go(k){
     n=k;var v=views[n];
-    b.src="/site/demo-"+v[0]+".jpg?v=20261122m";
+    b.src="/site/demo-"+v[0]+".jpg?v=20261127mado";
     var show=function(){b.classList.add("on");label.textContent=v[1];box.style.background=v[2];
       setTimeout(function(){a.src=b.src;b.classList.remove("on")},500)};
     if(b.complete)show();else b.onload=show;
@@ -299,12 +307,12 @@ th{white-space:nowrap;color:var(--mut);font-weight:600}
     genkoH:["原稿用紙 (横書き)","横書きの原稿用紙 (緑のマス目) にも、ボタン 1 つで。"],
     a4:["A4用紙","A4 の紙の見た目で。そのまま印刷・PDF に。"]};
   var img=document.getElementById("demo-img"),cap=document.getElementById("demo-cap"),tabs=document.querySelectorAll("#demo .demo-tabs button");
-  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261122m"});
+  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261127mado"});
   tabs.forEach(function(b){b.addEventListener("click",function(){
     var v=b.getAttribute("data-v");
     tabs.forEach(function(x){x.setAttribute("aria-selected",x===b?"true":"false")});
     img.classList.add("fade");
-    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261122m";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
+    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261127mado";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
     img.onload=function(){img.classList.remove("fade")};
   })});
 })();

@@ -36,7 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             menuItem.state = FolderTree.isVisible ? .on : .off
         }
         if menuItem.action == #selector(toggleRemoteTreeHM(_:)) {
-            let ed = NSApp.keyWindow?.windowController as? EditorWindowController
+            let ed = NSApp.keyWindow?.frontEditor
             menuItem.state = (ed?.remoteTreeShown ?? RemoteTree.isVisible) ? .on : .off
         }
         if menuItem.action == #selector(toggleRemoteAutoUploadHM(_:)) {
@@ -67,7 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     private var currentEditor: EditorWindowController? {
-        NSApp.mainWindow?.windowController as? EditorWindowController
+        NSApp.mainWindow?.frontEditor
     }
 
     /// 設定 > 表示の言語 (Language)
@@ -137,7 +137,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         RemoteDocuments.removeLeftovers()
         // JS の拡張機能を読み込む (~/.satoruEditor/plugins)
         PluginManager.shared.loadAll()
+        if Mado.isEnabled { Mado.install() }   // 窓割り (タブを並べる) の見張りを始める
         SelfTest.runIfRequested()
+        SelfTestMado.runIfRequested()
+        SelfTestLatency.runIfRequested()
         NSUpdateDynamicServices()
         AISettings.migrateVerified()
         Theme.load()
@@ -200,7 +203,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         guard EditorExtension.server.isOn else { NSSound.beep(); return }
         if RemoteServerStore.servers.isEmpty { ServerExplorerWindowController.shared.show(); return }
         // いまのタブで出ていれば消す (サーバのファイルのタブで自動で出ているときも)
-        if let ed = NSApp.keyWindow?.windowController as? EditorWindowController, ed.remoteTreeShown {
+        if let ed = NSApp.keyWindow?.frontEditor, ed.remoteTreeShown {
             ed.dismissRemoteTree()
         } else {
             RemoteTree.setVisible(true)
@@ -336,7 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// 公式サイト
     static let officialURL = "https://docs.satoru.net"
 
-    /// 「さとるエディタについて」: 標準の画面に、公式サイトのリンクを足す
+    /// 「エディタβについて」: 標準の画面に、公式サイトのリンクを足す
     @objc func showAboutHM(_ sender: Any?) {
         let center = NSMutableParagraphStyle()
         center.alignment = .center

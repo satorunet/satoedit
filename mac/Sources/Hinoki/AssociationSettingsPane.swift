@@ -9,8 +9,8 @@ final class FinderServices: NSObject {
 
     /// (メニュー名, メッセージ名, 説明)
     static let services: [(title: String, message: String, label: String)] = [
-        (L("さとるエディタで開く"), "openFilesService", L("ファイルを右クリック →「さとるエディタで開く」")),
-        (L("さとるエディタで grep"), "grepFolderService", L("フォルダを右クリック →「さとるエディタで grep」")),
+        (L("エディタβで開く"), "openFilesService", L("ファイルを右クリック →「エディタβで開く」")),
+        (L("エディタβで grep"), "grepFolderService", L("フォルダを右クリック →「エディタβで grep」")),
     ]
 
     private func fileURLs(_ pboard: NSPasteboard) -> [URL] {
@@ -97,7 +97,7 @@ final class AssociationSettingsPane: NSObject, SettingsPane, NSTableViewDataSour
         super.init()
         extensions = UserDefaults.standard.stringArray(forKey: "associationExtensions") ?? Self.defaultExtensions
 
-        let cols: [(String, String, CGFloat)] = [("on", L("さとるエディタで開く"), 90), ("ext", L("拡張子"), 110), ("app", L("いま開くアプリ"), 330)]
+        let cols: [(String, String, CGFloat)] = [("on", L("エディタβで開く"), 90), ("ext", L("拡張子"), 110), ("app", L("いま開くアプリ"), 330)]
         for (id, title, w) in cols {
             let c = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id))
             c.title = title
@@ -114,7 +114,7 @@ final class AssociationSettingsPane: NSObject, SettingsPane, NSTableViewDataSour
         addField.placeholderString = L("拡張子 (例: vue)")
         addField.widthAnchor.constraint(equalToConstant: 140).isActive = true
         let assocButtons = SettingsUI.row([
-            SettingsUI.button(L("すべてさとるエディタで開く"), self, #selector(associateAll(_:))),
+            SettingsUI.button(L("すべてエディタβで開く"), self, #selector(associateAll(_:))),
             SettingsUI.button(L("すべて元に戻す"), self, #selector(releaseAll(_:))),
             NSView(),
             addField,
@@ -122,7 +122,7 @@ final class AssociationSettingsPane: NSObject, SettingsPane, NSTableViewDataSour
             SettingsUI.button(L("一覧から外す"), self, #selector(removeExtension(_:))),
         ])
         let assocInner = NSStackView(views: [list, assocButtons,
-            SettingsUI.label(L("チェックした拡張子は、ダブルクリックでさとるエディタが開きます。"), small: true)])
+            SettingsUI.label(L("チェックした拡張子は、ダブルクリックでエディタβが開きます。"), small: true)])
         assocInner.orientation = .vertical
         assocInner.alignment = .leading
         for v in [list, assocButtons] { v.widthAnchor.constraint(equalTo: assocInner.widthAnchor).isActive = true }

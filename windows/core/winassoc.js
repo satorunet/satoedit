@@ -50,7 +50,7 @@ async function apply(o) {
     await reg(['delete', `${CLASSES}\\.${e}\\OpenWithProgids`, '/v', PROG_ID, '/f']);
   }
   if (extensions.length) {
-    await must(add(`${CLASSES}\\${PROG_ID}`, null, 'さとるエディタ'), 'ProgID');
+    await must(add(`${CLASSES}\\${PROG_ID}`, null, 'エディタβ'), 'ProgID');
     await must(add(`${CLASSES}\\${PROG_ID}`, 'Extensions', extensions.join(' ')), 'ProgID');
     await must(add(`${CLASSES}\\${PROG_ID}\\DefaultIcon`, null, `"${exe}",0`), 'icon');
     await must(add(`${CLASSES}\\${PROG_ID}\\shell\\open\\command`, null, `"${exe}" "%1"`), 'command');
@@ -61,7 +61,7 @@ async function apply(o) {
     await remove(`${CLASSES}\\${PROG_ID}`);
   }
 
-  // ファイルの右クリック「さとるエディタで開く」
+  // ファイルの右クリック「エディタβで開く」
   if (o.fileMenu) {
     await must(add(`${CLASSES}\\*\\shell\\satoEdit`, null, o.labels.open), 'file menu');
     await must(add(`${CLASSES}\\*\\shell\\satoEdit`, 'Icon', `"${exe}",0`), 'file menu');
@@ -70,7 +70,7 @@ async function apply(o) {
     await remove(`${CLASSES}\\*\\shell\\satoEdit`);
   }
 
-  // フォルダの右クリック「さとるエディタで grep」
+  // フォルダの右クリック「エディタβで grep」
   if (o.folderMenu) {
     await must(add(`${CLASSES}\\Directory\\shell\\satoEditGrep`, null, o.labels.grep), 'folder menu');
     await must(add(`${CLASSES}\\Directory\\shell\\satoEditGrep`, 'Icon', `"${exe}",0`), 'folder menu');

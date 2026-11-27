@@ -18,14 +18,18 @@ function makeScanner(profile) {
   const isIdentStart = c => (c >= 65 && c <= 90) || (c >= 97 && c <= 122) || c === 95 || c === 36 || c >= 0x80;
   const isIdentChar = c => isIdentStart(c) || isDigit(c);
 
-  /// 返り値は [開始, 終了, 種類, 開始, 終了, 種類, …] (位置は UTF-16 単位)
-  return function tokens(s) {
+  /// 返り値は [開始, 終了, 種類, 開始, 終了, 種類, …] (位置は UTF-16 単位)。
+  /// start から切り出し始め、limit を過ぎたら (トークンの外で) 止める。止めた位置は out.stop に入れる
+  /// (エディタは見えている所の近くまでしか切り出さない。続きは out.stop から切り出せる)
+  return function tokens(s, start, limit) {
     const n = s.length;
     const out = [];
-    let i = 0;
+    const end = limit === undefined ? n : Math.min(n, limit);
+    let i = start || 0;
     const emit = (a, b, k) => { out.push(a, Math.min(b, n), k); };
 
     scan: while (i < n) {
+      if (i >= end) break;
       const c = s.charCodeAt(i);
 
       for (const lc of lineComments) {
@@ -114,6 +118,7 @@ function makeScanner(profile) {
       }
       i += 1;
     }
+    out.stop = Math.min(i, n);
     return out;
   };
 }

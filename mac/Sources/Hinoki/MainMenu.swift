@@ -2,7 +2,7 @@ import AppKit
 import HinokiCore
 
 enum MainMenu {
-    static var appName: String { L("さとるエディタ") }
+    static var appName: String { L("エディタβ") }
 
     static func build() -> NSMenu {
         let main = NSMenu()
@@ -67,6 +67,7 @@ enum MainMenu {
          item("保存時の状態に戻す", "revertDocumentToSaved:"),
          item("版の履歴…", "versionHistoryHM:"),
          item("巨大ファイル: 読み込む範囲を変える…", "changePartialRangeHM:"),
+         item("巨大ファイル: 位置へ移動…", "jumpInHugeFileHM:"),
          sep(),
          item("印刷…", "printDocumentHM:", "p"),
          item("スクリーンショット (画像にする)…", "screenshotHM:"),
@@ -282,6 +283,31 @@ enum MainMenu {
             ])
         }
 
+        // 窓割り: ちがうタブの文書を 1 つのウインドウに並べる (Mado*.swift)
+        let madoMenu = NSMenu(title: L("窓割り"))
+        let arrowRight = String(Character(UnicodeScalar(NSRightArrowFunctionKey)!))
+        [item("タブを左右に並べる", "madoSplitTabsSideBySideHM:", arrowRight, [.command, .control]),
+         item("タブを上下に並べる", "madoSplitTabsStackedHM:", arrowDown, [.command, .control]),
+         item("この画面を左右に分割", "madoSplitPaneSideBySideHM:", arrowRight, [.command, .control, .option]),
+         item("この画面を上下に分割", "madoSplitPaneStackedHM:", arrowDown, [.command, .control, .option]),
+         item("並べるのをやめる (タブに戻す)", "madoUnsplitHM:", arrowUp, [.command, .control]),
+         sep(),
+         item("次の画面へ", "madoNextPaneHM:", "]", [.command, .control]),
+         item("前の画面へ", "madoPreviousPaneHM:", "[", [.command, .control]),
+         item("画面の大きさをそろえる", "madoEqualizeHM:"),
+         sep(),
+         item("このタブを選ぶ", "madoToggleMarkHM:"),
+         item("選択をすべて外す", "madoClearMarksHM:"),
+         sep(),
+         item("このタブを新しいウインドウに分ける", "madoMoveToNewWindowHM:"),
+        ].forEach { madoMenu.addItem($0) }
+        let placeMenu = NSMenu(title: L("窓割り中に新しい文書を開く場所"))
+        for (title, v) in [("毎回聞く", "ask"), ("窓内で開く", "split"), ("タブで開く", "tab"), ("新しいウインドウで開く", "window")] {
+            placeMenu.addItem(item(title, "madoSetOpenPlaceHM:", object: v, id: "madoOpenPlace." + v))
+        }
+        madoMenu.addItem(sep())
+        madoMenu.addItem(holder("窓割り中に新しい文書を開く場所", placeMenu))
+
         let window = submenu("ウインドウ", in: main, [
             item("しまう", "performMiniaturize:", "m"),
             item("拡大/縮小", "performZoom:"),
@@ -289,6 +315,8 @@ enum MainMenu {
             item("ウインドウ上下分割", "toggleSplitHM:"),
             item("ウインドウ左右分割", "toggleSplitSideHM:"),
             item("分割したもう一方へ移動", "switchSplitPaneHM:"),
+            sep(),
+            holder("窓割り", madoMenu),
             sep(),
             item("ウインドウを左右に並べる", "tileWindowsSideBySideHM:"),
             item("ウインドウを上下に並べる", "tileWindowsStackedHM:"),

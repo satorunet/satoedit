@@ -19,6 +19,10 @@ namespace SatoEdit {
         var file = S(a, 0);
         try { return ReadDocument(file, O(a, 1)); } catch (Exception e) { return Fail(e); }
       });
+      // 巨大なファイル: 読んでいる範囲の近くを読み直す (スクロールで端に近づいたとき・位置へ移動)
+      OnBg("hugeSlide", a => {
+        try { return HugeSlide(S(a, 0), O(a, 1)); } catch (Exception e) { return Fail(e); }
+      });
       OnBg("writeFile", a => {
         try { return WriteDocument(O(a, 0)); } catch (Exception e) { return Fail(e); }
       });
@@ -154,7 +158,7 @@ namespace SatoEdit {
     }
 
     JObj ReadDocument(string file, JObj opts) {
-      var r = DecodeDocument(File.ReadAllBytes(file), opts, file);
+      var r = ReadHugeDocument(file, opts) ?? DecodeDocument(File.ReadAllBytes(file), opts, file);
       if (r.Str("status") != "ok") return r;
       AddRecent(file);
       r["path"] = file;
@@ -162,6 +166,64 @@ namespace SatoEdit {
       r["locked"] = (File.GetAttributes(file) & FileAttributes.ReadOnly) != 0;
       r["mtime"] = MTime(file);
       return r;
+    }
+
+    // ---------- 巨大なファイル (Mac 版 HugeFileWindow.swift と同じ考え方) ----------
+    // 大きなファイルは全部は読まず、先頭の近く (はじめは 8 MB) だけを読んで、すぐに開く。
+    // スクロールで読んだ範囲の端に近づいたら、今見ている行のまわりを読み直す (画面側 app.js の huge*)。保存すると、その範囲だけをファイルに書き戻す
+
+    static long MB(string key, double fallback) => (long)(Store.Prefs.Num(key, fallback) * 1048576);
+    static long HugeThreshold => Math.Max(0, MB("hugeFileMB", 32));
+    static long HugeWindow => Math.Max(1L << 20, MB("hugeWindowMB", 8));
+
+    static JObj PartObj(PartialFile.Part p) => new JObj { { "offset", (double)p.Offset }, { "length", (double)p.Length }, { "fileSize", (double)p.FileSize } };
+    static PartialFile.Part PartOf(JObj o) => new PartialFile.Part((long)o.Num("offset"), (long)o.Num("length"), (long)o.Num("fileSize"));
+
+    /// 大きなファイルなら一部分だけ読む。全部読むもの (小さい・暗号化・画像・UTF-16・「全部読む」) は null
+    JObj ReadHugeDocument(string file, JObj opts) {
+      var want = opts.Obj("part");
+      if (want == null) {
+        long size = new FileInfo(file).Length;
+        if (opts.Bool("whole") || HugeThreshold <= 0 || size < HugeThreshold) return null;
+        var head = PartialFile.Head(file, 64 * 1024);
+        if (FileCrypto.IsEncrypted(head) || Binary.ImageType(file) != null) return null;
+      }
+      var part = want != null ? PartialFile.Align(file, (long)want.Num("offset"), Math.Max(1, (long)want.Num("length"))) : PartialFile.Align(file, 0, HugeWindow);
+      var data = PartialFile.Read(file, part);
+      if (!opts.Bool("forceText") && Binary.LooksBinary(data)) {
+        // バイナリは、見るだけの画面で先頭の 16 MB だけを出す
+        var hex = PartialFile.Read(file, new PartialFile.Part(0, Math.Min(16L << 20, part.FileSize), part.FileSize));
+        return new JObj { { "status", "viewer" }, { "kind", "hex" }, { "base64", Convert.ToBase64String(hex) }, { "size", (double)part.FileSize }, { "truncated", part.FileSize > hex.Length } };
+      }
+      var enc = opts.Str("encoding");
+      var d = Codec.Decode(data, enc == "" ? null : enc);
+      if (d.Encoding.StartsWith("utf16")) return null; // 行の切れ目 (LF のバイト) で切れないので、全部読む
+      return new JObj { { "status", "ok" }, { "text", d.Text }, { "encoding", d.Encoding }, { "lineEnding", d.LineEnding }, { "enc", null }, { "partial", PartObj(part) } };
+    }
+
+    /// 読み直す: o = { part (今の範囲), topLine (今いちばん上に見えている行。範囲の中の 0 始まり), back (新しい範囲で、その行より前に置く割合 0〜1),
+    ///   fraction (位置へ移動のとき: ファイル全体の 0〜1), encoding }
+    /// → { status, text, partial, line (今の行が新しい範囲の何行目か) }
+    JObj HugeSlide(string file, JObj o) {
+      var cur = PartOf(o.Obj("part") ?? new JObj());
+      long size = new FileInfo(file).Length, w = HugeWindow;
+      long anchor;
+      if (o.Has("fraction")) {
+        anchor = (long)(size * Math.Max(0, Math.Min(1, o.Num("fraction"))));
+      } else {
+        // 今の範囲の topLine 行目の行頭の、ファイルの中の位置
+        var data = PartialFile.Read(file, cur);
+        anchor = cur.Offset + PartialFile.LineStart(data, (int)o.Num("topLine"));
+      }
+      long back = (long)(w * Math.Max(0, Math.Min(1, o.Num("back", 0.5))));
+      var part = PartialFile.Align(file, Math.Max(0, anchor - back), w);
+      // 行の頭にそろえたので、anchor が範囲より前になることがある (1 行がとても長いとき)
+      if (anchor < part.Offset) anchor = part.Offset;
+      var bytes = PartialFile.Read(file, part);
+      var enc = o.Str("encoding");
+      var d = Codec.Decode(bytes, enc == "" ? null : enc);
+      return new JObj { { "status", "ok" }, { "text", d.Text }, { "encoding", d.Encoding }, { "lineEnding", d.LineEnding },
+        { "partial", PartObj(part) }, { "line", (double)PartialFile.LinesBefore(bytes, anchor - part.Offset) } };
     }
 
     /// 文章 → ファイルに書く中身 (文字コードを変換し、鍵があれば暗号化する)
@@ -186,6 +248,22 @@ namespace SatoEdit {
       // 置き換えて書くと、見えない所 (表示・版の履歴の番号) が消えるので、書き直す
       var mode = o.Has("mode") ? o["mode"] as string : Library.FileMode(path);
       var history = Library.ReadStream(path, Library.HistoryStream);
+      // 巨大なファイルの一部分だけを読んでいるとき: その範囲だけを差し替える (前後はファイルのまま)
+      if (o.Obj("part") is JObj pj && File.Exists(path)) {
+        var part = PartOf(pj);
+        var info = Codec.EncodingInfo(o.Str("encoding", "utf8"));
+        if (part.Offset > 0 && info.Bom != null && info.Bom.Length > 0 && body.Length >= info.Bom.Length && body.Take(info.Bom.Length).SequenceEqual(info.Bom)) body = body.Skip(info.Bom.Length).ToArray(); // BOM は先頭にだけ
+        var tmp = path + ".part-" + System.Diagnostics.Process.GetCurrentProcess().Id;
+        try {
+          PartialFile.Write(path, part, body, tmp);
+          Win32.ReplaceFile(tmp, path);
+        } catch { try { File.Delete(tmp); } catch { } throw; }
+        if (mode != null) Library.WriteStream(path, Library.ModeStream, mode);
+        if (history != null) Library.WriteStream(path, Library.HistoryStream, history);
+        AddRecent(path);
+        var size = new FileInfo(path).Length;
+        return new JObj { { "status", "ok" }, { "mtime", MTime(path) }, { "partial", PartObj(new PartialFile.Part(part.Offset, body.Length, size)) } };
+      }
       Store.WriteAtomic(path, body);
       if (mode != null) Library.WriteStream(path, Library.ModeStream, mode);
       if (history != null) Library.WriteStream(path, Library.HistoryStream, history);

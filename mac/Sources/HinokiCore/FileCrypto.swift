@@ -126,7 +126,7 @@ public enum FileCrypto {
 
     /// 新しい鍵ファイルの中身 (説明の行 + 乱数 32 バイトを Base64 にしたもの)
     public static func newKeyFileContents() -> Data {
-        let text = "\(keyFileHeader)\n# さとるエディタの鍵ファイルです。なくすと、これで暗号化した文書は開けなくなります。\n"
+        let text = "\(keyFileHeader)\n# エディタβの鍵ファイルです。なくすと、これで暗号化した文書は開けなくなります。\n"
             + randomBytes(32).base64EncodedString() + "\n"
         return Data(text.utf8)
     }

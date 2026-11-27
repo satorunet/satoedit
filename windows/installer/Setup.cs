@@ -1,9 +1,9 @@
-// さとるエディタ (Windows) のインストーラー / アンインストーラー
+// エディタβ (Windows) のインストーラー / アンインストーラー
 //   satoruEditorSetup.exe                 画面を出して入れる
 //   satoruEditorSetup.exe /S              画面を出さずに入れる (確認用)
 //   satoruEditorSetup.exe /update [/wait-pid=N] [/S]
 //                                         アップデート: アプリ (プロセス N) が閉じるのを待ち、今の入れ方 (デスクトップのショートカットの有無) のまま
-//                                         確かめずに入れ替えて、さとるエディタを起動し直す。/S なら進み具合の小窓も出さない (起動もしない)
+//                                         確かめずに入れ替えて、エディタβを起動し直す。/S なら進み具合の小窓も出さない (起動もしない)
 //   uninstall.exe /uninstall [/S]         消す (入れた先に置く。「設定 > アプリ」からも呼ばれる)
 // 入れる先: %LOCALAPPDATA%\Programs\satoruEditor (管理者の許可は要らない)。設定 (%USERPROFILE%\.satoruEditor) は消さない
 using System;
@@ -25,8 +25,8 @@ namespace SatoEditSetup
 {
     static class Setup
     {
-        const string AppName = "さとるエディタ";
-        const string AppNameEn = "Satoru Editor";
+        const string AppName = "エディタβ";
+        const string AppNameEn = "Editor β";
         const string ExeName = "satoruEditor.exe";
         const string Key = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\satoruEditor";
         static readonly bool Ja = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ja";
@@ -37,6 +37,10 @@ namespace SatoEditSetup
         static string InstallDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "satoruEditor");
         static string StartMenuLink => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), Name + ".lnk");
         static string DesktopLink => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), Name + ".lnk");
+        /// 前の版の名前で作ったショートカット (1.0.3 までは「さとるエディタ」/ Satoru Editor)。入れ直すとき・消すときに片付ける
+        static readonly string[] OldNames = { "さとるエディタ", "Satoru Editor", AppName, AppNameEn };
+        static string[] OldStartMenuLinks => OldNames.Where(n => n != Name).Select(n => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs), n + ".lnk")).ToArray();
+        static string[] OldDesktopLinks => OldNames.Where(n => n != Name).Select(n => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory), n + ".lnk")).ToArray();
 
         [STAThread]
         static int Main(string[] args)
@@ -65,7 +69,10 @@ namespace SatoEditSetup
                     var pidArg = args.FirstOrDefault(a => a.StartsWith("/wait-pid=", StringComparison.OrdinalIgnoreCase));
                     if (pidArg != null && int.TryParse(pidArg.Substring("/wait-pid=".Length), out var pid)) WaitForExit(pid, 60000);
                     var dir = Path.GetFullPath(portableArg.Substring("/portable=".Length).Trim('"')).TrimEnd('\\');
-                    if (!File.Exists(Path.Combine(dir, "portable.txt"))) throw new InvalidOperationException(T("ポータブル版のフォルダではありません: ", "Not a portable folder: ") + dir);
+                    if (!File.Exists(Path.Combine(dir, "data", "portable.txt")) && !File.Exists(Path.Combine(dir, "portable.txt"))) throw new InvalidOperationException(T("ポータブル版のフォルダではありません: ", "Not a portable folder: ") + dir);
+                    // 前の版の部品 (いまは exe の中に入っている) を片付ける。data と目印には触れない
+                    try { if (Directory.Exists(Path.Combine(dir, "app"))) Directory.Delete(Path.Combine(dir, "app"), true); } catch { }
+                    foreach (var old in Directory.GetFiles(dir, "*.dll").Concat(Directory.GetFiles(dir, "*.exe.config"))) TryDelete(old);
                     for (int i = 0; ; i++)
                     {
                         try { Extract(dir, true); break; }
@@ -78,7 +85,7 @@ namespace SatoEditSetup
                 {
                     var pidArg = args.FirstOrDefault(a => a.StartsWith("/wait-pid=", StringComparison.OrdinalIgnoreCase));
                     if (pidArg != null && int.TryParse(pidArg.Substring("/wait-pid=".Length), out var pid)) WaitForExit(pid, 60000);
-                    bool desktop = File.Exists(DesktopLink) || !File.Exists(StartMenuLink); // 前に入れたときの選び方を引き継ぐ
+                    bool desktop = File.Exists(DesktopLink) || OldDesktopLinks.Any(File.Exists) || !(File.Exists(StartMenuLink) || OldStartMenuLinks.Any(File.Exists)); // 前に入れたときの選び方を引き継ぐ (前の名前のショートカットも見る)
                     if (silent) { Install(desktop, false, null); return 0; }
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
@@ -108,7 +115,7 @@ namespace SatoEditSetup
             catch { } // もう閉じている
         }
 
-        /// 動いているさとるエディタを閉じる (ファイルを差し替えるため)
+        /// 動いているエディタβを閉じる (ファイルを差し替えるため)
         static void StopRunningApp()
         {
             foreach (var p in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(ExeName)))
@@ -172,6 +179,7 @@ namespace SatoEditSetup
             var exe = Path.Combine(dir, ExeName);
 
             progress?.Invoke(T("ショートカットを作っています…", "Creating shortcuts…"));
+            foreach (var old in OldStartMenuLinks.Concat(OldDesktopLinks)) TryDelete(old); // 前の名前のショートカットは消して、今の名前で作り直す
             MakeShortcut(StartMenuLink, exe, dir);
             if (desktop) MakeShortcut(DesktopLink, exe, dir);
             else TryDelete(DesktopLink);
@@ -227,7 +235,7 @@ namespace SatoEditSetup
         }
 
         /// Microsoft の配布元から小さなインストーラ (Evergreen Bootstrapper) を取ってきて、画面を出さずに入れる。
-        /// 管理者の権限が無ければ、このユーザーだけに入る。うまくいかなくても、さとるエディタの起動時にもう一度入れ方を案内する
+        /// 管理者の権限が無ければ、このユーザーだけに入る。うまくいかなくても、エディタβの起動時にもう一度入れ方を案内する
         static void InstallWebView2()
         {
             var file = Path.Combine(Path.GetTempPath(), "MicrosoftEdgeWebview2Setup-" + Guid.NewGuid().ToString("N") + ".exe");
@@ -244,7 +252,7 @@ namespace SatoEditSetup
             }
             catch (Exception e)
             {
-                // 入れられなくても、さとるエディタは入っている (起動したときに、もう一度入れ方を案内する)
+                // 入れられなくても、エディタβは入っている (起動したときに、もう一度入れ方を案内する)
                 try { File.AppendAllText(Path.Combine(Path.GetTempPath(), "satoruEditorSetup.log"), DateTime.Now + " webview2: " + e + "\r\n"); } catch { }
             }
             finally
@@ -260,8 +268,9 @@ namespace SatoEditSetup
             StopRunningApp();
             TryDelete(StartMenuLink);
             TryDelete(DesktopLink);
+            foreach (var old in OldStartMenuLinks.Concat(OldDesktopLinks)) TryDelete(old);
             try { Registry.CurrentUser.DeleteSubKeyTree(Key, false); } catch { }
-            // 入れた先のフォルダだけ消す (念のため、さとるエディタの exe がある所に限る)
+            // 入れた先のフォルダだけ消す (念のため、エディタβの exe がある所に限る)
             if (Directory.Exists(dir) && File.Exists(Path.Combine(dir, ExeName)))
             {
                 for (int i = 0; i < 20; i++)
@@ -295,7 +304,7 @@ namespace SatoEditSetup
 
         static void TryDelete(string f) { try { if (File.Exists(f)) File.Delete(f); } catch { } }
 
-        /// アップデートの間だけ出す小窓 (確かめることは無い。終わったら、さとるエディタを起動して閉じる)
+        /// アップデートの間だけ出す小窓 (確かめることは無い。終わったら、エディタβを起動して閉じる)
         sealed class UpdateForm : Form
         {
             readonly Label status = new Label { AutoSize = true, ForeColor = SystemColors.GrayText };

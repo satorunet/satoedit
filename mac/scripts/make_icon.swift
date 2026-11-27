@@ -1,4 +1,4 @@
-// さとるエディタのアイコン: 角を折った原稿用紙。右の列に明朝の「さとる」を縦書き
+// アイコン: 角を折った原稿用紙。紙いっぱいに枠と明朝の「あ」、後ろにうすく格子
 // 使い方: swift scripts/make_icon.swift <出力.png> [未使用 RRGGBB] [罫線の色 RRGGBB] [invert]
 //   罫線の色が色ちがいの色になる (本物の原稿用紙と同じく、朱・緑・藍など)。字はいつも墨
 //   invert をつけると、濃い紙に生成りの罫線と字になる (墨)
@@ -24,8 +24,8 @@ NSGraphicsContext.saveGraphicsState()
 NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
 let ctx = NSGraphicsContext.current!.cgContext
 
-// 紙 (縦書きは右上から書くので、左上の角を折る)
-let r = NSRect(x: 190, y: 110, width: 644, height: 800), fold: CGFloat = 150, radius: CGFloat = 46
+// 紙: 正方形に近い形 (縦書きは右上から書くので、左上の角を折る)
+let r = NSRect(x: 100, y: 120, width: 824, height: 790), fold: CGFloat = 150, radius: CGFloat = 46
 let p = NSBezierPath()
 p.move(to: P(r.minX + radius, r.minY)); p.line(to: P(r.maxX - radius, r.minY))
 p.appendArc(withCenter: P(r.maxX - radius, r.minY + radius), radius: radius, startAngle: 270, endAngle: 360)
@@ -47,9 +47,9 @@ for (alpha, dy, blur) in [(CGFloat(0.30), CGFloat(-26), CGFloat(46)), (0.38, -8,
 // 紙の面: 上から下へ、ごくわずかに暗くする
 NSGradient(starting: paper, ending: invert ? color(0x20232B) : color(0xF1E9D8))!.draw(in: p, angle: -90)
 
-// マス目: 3 列 × 4 行。マスの左にふりがなの細い欄、外側に太い枠 (アプリの原稿用紙と同じ作り)
-let cols = 3, rows = 4
-let cell: CGFloat = 150, strip: CGFloat = 34, pitch = cell + strip
+// マス目: 3 列 × 3 行。マスの左にふりがなの細い欄、外側に太い枠 (アプリの原稿用紙と同じ作り)
+let cols = 3, rows = 3
+let cell: CGFloat = 190, strip: CGFloat = 40, pitch = cell + strip
 let gridW = pitch * CGFloat(cols) - strip, gridH = cell * CGFloat(rows)
 let gx = r.midX - gridW / 2, gy = r.midY - gridH / 2 - 10
 NSGraphicsContext.saveGraphicsState()
@@ -70,17 +70,41 @@ let frame = NSBezierPath(rect: NSRect(x: gx, y: gy, width: gridW, height: gridH)
 frame.lineWidth = 16
 frame.stroke()
 
-// 右の列に「さとる」(縦書き。1 字ずつマスの真ん中に)
-let font = NSFont(name: "HiraMinProN-W6", size: cell * 0.78) ?? NSFont.boldSystemFont(ofSize: cell * 0.78)
-let rightX = gx + CGFloat(cols - 1) * pitch
-for (i, ch) in ["さ", "と", "る"].enumerated() {
-    let line = CTLineCreateWithAttributedString(NSAttributedString(string: ch, attributes: [.font: font, .foregroundColor: ink]))
-    ctx.textPosition = .zero // 字の大きさは、書く位置を 0 にしてから測る
-    let b = CTLineGetImageBounds(line, ctx)
-    let cy = gy + gridH - (CGFloat(i) + 0.5) * cell
-    ctx.textPosition = CGPoint(x: rightX + cell / 2 - b.midX, y: cy - b.midY)
-    CTLineDraw(line, ctx)
+// 紙いっぱいに、枠と大きな明朝の「あ」
+let box = NSRect(x: gx - 30, y: gy - 30, width: gridW + 60, height: gridH + 60)
+paper.setFill(); box.fill()
+rule.setStroke()
+let boxPath = NSBezierPath(rect: box)
+boxPath.lineWidth = 12
+boxPath.stroke()
+// 字の後ろに、うすく窓の格子 (障子のような細い桟と、真ん中の太い桟) を入れて「窓」らしくする
+NSGraphicsContext.saveGraphicsState()
+NSBezierPath(rect: box.insetBy(dx: 6, dy: 6)).addClip()
+let inner = box.insetBy(dx: 6, dy: 6)
+// 細い格子 (4 × 4)
+rule.withAlphaComponent(0.10).setStroke()
+let lattice = NSBezierPath()
+lattice.lineWidth = 5
+for k in 1..<4 {
+    let x = inner.minX + inner.width * CGFloat(k) / 4, y = inner.minY + inner.height * CGFloat(k) / 4
+    lattice.move(to: P(x, inner.minY)); lattice.line(to: P(x, inner.maxY))
+    lattice.move(to: P(inner.minX, y)); lattice.line(to: P(inner.maxX, y))
 }
+lattice.stroke()
+// 真ん中の太い桟 (十字)
+rule.withAlphaComponent(0.18).setStroke()
+let cross = NSBezierPath()
+cross.lineWidth = 16
+cross.move(to: P(inner.midX, inner.minY)); cross.line(to: P(inner.midX, inner.maxY))
+cross.move(to: P(inner.minX, inner.midY)); cross.line(to: P(inner.maxX, inner.midY))
+cross.stroke()
+NSGraphicsContext.restoreGraphicsState()
+let font = NSFont(name: "HiraMinProN-W6", size: 540) ?? NSFont.boldSystemFont(ofSize: 540)
+let line = CTLineCreateWithAttributedString(NSAttributedString(string: "あ", attributes: [.font: font, .foregroundColor: ink]))
+ctx.textPosition = .zero // 字の大きさは、書く位置を 0 にしてから測る
+let b = CTLineGetImageBounds(line, ctx)
+ctx.textPosition = CGPoint(x: box.midX - b.midX, y: box.midY - b.midY)
+CTLineDraw(line, ctx)
 NSGraphicsContext.restoreGraphicsState()
 
 // 紙の縁をはっきりさせる

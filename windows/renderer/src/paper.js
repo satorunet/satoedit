@@ -64,11 +64,7 @@ function sheetHTML(sheet, index, total, sel, comp, rubyByColumn, horizontal) {
       if (ch.length === 1 && ch.charCodeAt(0) < 0x2000) cls += ' half';
       out += `<span class="${cls}" style="${box(x, SHEET.top + r * SHEET.cell, SHEET.cell, SHEET.cell, horizontal)}">${ch === ' ' || ch === '\t' ? '' : esc(ch)}</span>`;
     }
-    // 何も書いていない列を選んだとき (改行だけの段落) も選択が見えるように
-    if (sel && col.last && col.to >= sel[0] && col.to < sel[1] && col.from >= 0) {
-      const n = col.cells.reduce((m, c, r) => (c !== null ? r + 1 : m), col.first);
-      if (n < ROWS) out += `<span class="gk sel" style="${box(x, SHEET.top + n * SHEET.cell, SHEET.cell, SHEET.cell, horizontal)}"></span>`;
-    }
+    // 選択は字のあるマスだけを塗る (改行のぶんや、何も書いていない列は塗らない。Mac 版と同じ)
   }
   // 用紙の下の小さな表示 (枠の左下と右下)
   const span = genko.gridSpan(horizontal);
@@ -182,7 +178,9 @@ export class GenkoEditor {
     input.addEventListener('keydown', e => this.keydown(e));
     input.addEventListener('focus', () => { this.dom.classList.add('focused'); this.render(); });
     input.addEventListener('blur', () => { this.dom.classList.remove('focused'); });
-    this.onSelectionChange = () => { if (document.activeElement === input) { this.render(); this.onSelection(); } };
+    this.onSelectionChange = () => { if (document.activeElement === input) { this.renderIfChanged(); this.onSelection(); } };
+    // スクロールして見えた用紙の中身を作る
+    this.dom.addEventListener('scroll', () => this.fillSheets(-1), { passive: true });
     document.addEventListener('selectionchange', this.onSelectionChange);
 
     let dragging = false;
@@ -323,14 +321,45 @@ export class GenkoEditor {
     const sel = input.selectionStart !== input.selectionEnd ? [input.selectionStart, input.selectionEnd] : null;
     const comp = this.comp ? [this.comp[0], input.selectionEnd] : null;
     const rubyByColumn = this.prefs.genkoFurigana ? placeRuby(this.columns, this.ruby) : null;
+    this.rendered = { value: input.value, start: input.selectionStart, end: input.selectionEnd, comp: comp && comp.join(), ruby: this.ruby };
     while (this.sheetsEl.children.length > sheets.length) { this.sheetsEl.lastChild.remove(); this.cache.pop(); }
-    sheets.forEach((sheet, i) => {
-      const html = sheetHTML(sheet, i, sheets.length, sel, comp, rubyByColumn, this.horizontal);
-      let el = this.sheetsEl.children[i];
-      if (!el) { el = h('div', { class: 'genko-sheet' + (this.horizontal ? ' h' : '') }); this.sheetsEl.append(el); this.cache[i] = null; }
-      if (this.cache[i] !== html) { el.innerHTML = html; this.cache[i] = html; }
-    });
+    for (let i = this.sheetsEl.children.length; i < sheets.length; i++) {
+      this.sheetsEl.append(h('div', { class: 'genko-sheet' + (this.horizontal ? ' h' : '') }));
+      this.cache[i] = null;
+    }
+    // 中身を作るのは、見えている用紙とその前後 1 画面ぶん (と、カーソルのある用紙) だけ。
+    // ほかの用紙はスクロールして見えたときに作る (長い原稿でも、打つたびに全部の用紙を作り直さない)
+    this.pending = { sheets, sel, comp, rubyByColumn, done: new Set() };
+    const caretSheet = Math.floor(genko.caretCell(this.columns, this.head()).column / COLUMNS_PER_SHEET);
+    this.fillSheets(caretSheet);
     this.placeCaret();
+  }
+
+  /// 見えている用紙 (と前後 1 画面ぶん、extra の用紙) の中身を、まだなら作る
+  fillSheets(extra) {
+    const p = this.pending;
+    if (!p) return;
+    const els = this.sheetsEl.children;
+    const top = this.dom.scrollTop, height = this.dom.clientHeight || 800;
+    for (let i = 0; i < p.sheets.length; i++) {
+      const el = els[i];
+      const near = i === extra || (el.offsetTop + el.offsetHeight >= top - height && el.offsetTop <= top + height * 2);
+      if (!near || p.done.has(i)) continue;
+      p.done.add(i);
+      const html = sheetHTML(p.sheets[i], i, p.sheets.length, p.sel, p.comp, p.rubyByColumn, this.horizontal);
+      if (this.cache[i] !== html) { el.innerHTML = html; this.cache[i] = html; }
+    }
+  }
+
+  /// 選択が変わったと知らされたとき: 文章・選択・変換中・ふりがなが描いたときと同じなら描き直さない
+  /// (字を打つと input と selectionchange の両方から呼ばれるため)
+  renderIfChanged() {
+    const r = this.rendered, input = this.input, comp = this.comp ? [this.comp[0], input.selectionEnd] : null;
+    if (r && r.value === input.value && r.start === input.selectionStart && r.end === input.selectionEnd && r.comp === (comp && comp.join()) && r.ruby === this.ruby) {
+      this.placeCaret();
+      return;
+    }
+    this.render();
   }
 
   placeCaret() {

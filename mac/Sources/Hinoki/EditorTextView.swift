@@ -288,13 +288,23 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate {
 
     override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting: Bool) {
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelecting)
-        setNeedsDisplay(visibleRect)
+        invalidateCurrentLineBackground()
         updateCurrentTextLine()
         // 打った文字以外でカーソルが動いたら候補を消す (引数ヒントは場所に合わせる)
         if !typingForCompletion && !stillSelecting, completionIfCreated != nil {
             completion.hideList()
             completion.updateHint()
         }
+    }
+
+    /// カーソル行の背景を描き直す。前の行と今の行だけ (画面全体を描き直すと、大きな文書で打つたびに引っかかる)
+    private var lastCurrentLineRect: NSRect?
+    private func invalidateCurrentLineBackground() {
+        guard paperMode == .normal else { setNeedsDisplay(visibleRect); return }
+        if let old = lastCurrentLineRect { setNeedsDisplay(old) }
+        let now = highlightsCurrentLine ? currentLineRect().map { NSRect(x: bounds.minX, y: $0.minY, width: bounds.width, height: $0.height) } : nil
+        if let now = now { setNeedsDisplay(now) }
+        lastCurrentLineRect = now
     }
 
     private func currentLineRect() -> NSRect? {
@@ -316,6 +326,14 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate {
         guard let lm = layoutManager, let tc = textContainer else { return }
         let length = ns.length
         let origin = textContainerOrigin
+        // 文末が見えていないときは描かない。描くには文末まで組む必要があり、
+        // 大きな文書では打つたびにカーソルより後ろを全部組み直すことになって引っかかる
+        if length > 0 {
+            let visible = visibleRect.offsetBy(dx: -origin.x, dy: -origin.y)
+            let glyphs = lm.glyphRange(forBoundingRectWithoutAdditionalLayout: visible, in: tc)
+            let chars = lm.characterRange(forGlyphRange: glyphs, actualGlyphRange: nil)
+            if NSMaxRange(chars) < length - 1 { return }
+        }
         var point: NSPoint
         // 最後の字のあたりは、組み終わっていないことがある (サーバへ送るときなど、表示を更新した直後)。先に組んでおく
         if length > 0 { lm.ensureLayout(forCharacterRange: NSRange(location: length - 1, length: 1)) }
@@ -545,7 +563,7 @@ final class EditorTextView: NSTextView, NSLayoutManagerDelegate {
         guard FileDrop.handles(sender) else { return super.performDragOperation(sender) }
         let urls = FileDrop.fileURLs(sender)
         // ドラッグが終わってから開く (開くときの確認などがドラッグ中に出ないように)
-        let target = window?.windowController as? EditorWindowController
+        let target = owningEditor
         DispatchQueue.main.async { FileDrop.open(urls, into: target) }
         return true
     }

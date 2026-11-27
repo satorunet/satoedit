@@ -16,7 +16,7 @@ namespace SatoEdit {
         var o = O(a, 0);
         var labels = o.Obj("labels") ?? new JObj();
         var r = Assoc.Apply(System.Reflection.Assembly.GetExecutingAssembly().Location, (o.Arr("extensions") ?? new List<object>()).Select(x => Convert.ToString(x)).ToList(),
-          o.Bool("fileMenu"), o.Bool("folderMenu"), labels.Str("open", "さとるエディタで開く"), labels.Str("grep", "さとるエディタで grep"));
+          o.Bool("fileMenu"), o.Bool("folderMenu"), labels.Str("open", "エディタβで開く"), labels.Str("grep", "エディタβで grep"));
         return r == "" ? new JObj { { "status", "ok" } } : new JObj { { "status", "error" }, { "message", r } };
       });
     }
@@ -184,6 +184,22 @@ namespace SatoEdit {
       };
     }
 
+    /// 前の版の名前 (さとるエディタ) で登録した右クリックメニュー・「プログラムから開く」の名前を、今の名前に直す (起動したときに呼ぶ。
+    /// レジストリの中の名前 (satoEdit など) はそのまま。自分で変えた名前には触らない)
+    public static void RenameOldLabels() {
+      void Fix(string key) {
+        try {
+          using (var k = Registry.CurrentUser.OpenSubKey(key, true)) {
+            if (k?.GetValue("") is string v && (v.Contains("さとるエディタ") || v.Contains("Satoru Editor")))
+              k.SetValue("", v.Replace("さとるエディタ", "エディタβ").Replace("Satoru Editor", "Editor β"), RegistryValueKind.String);
+          }
+        } catch { }
+      }
+      Fix(Classes + "\\" + ProgId);
+      Fix(Classes + @"\*\shell\satoEdit");
+      Fix(Classes + @"\Directory\shell\satoEditGrep");
+    }
+
     static void Set(string key, string name, string value) {
       using (var k = Registry.CurrentUser.CreateSubKey(key)) k.SetValue(name ?? "", value, RegistryValueKind.String);
     }
@@ -199,7 +215,7 @@ namespace SatoEdit {
         try { using (var k = Registry.CurrentUser.OpenSubKey(Classes + "\\." + e + "\\OpenWithProgids", true)) k?.DeleteValue(ProgId, false); } catch { }
       }
       if (exts.Count > 0) {
-        Must(() => Set(Classes + "\\" + ProgId, null, "さとるエディタ"), "ProgID");
+        Must(() => Set(Classes + "\\" + ProgId, null, "エディタβ"), "ProgID");
         Must(() => Set(Classes + "\\" + ProgId, "Extensions", string.Join(" ", exts)), "ProgID");
         Must(() => Set(Classes + "\\" + ProgId + "\\DefaultIcon", null, $"\"{exe}\",0"), "icon");
         Must(() => Set(Classes + "\\" + ProgId + @"\shell\open\command", null, $"\"{exe}\" \"%1\""), "command");

@@ -27,7 +27,7 @@ func text(_ s: String, size: CGFloat, weight: NSFont.Weight, color c: NSColor, c
     let sz = a.size()
     a.draw(at: NSPoint(x: (W - sz.width) / 2, y: centerY - sz.height / 2))
 }
-text("さとるエディタ", size: 24, weight: .bold, color: color(0x1B1F2E), centerY: H - 52)
+text("エディタβ", size: 24, weight: .bold, color: color(0x1B1F2E), centerY: H - 52)
 
 // 矢印: 左右のアイコンのあいだ (x 250〜390)、アイコンの中心の高さ
 let y: CGFloat = H - 190

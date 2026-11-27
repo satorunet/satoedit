@@ -10,7 +10,7 @@ using Microsoft.Web.WebView2.Core;
 namespace SatoEdit {
   /// 自己点検 (satoruEditor.exe --selftest=フォルダ [--fixtures=Mac 版の見本のフォルダ]):
   /// 実機で動くかを確かめ、画面の画像と結果 (report.json) をそのフォルダに書いて終了する。core/selftest.js と同じ考え方
-  class SelfTest {
+  partial class SelfTest {
     readonly MainForm form;
     readonly string dir;
     readonly JObj steps = new JObj();
@@ -400,6 +400,8 @@ namespace SatoEdit {
 await Step("furigana", async () => await Js("window.api.furigana('先週の金曜日、学校の遠足で美味しいお寿司を食べました').then(r => r.map(x => x.reading))"));
       await RunLibrarySteps(work);
       await RunMacParitySteps();
+      await RunPerfSteps(work);   // 速さ・選択の見た目 (SelfTestPerf.cs)
+      await RunMadoSteps(work);   // 窓割り・巨大ファイル・ツールバー (SelfTestMado.cs)
       await RunUpdateSteps(work);
       await Step("closeFlow", async () => {
         await Js("(() => { for (let i = 0; i < 3; i++) { const b = document.querySelector('.modal-buttons button'); if (b) b.click(); } })()");
@@ -722,7 +724,7 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
           return await Js(@"(async () => { const bad = [], out = {}; const wait = ms => new Promise(r => setTimeout(r, ms));
             const files = JSON.stringify(__app.prefs.libraryFiles), links = JSON.stringify(__app.prefs.sharedLinks), servers = JSON.stringify(__app.prefs.servers);
             for (const [k, v] of [['libraryOneColumn', false], ['aiWidth', 520], ['shareDays', 7], ['versionHistoryMax', 200], ['encryptAlways', true], ['remoteAutoUpload', false],
-              ['shareEnabled', false], ['aiApply', 'auto'], ['libraryVisible', false], ['librarySelectedGroup', 'root'], ['diffVisible', true], ['paperCandidates', ['a4']]]) __app.setPref(k, v);
+              ['shareEnabled', false], ['aiApply', 'auto'], ['libraryVisible', true], ['librarySelectedGroup', 'root'], ['diffVisible', true], ['paperCandidates', ['a4']]]) __app.setPref(k, v);
             await wait(300);
             const p = __app.resetAllSettings(); await wait(400);
             out.asked = (document.querySelector('.modal-title') || {}).textContent || '';
@@ -730,10 +732,10 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
             out.done = await p; await wait(700);
             const pr = __app.prefs;
             out.values = [pr.libraryOneColumn, pr.aiWidth, pr.shareDays, pr.versionHistoryMax, pr.encryptAlways, pr.remoteAutoUpload, pr.shareEnabled, pr.aiApply, pr.libraryVisible, pr.librarySelectedGroup, pr.diffVisible, pr.paperCandidates].join(',');
-            if (out.values !== 'true,340,30,20,false,true,true,confirm,true,all,false,') bad.push('戻っていない: ' + out.values);
+            if (out.values !== 'true,340,30,20,false,true,true,confirm,false,all,false,') bad.push('戻っていない: ' + out.values);
             if (JSON.stringify(pr.libraryFiles) !== files || JSON.stringify(pr.sharedLinks) !== links || JSON.stringify(pr.servers) !== servers) bad.push('自分のデータが消えた');
             out.panes = [document.getElementById('library-pane').hidden, document.getElementById('library-pane').classList.contains('stacked'), document.getElementById('diff-pane').hidden, document.getElementById('ai-pane').style.width].join(',');
-            if (out.panes !== 'false,true,true,340px') bad.push('欄が戻っていない: ' + out.panes);
+            if (out.panes !== 'true,true,true,340px') // 左の一覧は、はじめは出さない (Mac 版と同じ) bad.push('欄が戻っていない: ' + out.panes);
             if (bad.length) throw new Error(bad.join(' ; '));
             return out; })()");
         } finally {
@@ -900,8 +902,13 @@ await Step("furigana", async () => await Js("window.api.furigana('先週の金�
         await Wait(500);
         var title = await Js("(document.querySelector('.modal-title') || {}).textContent || ''");
         await Js("(() => { const b = document.querySelector('.modal-buttons button.primary'); if (b) b.click(); })()");
-        await Wait(1500);
-        var after = await Js("({ tabs: __app.tabs.length, path: __app.active.path, text: __app.active.getText(), folder: !!__app.library.findRel('空のフォルダ') })") as JObj;
+        // ごみ箱へ移すのは、はじめての起動などで時間がかかることがあるので、終わるまで待つ (最大 6 秒)
+        JObj after = null;
+        for (int i = 0; i < 12; i++) {
+          await Wait(500);
+          after = await Js("({ tabs: __app.tabs.length, path: __app.active.path, text: __app.active.getText(), folder: !!__app.library.findRel('空のフォルダ') })") as JObj;
+          if (after != null && !after.Bool("folder")) break;
+        }
         if (after == null || after["path"] != null || after.Bool("folder") || Convert.ToInt32(after["tabs"]) != Convert.ToInt32(before)) errors.Add("libraryDeleteOpen: " + Json.Stringify(after));
         return new JObj { { "asked", title }, { "after", after } };
       });

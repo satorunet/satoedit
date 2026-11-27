@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
-  <!-- さとるエディタ (Windows) のインストーラー: 中に配布用の zip を抱えた 1 つの exe。
+  <!-- エディタβ (Windows) のインストーラー: 中に配布用の zip を抱えた 1 つの exe。
        管理者の許可なしで、そのユーザーの %LOCALAPPDATA%\Programs\satoruEditor に入れる。
        スタートメニュー・デスクトップのショートカットと、「アプリ」一覧からのアンインストールを登録する -->
   <PropertyGroup>

@@ -17,8 +17,8 @@ final class PluginManager: NSObject {
     private var eventEditor: EditorWindowController?
     var targetEditor: EditorWindowController? {
         if let e = eventEditor { return e }
-        if let e = NSApp.mainWindow?.windowController as? EditorWindowController { return e }
-        return NSApp.orderedWindows.lazy.compactMap { $0.windowController as? EditorWindowController }.first
+        if let e = NSApp.mainWindow?.frontEditor { return e }
+        return NSApp.orderedWindows.lazy.compactMap { $0.frontEditor }.first
     }
     var targetText: EditorTextView? { targetEditor?.textView }
 

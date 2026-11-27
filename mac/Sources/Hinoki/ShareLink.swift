@@ -113,15 +113,26 @@ enum ShareLink {
         var t: [String: Any] = [:]
         for (k, c) in [("background", Theme.background), ("text", Theme.text), ("gutterBackground", Theme.gutterBackground),
                        ("gutterText", Theme.gutterText), ("gutterSeparator", Theme.gutterSeparator), ("newlineMark", Theme.newlineMark),
-                       ("eof", Theme.eof), ("chrome", Theme.footerBackground), ("chromeText", Theme.statusText),
+                       ("eof", Theme.eof), ("chrome", Theme.footerBackground), ("chromeText", Theme.footerText),
                        // カーソルのある行・選んだところ・カーソルの色 (公開ページでも、クリックした行がアプリと同じ色になる)
                        ("currentLine", Theme.currentLine), ("currentLineText", Theme.currentLineText),
                        ("gutterCurrentText", Theme.gutterCurrentText), ("selection", Theme.selection), ("caret", Theme.caret)] {
-            t[k] = String(Theme.hex(of: c).prefix(7))
+            // 半透明の色 (カーソル行の背景など) は、透明さも送る (#RRGGBBAA)。
+            // ウインドウ枠の色などは明るい・暗いの見た目で変わるので、今の見た目で色を決める
+            NSApp.effectiveAppearance.performAsCurrentDrawingAppearance { t[k] = Theme.hex(of: c) }
         }
+        t["v"] = 2 // 透明さつきの色を送る版
         t["marks"] = UserDefaults.standard.bool(forKey: "invisibles")
         t["ruler"] = UserDefaults.standard.bool(forKey: "columnRuler")
         t["currentLineOn"] = Prefs.bool("highlightCurrentLine")
+        // 文字の形と大きさ・行間 (アプリと同じ見た目にする。見る人の PC にそのフォントが無ければ、近いものになる)
+        t["fontFamily"] = Theme.font.familyName ?? ""
+        t["fontSize"] = Double(Theme.fontSize)
+        t["lineSpacing"] = UserDefaults.standard.double(forKey: "lineSpacing")
+        // 折り返し・行番号を出すか・行番号の数え方 (エディタ的 = 改行ごと / ワープロ的 = 折り返しも 1 行)
+        t["wrap"] = UserDefaults.standard.bool(forKey: "wrap")
+        t["lineNumbers"] = UserDefaults.standard.bool(forKey: "lineNumbers")
+        t["lineCounting"] = UserDefaults.standard.string(forKey: "lineCounting") == "visual" ? "visual" : "logical"
         return t
     }
 
@@ -168,7 +179,7 @@ enum ShareLink {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { NSSound.beep(); return }
         // 選んだ部分だけを公開するときは、本文の中での場所 (見直しで選ぶため) を出しておく
         var offset = 0
-        if let ed = window?.windowController as? EditorWindowController, ed.textView.selectedRange().length > 0 {
+        if let ed = window?.frontEditor, ed.textView.selectedRange().length > 0 {
             offset = ed.textView.selectedRange().location
         }
         confirmPrivacy(text, window: window, file: file, offset: offset) {
@@ -218,7 +229,7 @@ enum ShareLink {
             let ranges = found.map { NSRange(location: $0.range.location + offset, length: $0.range.length) }
                 .filter { NSMaxRange($0) <= len }
             guard let first = ranges.first else { return }
-            ed.window?.makeKeyAndOrderFront(nil)
+            ed.bringToFront()
             ed.textView.setSelectedRanges(ranges.map { NSValue(range: $0) }, affinity: .downstream, stillSelecting: false)
             ed.textView.scrollRangeToVisible(first)
             ed.focusEditor()
@@ -230,7 +241,7 @@ enum ShareLink {
                 guard let ed = (doc as? Document)?.editor else { return }
                 DispatchQueue.main.async { select(in: ed) }
             }
-        } else if let ed = window?.windowController as? EditorWindowController {
+        } else if let ed = window?.frontEditor {
             select(in: ed)
         }
     }
@@ -273,7 +284,7 @@ enum ShareLink {
         req.timeoutInterval = 30
         var body: [String: Any] = ["text": text, "title": r.title, "mode": mode]
         if mode == "genko" || mode == "genkoH" { body["layout"] = genkoLayout(text, horizontal: mode == "genkoH") }
-        if mode == "editor" { body["theme"] = editorTheme() }
+        body["theme"] = editorTheme() // どの表示で公開しても、見る人がエディタ表示に切り替えたときにアプリと同じ見た目にする
         if r.visibility != "password", let p = r.path, let img = shareImage(file: URL(fileURLWithPath: p)) { body["image"] = img }
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { _, resp, err in
@@ -342,7 +353,7 @@ enum ShareLink {
                                    "keepHistory": keepHistory, "listed": listed && visibility == "public"]
         if let e = expiresAt { body["expiresAt"] = e.timeIntervalSince1970 }
         if mode == "genko" || mode == "genkoH" { body["layout"] = genkoLayout(text, horizontal: mode == "genkoH") }
-        if mode == "editor" { body["theme"] = editorTheme() }
+        body["theme"] = editorTheme() // どの表示で公開しても、見る人がエディタ表示に切り替えたときにアプリと同じ見た目にする
         if visibility == "password" { body["password"] = password }
         // 「画像としてコピー」用に、いまの画面の画像も送る (パスワード制のものは送らない)
         if visibility != "password", let img = shareImage(file: file) { body["image"] = img }
@@ -390,7 +401,7 @@ enum ShareLink {
         req.timeoutInterval = 30
         var body: [String: Any] = ["text": text, "title": title, "mode": mode, "visibility": visibility, "days": 0, "keepHistory": true]
         if mode == "genko" || mode == "genkoH" { body["layout"] = genkoLayout(text, horizontal: mode == "genkoH") }
-        if mode == "editor" { body["theme"] = editorTheme() }
+        body["theme"] = editorTheme() // どの表示で公開しても、見る人がエディタ表示に切り替えたときにアプリと同じ見た目にする
         if let img = shareImage(file: file) { body["image"] = img }
         req.httpBody = try? JSONSerialization.data(withJSONObject: body)
         URLSession.shared.dataTask(with: req) { data, _, _ in DispatchQueue.main.async { completion(data) } }.resume()

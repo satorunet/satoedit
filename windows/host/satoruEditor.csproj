@@ -26,6 +26,12 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3912.50" />
     <PackageReference Include="SSH.NET" Version="2024.1.0" />
   </ItemGroup>
+  <!-- 配布用 (package-host.js が EmbedDir を渡す): 部品と画面を exe の中に入れて、exe 1 つで動くようにする (Program.cs の Embedded) -->
+  <ItemGroup Condition="'$(EmbedDir)' != ''">
+    <EmbeddedResource Include="$(EmbedDir)/lib/*.dll" LogicalName="lib/%(Filename)%(Extension)" />
+    <EmbeddedResource Include="$(EmbedDir)/WebView2Loader.dll" LogicalName="native/WebView2Loader.dll" />
+    <EmbeddedResource Include="$(EmbedDir)/app.zip" LogicalName="app.zip" />
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Drawing" />

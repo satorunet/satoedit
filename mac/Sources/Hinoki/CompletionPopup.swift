@@ -95,7 +95,7 @@ final class CompletionController: NSObject, NSTableViewDataSource, NSTableViewDe
             let lineRange = text.lineRange(for: NSRange(location: min(sel, text.length), length: 0))
             let line = text.substring(with: NSRange(location: lineRange.location, length: max(0, sel - lineRange.location)))
             out += PluginManager.shared.completions(word: typed, language: language, line: line,
-                                                    editor: tv.window?.windowController as? EditorWindowController)
+                                                    editor: tv.owningEditor)
         }
         out += keywords.map { Completion.Item(label: $0, kind: .keyword) }
         out += types.map { Completion.Item(label: $0, kind: .type) }
@@ -109,7 +109,17 @@ final class CompletionController: NSObject, NSTableViewDataSource, NSTableViewDe
         if symbolsVersion >= 0, Date().timeIntervalSince(symbolsTime) < 1.5 { return }
         symbolsVersion = textVersion
         symbolsTime = Date()
-        let s = tv.string
+        // 大きな文書では、カーソルの前後だけから集める (全体をなめると打つたびに引っかかる)
+        let all = tv.string as NSString
+        let around = 100_000
+        var s = tv.string
+        if all.length > around * 2 {
+            let caret = min(tv.selectedRange().location, all.length)
+            let from = max(0, caret - around), to = min(all.length, caret + around)
+            s = all.substring(with: all.rangeOfComposedCharacterSequences(for: NSRange(location: from, length: to - from)))
+        }
+        // Swift の文字列にしてから数える (NSString のままだと 1 字ずつたどるのが遅い)
+        s.makeContiguousUTF8()
         cachedFunctions = language == nil ? [] : Completion.definedFunctions(in: s)
         cachedWords = Completion.words(in: s)
     }

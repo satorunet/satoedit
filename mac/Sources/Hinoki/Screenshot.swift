@@ -185,7 +185,7 @@ enum Screenshot {
 extension EditorWindowController {
     /// いまの設定で画像を作る
     func screenshot(scope: Screenshot.Scope) -> Screenshot.Shot? {
-        if scope == .window { return window.flatMap { Screenshot.window($0) } }
+        if scope == .window { return presentingWindow.flatMap { Screenshot.window($0) } }   // 窓割りの画面なら、並べているウインドウ全体
         if scope == .visible {
             // A4・原稿用紙のときは、見えている用紙 1 枚がちょうど入る大きさで
             if paperMode == .a4 { return Screenshot.a4Page(screenshotTextView) }

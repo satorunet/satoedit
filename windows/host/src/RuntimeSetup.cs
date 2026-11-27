@@ -17,8 +17,8 @@ namespace SatoEdit {
       var ja = System.Globalization.CultureInfo.CurrentUICulture.Name.StartsWith("ja");
       var msg = ja
         ? "画面の表示に使う「Microsoft Edge WebView2 ランタイム」がこの PC に入っていません。\n\nMicrosoft の配布元から取ってきて入れますか? (インターネットにつながっている必要があります。数分かかります)"
-        : "This PC does not have the Microsoft Edge WebView2 Runtime, which Satoru Editor uses to draw its window.\n\nDownload and install it from Microsoft now? (Requires an internet connection. Takes a few minutes.)";
-      if (MessageBox.Show(owner, msg, ja ? "さとるエディタ" : "Satoru Editor", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return false;
+        : "This PC does not have the Microsoft Edge WebView2 Runtime, which Editor β uses to draw its window.\n\nDownload and install it from Microsoft now? (Requires an internet connection. Takes a few minutes.)";
+      if (MessageBox.Show(owner, msg, ja ? "エディタβ" : "Editor β", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return false;
       owner.UseWaitCursor = true;
       var file = Path.Combine(Path.GetTempPath(), "MicrosoftEdgeWebview2Setup-" + DateTime.Now.Ticks + ".exe");
       try {
@@ -35,7 +35,7 @@ namespace SatoEdit {
       } catch (Exception e) {
         Log.Error("runtime setup", e);
         MessageBox.Show(owner, (ja ? "入れられませんでした。次のページから入れてください。\n" : "Could not install it. Please get it from this page:\n")
-          + "https://developer.microsoft.com/microsoft-edge/webview2/\n\n" + e.Message, "さとるエディタ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+          + "https://developer.microsoft.com/microsoft-edge/webview2/\n\n" + e.Message, "エディタβ", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         MainForm.OpenExternal("https://developer.microsoft.com/microsoft-edge/webview2/");
         return false;
       } finally {

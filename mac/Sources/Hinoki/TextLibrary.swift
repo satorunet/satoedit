@@ -509,9 +509,9 @@ enum TextLibrary {
         move(url, toDirectory: folderURL(g))
     }
 
-    /// 左の一覧を出しているか (はじめは出す)
+    /// 左の一覧を出しているか (はじめは出さない: 起動したら左の欄のない、ふつうのエディタ)
     static var isVisible: Bool {
-        EditorExtension.library.isOn && (UserDefaults.standard.object(forKey: visibleKey) as? Bool ?? true)
+        EditorExtension.library.isOn && (UserDefaults.standard.object(forKey: visibleKey) as? Bool ?? false)
     }
     static func setVisible(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: visibleKey)
@@ -959,8 +959,8 @@ enum TextLibrary {
     static func open(_ url: URL) {
         let dc = NSDocumentController.shared
         let front = NSApp.keyWindow ?? NSApp.mainWindow ?? NSApp.orderedWindows.first { $0.windowController is EditorWindowController }
-        if dc.document(for: url) == nil, let ed = front?.windowController as? EditorWindowController,
-           let old = ed.hdoc, old.canBeReplacedByBrowsing, let oldWindow = ed.window {
+        if dc.document(for: url) == nil, let ed = front?.frontEditor,
+           let old = ed.hdoc, old.canBeReplacedByBrowsing, let oldWindow = ed.presentingWindow {
             // タブはそのまま、中身だけ入れ替える
             if old.switchContents(to: url) {
                 oldWindow.makeKeyAndOrderFront(nil)

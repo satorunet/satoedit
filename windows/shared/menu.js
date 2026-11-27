@@ -19,6 +19,8 @@ const FEATURES = [
     confirm: 'メニューバーの「用紙」で切り替えます。' },
   { id: 'library', pref: 'libraryEnabled', title: 'テキスト管理 (テキスト一覧、履歴)', summary: '左にフォルダとテキストの一覧 (履歴) を出し、サムネで見わたせます。書いたものは自動で保存され、テキストごとに版の履歴も残ります。',
     confirm: '「表示 > テキスト一覧」で出し入れします。テキストは「ドキュメント\\さとるエディタ」に置きます。' },
+  { id: 'mado', pref: 'madoEnabled', title: '窓割り (タブを並べて表示)', summary: 'ちがうタブの文書を、1 つのウインドウに左右・上下に並べます。タブを編集画面の端へドラッグしても並べられます。',
+    confirm: '「表示 > 窓割り」で並べます。並べた画面の見出しの × で、その画面の文書を閉じます。' },
   { id: 'share', pref: 'shareEnabled', title: 'リンクで公開共有', summary: 'テキストを docs.satoru.net に置いて、リンクで読めるようにします。公開・リンクだけ・パスワードを選べます。',
     confirm: '公開したテキストは、リンクを知った人が読めるようになります。公開の前に、個人情報が入っていないかを確かめます。' },
   { id: 'collab', pref: 'collabEnabled', hidden: true, title: '共同編集 (共有)', summary: '同じ文書を、ほかの人と同時に編集します。チャットつき。Mac 版とも一緒に編集できます。',
@@ -60,7 +62,7 @@ const header = label => ({ label, header: true });
 function build(state) {
   const p = state.prefs || {};
   const on = key => !!p[key];
-  const check = (label, id, accel, checked) => item(label, id, accel, { type: 'checkbox', checked: !!checked });
+  const check = (label, id, accel, checked, extra) => item(label, id, accel, Object.assign({ type: 'checkbox', checked: !!checked }, extra || {}));
   const radio = (label, id, checked, accel) => item(label, id, accel, { type: 'radio', checked: !!checked });
   const paper = state.paperMode || 0;
 
@@ -79,6 +81,7 @@ function build(state) {
     item('名前を変更…', 'file.rename'),
     item('保存時の状態に戻す', 'file.revert'),
     ...(p.libraryEnabled !== false && p.versionHistory !== false ? [item('版の履歴…', 'file.versions', '', { enabled: !!state.hasPath })] : []),
+    item('巨大ファイル: 位置へ移動…', 'huge.jump', '', { enabled: !!state.hugeFile }),
     sep,
     item('印刷…', 'file.print', 'Ctrl+P'),
     sep,
@@ -89,7 +92,7 @@ function build(state) {
     sep,
     item('スクリーンショット (画像にする)…', 'file.screenshot', 'Ctrl+Alt+S'),
     sep,
-    item('さとるエディタの終了', 'app.quit', 'Alt+F4'));
+    item('エディタβの終了', 'app.quit', 'Alt+F4'));
 
   const edit = [
     item('元に戻す', 'edit.undo', 'Ctrl+Z'),
@@ -149,7 +152,7 @@ function build(state) {
     ] },
   ];
   if (p.libraryEnabled !== false) {
-    view.push(check('テキスト一覧', 'library.toggle', 'Ctrl+Shift+L', p.libraryVisible !== false));
+    view.push(check('テキスト一覧', 'library.toggle', 'Ctrl+Shift+L', p.libraryVisible === true));
     view.push(item('テキストをサムネで一覧', 'library.grid', 'Ctrl+Alt+Shift+L'));
     view.push(item('テキスト管理の設定…', 'settings.open:backup'));
   }
@@ -158,7 +161,26 @@ function build(state) {
   view.push(sep,
     check('上下に分割', 'view.split', 'Ctrl+Shift+2', state.split && !state.splitSide),
     check('左右に分割', 'view.splitSide', 'Ctrl+Shift+3', state.split && state.splitSide),
-    item('分割したもう一方へ移動', 'view.switchPane', 'F6'),
+    item('分割したもう一方へ移動', 'view.switchPane', 'F6'));
+  if (p.madoEnabled !== false) {
+    // 窓割り: ちがうタブの文書を 1 つのウインドウに並べる (mado.js)。キーは Mac 版の ⌃⌘ を Ctrl+Alt にしたもの
+    const m = state.mado || {};
+    const many = (m.tabs || 0) >= 2;
+    view.push({ label: '窓割り', submenu: [
+      check('タブを左右に並べる', 'mado.sideBySide', 'Ctrl+Alt+Right', m.active && m.dir === 'row', { enabled: many }),
+      check('タブを上下に並べる', 'mado.stacked', 'Ctrl+Alt+Down', m.active && m.dir === 'col', { enabled: many }),
+      item('この画面を左右に分割', 'mado.splitPaneSide', 'Ctrl+Alt+Shift+Right', { enabled: !!m.partner }),
+      item('この画面を上下に分割', 'mado.splitPaneStacked', 'Ctrl+Alt+Shift+Down', { enabled: !!m.partner }),
+      item('並べるのをやめる (タブに戻す)', 'mado.unsplit', 'Ctrl+Alt+Up', { enabled: !!m.active }),
+      sep,
+      item('次の画面へ', 'mado.next', 'Ctrl+Alt+]', { enabled: !!m.shown }),
+      item('前の画面へ', 'mado.previous', 'Ctrl+Alt+[', { enabled: !!m.shown }),
+      item('画面の大きさをそろえる', 'mado.equalize', '', { enabled: !!m.active }),
+      sep,
+      item('この画面をタブに戻す', 'mado.returnToTab', '', { enabled: !!m.shown }),
+    ] });
+  }
+  view.push(
     sep,
     item('前のタブ', 'tab.previous', 'Ctrl+Shift+Tab'),
     item('次のタブ', 'tab.next', 'Ctrl+Tab'),
@@ -304,7 +326,7 @@ function build(state) {
     { label: 'テーマ', submenu: PRESETS.map(t => radio(t.name, 'theme.preset:' + t.name, state.themePreset === t.name)) },
     sep,
     item('アップデートを確認…', 'app.checkUpdate'),
-    item('さとるエディタについて', 'app.about'),
+    item('エディタβについて', 'app.about'),
   ] });
   return translate(customize(menus, p, !!state.forSettings));
 }

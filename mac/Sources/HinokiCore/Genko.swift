@@ -73,30 +73,34 @@ public enum Genko {
     }
 
     /// 文章 → 列の並び
+    /// (打つたびに文章全体で呼ばれるので速さが大事: 列は手元で組み立ててから足し、段落は Unicode の単位で切る。
+    ///  文字単位で切ると "\r\n" が 1 文字になって分けられない)
     public static func layout(_ text: String, autoFormat: Bool = true) -> [Column] {
         var columns: [Column] = []
+        columns.reserveCapacity(text.utf16.count / rows + 8)
         var offset = 0
-        func newColumn(_ index: Int, _ first: Int) {
-            columns.append(Column(cells: Array(repeating: nil, count: rows), offs: Array(repeating: -1, count: rows),
-                                  paragraph: index, from: offset, to: offset, first: first, last: false))
-        }
-        for (index, para) in text.components(separatedBy: "\n").enumerated() {
+        let emptyCells = [String?](repeating: nil, count: rows), emptyOffs = [Int](repeating: -1, count: rows)
+        var index = 0
+        for scalars in text.unicodeScalars.split(separator: "\n", omittingEmptySubsequences: false) {
+            let para = String(String.UnicodeScalarView(scalars))
             var row = indentFor(index: index, text: para, autoFormat: autoFormat)
-            newColumn(index, row)
+            var cur = Column(cells: emptyCells, offs: emptyOffs, paragraph: index, from: offset, to: offset, first: row, last: false)
             for ch in para {
                 if row >= rows {
-                    newColumn(index, 0)
+                    columns.append(cur)
+                    cur = Column(cells: emptyCells, offs: emptyOffs, paragraph: index, from: offset, to: offset, first: 0, last: false)
                     row = 0
                 }
-                let i = columns.count - 1
-                columns[i].cells[row] = String(ch)
-                columns[i].offs[row] = offset
+                cur.cells[row] = String(ch)
+                cur.offs[row] = offset
                 offset += ch.utf16.count
-                columns[i].to = offset
+                cur.to = offset
                 row += 1
             }
-            columns[columns.count - 1].last = true
+            cur.last = true
+            columns.append(cur)
             offset += 1 // 改行
+            index += 1
         }
         return columns
     }

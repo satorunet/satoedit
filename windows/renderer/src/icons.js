@@ -17,6 +17,8 @@ const P = {
   goto: 'M4 12h12M12 7l5 5-5 5M20 4v16',
   diff: 'M7 4v8M3 8h8M4 18h7M15 6l5 12M14 18h7',
   split: 'M3 4h18v16H3zM3 12h18',
+  // 窓割り: 見出しの付いた画面を 2 つ並べた窓
+  mado: 'M3 4h18v16H3zM12 4v16M3 8h18',
   // 用紙切替: 紙と、回る矢印
   paper: 'M4 3h9l3 3v6M4 3v18h7M7 8h6M7 11h6M7 14h3M14 18a4 4 0 0 1 6.8-2.8M21 13v2.6h-2.6M21 18a4 4 0 0 1-6.8 2.8M14 23v-2.6h2.6',
   libraryGrid: 'M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z',

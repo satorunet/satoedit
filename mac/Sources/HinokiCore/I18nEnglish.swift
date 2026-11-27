@@ -256,23 +256,27 @@ Follow macOS
 profiles.json を直接編集…
 Edit profiles.json Directly…
 
-さとるエディタで grep
-grep with Satoru Editor
+エディタβで grep
+grep with Editor β
 
+エディタβ
+Editor β
+
+# 書類・iCloud Drive のフォルダの名前 (前のアプリ名。今のテキストがあるので変えない)
 さとるエディタ
 Satoru Editor
 
-さとるエディタで開く
-Open with Satoru Editor
+エディタβで開く
+Open with Editor β
 
-さとるエディタの設定ファイルではありません
-This is not a Satoru Editor settings file
+エディタβの設定ファイルではありません
+This is not a Editor β settings file
 
-さとるエディタの鍵.
-Satoru Editor key.
+エディタβの鍵.
+Editor β key.
 
-さとるエディタ設定_{0}.json
-Satoru Editor settings_{0}.json
+エディタβ設定_{0}.json
+Editor β settings_{0}.json
 
 theme.json に問題があります (その項目は既定値を使います)
 There is a problem in theme.json (defaults are used for those items)
@@ -496,8 +500,8 @@ Later
 あなた
 You
 
-あなたはテキストエディタ「さとるエディタ」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。
-You are a writing assistant built into the text editor "Satoru Editor". Output only the requested result, with no preamble or closing remarks. Do not use Markdown formatting unless the original text uses it.
+あなたはテキストエディタ「エディタβ」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。
+You are a writing assistant built into the text editor "Editor β". Output only the requested result, with no preamble or closing remarks. Do not use Markdown formatting unless the original text uses it.
 
 ある鍵ファイルを選ぶ…
 Choose an Existing Key File…
@@ -598,8 +602,8 @@ Sakura (Pink)
 しまう
 Minimize
 
-すべてさとるエディタで開く
-Open All with Satoru Editor
+すべてエディタβで開く
+Open All with Editor β
 
 すべてのタブを表示
 Show All Tabs
@@ -958,8 +962,8 @@ Double-click, then press a key. Bold items have been changed.
 ダーク
 Dark
 
-チェックした拡張子は、ダブルクリックでさとるエディタが開きます。
-Checked extensions open in Satoru Editor when double-clicked.
+チェックした拡張子は、ダブルクリックでエディタβが開きます。
+Checked extensions open in Editor β when double-clicked.
 
 チェックを外すとメニューに出なくなります。
 Unchecked items no longer appear in the menus.
@@ -1063,8 +1067,8 @@ Files:
 ファイルから検索 (⌘⇧F)
 Find in files (⌘⇧F)
 
-ファイルを右クリック →「さとるエディタで開く」
-Right-click a file → "Open with Satoru Editor"
+ファイルを右クリック →「エディタβで開く」
+Right-click a file → "Open with Editor β"
 
 ファイルを開いたとき、前回のカーソル位置に戻す
 Return to the last caret position when opening a file
@@ -1102,8 +1106,8 @@ The folder's contents go to the Trash too. You can put them back from the Trash.
 フォルダの中身を左にツリーで表示。たくさんのファイルを行き来できます。
 Shows a folder as a tree on the left, to move between many files.
 
-フォルダを右クリック →「さとるエディタで grep」
-Right-click a folder → "grep with Satoru Editor"
+フォルダを右クリック →「エディタβで grep」
+Right-click a folder → "grep with Editor β"
 
 フォルダを選ぶ
 Choose a folder
@@ -3615,8 +3619,8 @@ Speech recognition limit reached
 Apple の音声認識は、短い時間に使える回数が決まっています。少し時間をおいてから、もう一度お試しください。
 Apple's speech recognition can only be used a limited number of times in a short period. Please wait a while and try again.
 
-「システム設定 > プライバシーとセキュリティ」で、さとるエディタに {0} を許可してください。
-Allow {0} for Satoru Editor in "System Settings > Privacy & Security".
+「システム設定 > プライバシーとセキュリティ」で、エディタβに {0} を許可してください。
+Allow {0} for Editor β in "System Settings > Privacy & Security".
 
 メニュー「音声 > 声で入力」かツールバーのマイクのボタンで始めます。話した言葉はカーソルの位置に入ります。少し黙ると、そこまでが文章に入ります。\n声は Apple のサーバに送って文字にします (インターネットが必要です)。
 Start with "Speech > Dictate" or the microphone button in the toolbar. Your words go in at the cursor; when you pause, what you said so far is added.\nYour voice is sent to Apple's servers to be turned into text (an internet connection is needed).
@@ -4802,7 +4806,7 @@ Backup password
 Restored from the backup
 公開したリンクの記録も入れる (更新・公開をやめるための合言葉も)
 Include published-link records (with the tokens to update or unpublish)
-さとるエディタのバックアップ
+エディタβのバックアップ
 SatoruEditor Backup
 バックアップから戻しますか？
 Restore from this backup?
@@ -4812,13 +4816,13 @@ Creating the backup…
 Backup exported
 バックアップを書き出せませんでした
 Couldn't export the backup
-さとるエディタのバックアップではありません
+エディタβのバックアップではありません
 This isn't a SatoruEditor backup
 テキスト一覧のファイルを、パスワードで鍵をかけた 1 つのファイルに書き出します。読み込むと、別の Mac にも戻せます。
 Exports your text library into one file locked with a password. You can restore it on another Mac.
 パスワードを忘れると、このバックアップは開けません。
 If you forget the password, this backup can't be opened.
-新しい版のさとるエディタで作ったバックアップです。アプリを新しくしてください
+新しい版のエディタβで作ったバックアップです。アプリを新しくしてください
 This backup was made by a newer SatoruEditor. Please update the app
 さとるエディタのフォルダに戻します。今あるファイルは消しません。同じ名前で中身が違うものは「(バックアップ)」を付けて別に置きます。
 Restores into the SatoruEditor folder. Existing files are kept; a file with the same name but different content is saved alongside with "(backup)".
@@ -4840,5 +4844,154 @@ Leave empty to keep
 Couldn't change the settings
 公開をやめる・設定を変えるには、メニューの「公開」から。
 To unpublish or change settings, use the Publish menu.
+
+# 大きなファイル (見ている所の近くだけ読む)
+この先はまだ読み込んでいません
+The rest has not been loaded yet
+
+書き換えを保存すると、続きを読み込めます
+Save your changes to load more of the file
+
+大きなファイル: {0} の {1}〜{2}% を表示中
+Large file: showing {1}–{2}% of {0}
+
+先に保存してください
+Please save first
+
+書き換えを保存すると、ほかの位置へ移動できます
+Save your changes to move to another position
+
+ファイルの位置へ移動
+Go to Position in File
+
+全体 {0} のうち、何 % の所へ移動しますか？ (0〜100)
+Which position (%) of {0} do you want to go to? (0–100)
+
+巨大ファイル: 位置へ移動…
+Huge File: Go to Position…
+
+# 窓割り
+窓割り
+Window Split
+
+窓割り (タブを並べて表示)
+Window Split (tabs side by side)
+
+ちがうタブの文書を、1 つのウインドウに左右・上下に並べます。タブをほかのウインドウの端へドラッグしても並べられます。
+Shows documents from different tabs side by side or stacked in one window. You can also drag a tab onto another window to place it there.
+
+タブ
+Tabs
+
+1 つのウインドウに並べる
+Side by side in one window
+
+左右・上下に
+Left/right, top/bottom
+
+タブを左右に並べる
+Arrange Tabs Side by Side
+
+タブを上下に並べる
+Arrange Tabs Top to Bottom
+
+この画面を左右に分割
+Split This Pane Left/Right
+
+この画面を上下に分割
+Split This Pane Top/Bottom
+
+並べるのをやめる (タブに戻す)
+Stop Arranging (Back to Tabs)
+
+次の画面へ
+Next Pane
+
+前の画面へ
+Previous Pane
+
+画面の大きさをそろえる
+Make Panes Equal Size
+
+このタブを選ぶ
+Select This Tab
+
+このタブの選択を外す
+Deselect This Tab
+
+この画面を選ぶ
+Select This Pane
+
+この画面の選択を外す
+Deselect This Pane
+
+選択をすべて外す
+Clear All Selections
+
+このタブを新しいウインドウに分ける
+Move Tab to New Window
+
+この画面を新しいウインドウに分ける
+Move Pane to New Window
+
+新しいウインドウに分ける
+Move to New Window
+
+窓割り中に新しい文書を開く場所
+Where to Open New Documents While Split
+
+毎回聞く
+Ask Every Time
+
+窓内で開く
+Open in This Window
+
+新しいウインドウで開く
+Open in a New Window
+
+新しい文書をどこに開きますか？
+Where do you want to open the new document?
+
+このウインドウは窓割りで並べています。
+This window is showing several documents side by side.
+
+次から聞かない (ウインドウ > 窓割り で変えられます)
+Don't ask again (change it in Window > Window Split)
+
+端まで伸ばす
+Extend to Edge
+
+上へ
+Up
+
+下へ
+Down
+
+左へ
+Left
+
+右へ
+Right
+
+タブに戻す
+Back to Tab
+
+この画面のメニュー
+Menu for this pane
+
+端に並べる
+Place at edge
+
+離すとタブに戻ります
+Release to make it a tab again
+
+離すとこのウインドウのタブになります
+Release to add as a tab of this window
+
+ここまで伸ばす
+Extend to here
+
+このウインドウの中の画面の数: {0}
+Panes in this window: {0}
 """#
 }

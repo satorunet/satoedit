@@ -1,26 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>さとるエディタ</title>
+    <title>エディタβ</title>
     <link>https://github.com/satorunet/satoedit</link>
     <language>ja</language>
     <item>
-      <title>さとるエディタ 1.0.3</title>
-      <pubDate>Sun, 22 Nov 2026 12:44:08 +0000</pubDate>
-      <sparkle:version>1.0.3</sparkle:version>
-      <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
+      <title>エディタβ 1.0.4</title>
+      <pubDate>Fri, 27 Nov 2026 15:49:18 +0000</pubDate>
+      <sparkle:version>1.0.4</sparkle:version>
+      <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.3</sparkle:fullReleaseNotesLink>
-      <description><![CDATA[<h2>さとるエディタ 1.0.3 (β)</h2>
+      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.4</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>エディタβ 1.0.4</h2>
 <ul>
-<li>音声入力: 話しているそばから文字が入るように。話し始めで止まる問題を直しました</li>
-<li>音声入力: 声に反応して動く印と「止める」ボタン (esc でも止まります)</li>
-<li>起動したときの画面を標準エディタに</li>
-<li>公開中のテキストを保存したとき、公開ページにも反映するか確認</li>
-<li>Windows: ポータブル版 (インストール不要) を追加</li>
-<li>Windows: 原稿用紙でスクロールバーが出たり消えたりする問題を直しました</li>
+<li>名前を「エディタβ」に変え、アイコンを新しくしました (設定やテキストはそのまま使えます)</li>
+<li>窓割り: ちがう文書を 1 つのウインドウに左右・上下に並べられるように</li>
+<li>大きなファイル: 数百 MB〜数 GB でも、見ている所の近くだけを読んですぐ開けるように</li>
+<li>文字を打ったときの描き直しを速くしました (大きな文書・原稿用紙)</li>
+<li>選択の色が、文字のある所だけに付くように</li>
+<li>ツールバーを、よく使うボタンだけの名前付きにしました (ほかのボタンは右クリックで足せます)</li>
+<li>はじめて起動したときは、左の一覧を出さないふつうのエディタに</li>
+<li>タブの「＋」は、いつも新しいタブで開くように</li>
 </ul>]]></description>
-      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.3/SatoruEditor-1.0.3-mac.dmg" sparkle:edSignature="Z7nHB8HPkKarv3o+Y7BXO2KwDmEET9dRGmcRZsBaLM1VjmCV/llYqFUrbeemTB6wmJxRXR6tE17Lnu9HPxPACQ==" length="7338835" type="application/octet-stream"/>
+      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.4/SatoruEditor-1.0.4-mac.dmg" sparkle:edSignature="iJ9WezWtujKjZkrvW9hYcO5pJDpMKSmw+Z0q7ioRViTV8xdq3aD1h5Zl6gSYklrKLl/mutnodDWY1J4J645sCQ==" length="7773167" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>

@@ -247,7 +247,7 @@ final class VersionHistoryWindowController: NSWindowController, NSTableViewDataS
                 tv.didChangeText()
                 tv.undoManager?.setActionName(L("この版に戻す"))
             }
-            d.editor?.window?.makeKeyAndOrderFront(nil)
+            d.editor?.bringToFront()
         }
         if let d = NSDocumentController.shared.document(for: url) as? Document {
             apply(d)

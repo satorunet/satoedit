@@ -340,14 +340,23 @@ export class ShareLink {
   /// 標準エディタで公開するときの見た目: いまのエディタの色と、改行の印を出すか
   editorTheme() {
     const c = themeDef.colors(this.app.theme);
-    const hex = v => (themeDef.normalizeHex(v) || '#000000').slice(0, 7);
+    const hex = v => themeDef.normalizeHex(v) || '#000000'; // 半透明の色 (カーソル行の背景など) は透明さも送る (#RRGGBBAA)
     const out = {};
     for (const [k, from] of [['background', 'background'], ['text', 'text'], ['gutterBackground', 'gutterBackground'], ['gutterText', 'gutterText'],
       ['gutterSeparator', 'gutterSeparator'], ['newlineMark', 'newlineMark'], ['eof', 'eof'], ['chrome', 'statusBackground'], ['chromeText', 'statusText'],
       ['currentLine', 'currentLine'], ['currentLineText', 'currentLineText'], ['gutterCurrentText', 'gutterCurrentText'], ['selection', 'selection'], ['caret', 'caret']]) out[k] = hex(c[from]);
+    out.v = 2; // 透明さつきの色を送る版
     out.marks = !!this.app.prefs.invisibles;
     out.ruler = !!this.app.prefs.columnRuler;
     out.currentLineOn = !!this.app.prefs.highlightCurrentLine;
+    // 文字の形と大きさ・行間 (見る人の PC にそのフォントが無ければ、近いものになる)
+    out.fontFamily = (this.app.theme && this.app.theme.fontName) || '';
+    out.fontSize = (this.app.theme && this.app.theme.fontSize) || 0;
+    out.lineSpacing = Number(this.app.prefs.lineSpacing) || 0;
+    // 折り返し・行番号を出すか・行番号の数え方 (エディタ的 = 改行ごと / ワープロ的 = 折り返しも 1 行)
+    out.wrap = !!this.app.prefs.wrap;
+    out.lineNumbers = this.app.prefs.lineNumbers !== false;
+    out.lineCounting = this.app.prefs.lineCounting === 'visual' ? 'visual' : 'logical';
     return out;
   }
 
@@ -376,7 +385,7 @@ export class ShareLink {
   async body(base, text, mode, tab, withImage) {
     const body = Object.assign({}, base);
     if (mode === 'genko' || mode === 'genkoH') body.layout = await this.genkoLayout(text, mode === 'genkoH', tab);
-    if (mode === 'editor') body.theme = this.editorTheme();
+    body.theme = this.editorTheme(); // どの表示で公開しても、見る人がエディタ表示に切り替えたときにアプリと同じ見た目にする
     if (withImage) { const img = await this.image(tab, text); if (img) body.image = img; }
     return body;
   }

@@ -81,14 +81,23 @@ async function main() {
   copyDir(path.join(pdfjs, 'cmaps'), path.join(app, 'pdfjs', 'cmaps'), (p, e) => e.isFile() && e.name.endsWith('.bcmap') && !OTHER_CJK.test(e.name));
   fs.copyFileSync(path.join(pdfjs, 'LICENSE'), path.join(app, 'pdfjs', 'LICENSE'));
 
-  // 3. 本体の部品
-  const take = ['satoruEditor.exe', 'satoruEditor.exe.config', 'Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll'];
-  for (const f of fs.readdirSync(bin)) if (/^(Renci\.SshNet|Microsoft\.Bcl\.AsyncInterfaces|System\.[A-Za-z.]+)\.dll$/.test(f)) take.push(f);
-  for (const f of take) fs.copyFileSync(path.join(bin, f), path.join(out, f));
-  fs.copyFileSync(path.join(bin, 'runtimes', 'win-x64', 'native', 'WebView2Loader.dll'), path.join(out, 'WebView2Loader.dll'));
+  // 3. 部品 (DLL) と画面 (app) を exe の中に入れて、もう一度作る → 配るのは exe 1 つ (Program.cs の Embedded)
+  const embed = path.join(build, 'host-embed');
+  fs.rmSync(embed, { recursive: true, force: true });
+  fs.mkdirSync(path.join(embed, 'lib'), { recursive: true });
+  const libs = ['Microsoft.Web.WebView2.Core.dll', 'Microsoft.Web.WebView2.WinForms.dll'];
+  for (const f of fs.readdirSync(bin)) if (/^(Renci\.SshNet|Microsoft\.Bcl\.AsyncInterfaces|System\.[A-Za-z.]+)\.dll$/.test(f)) libs.push(f);
+  for (const f of libs) fs.copyFileSync(path.join(bin, f), path.join(embed, 'lib', f));
+  fs.copyFileSync(path.join(bin, 'runtimes', 'win-x64', 'native', 'WebView2Loader.dll'), path.join(embed, 'WebView2Loader.dll'));
+  run('zip', ['-q', '-r', '-X', '-9', path.join(embed, 'app.zip'), '.'], { cwd: app });
+  const bin2 = path.join(build, 'host-bin-single');
+  fs.rmSync(bin2, { recursive: true, force: true });
+  run(dotnet, ['build', path.join(root, 'host', 'satoruEditor.csproj'), '-c', 'Release', '-o', bin2, '-nologo', '-v', 'q', `-p:ApplicationIcon=${ico}`, `-p:Version=${pkg.version}`, `-p:EmbedDir=${embed}`]);
+  fs.copyFileSync(path.join(bin2, 'satoruEditor.exe'), path.join(out, 'satoruEditor.exe'));
+  fs.rmSync(app, { recursive: true, force: true }); // 画面は exe の中に入れたので、横には置かない
 
   fs.writeFileSync(path.join(out, 'README.txt'), [
-    'さとるエディタ ' + pkg.version + ' (軽量版)', '',
+    'エディタβ ' + pkg.version + ' (軽量版)', '',
     'satoruEditor.exe をダブルクリックして起動します。フォルダごと好きな場所に置いてください。',
     'Double-click satoruEditor.exe to start. Keep the whole folder together.', '',
     '動かすには Windows 10 / 11 に最初から入っている .NET Framework 4.8 と Microsoft Edge WebView2 ランタイムを使います。',

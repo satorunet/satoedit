@@ -18,6 +18,7 @@ import { screenshotDialog } from './screenshot';
 import { openServers } from './servers';
 import { CollabPanel, startHosting, joinShare } from './collab';
 import { TextLibrary } from './library';
+import { Mado } from './mado';
 import { ShareLink } from './sharelink';
 import { VersionHistory } from './versions';
 import { checkForUpdates, scheduleAutoCheck } from './updater';
@@ -32,7 +33,7 @@ import genko from '../../shared/genko';
 import langGuess from '../../shared/langguess';
 
 const { t } = i18n;
-const appName = () => t('さとるエディタ');
+const appName = () => t('エディタβ');
 if (!window.api && window.chrome && window.chrome.webview) installHostAPI(); // 軽量版 (WebView2) の本体とつなぐ
 if (!window.api) installMockAPI();
 const api = window.api;
@@ -79,6 +80,7 @@ app.applyPrefs = function () {
   app.applyLibrary();
   app.fitForPanes();
   app.collabPanel.setVisible(!!(p.collabEnabled && p.collabChatVisible));
+  if (p.madoEnabled === false && app.mado && app.mado.active) app.mado.unsplit(); // 窓割りを切ったら、並びをやめてタブに戻す
   if (!p.collabEnabled && app.collab && app.collab.active) app.collab.stop();
   app.updateStatus();
   app.pushMenuState();
@@ -114,7 +116,7 @@ app.resetAllSettings = async function () {
 /// 左のテキスト一覧を出し入れする (サーバツリーを出しているあいだは隠す。Mac 版と同じ)
 app.applyLibrary = function () {
   const p = app.prefs;
-  if (app.library) app.library.setVisible(p.libraryEnabled !== false && p.libraryVisible !== false && !(app.remoteTree && app.remoteTree.visible));
+  if (app.library) app.library.setVisible(p.libraryEnabled !== false && p.libraryVisible === true && !(app.remoteTree && app.remoteTree.visible));
 };
 
 app.applyTheme = function () {
@@ -182,6 +184,8 @@ app.menuState = function () {
     paperMode: tab ? tab.paperMode : 0, genkoHorizontal: !!(tab && tab.genkoHorizontal), hasPath: !!(tab && tab.path),
     published: pub ? { id: pub.id } : null, shareNeedsUpdate: !!(pub && app.share.needsUpdate(pub, tab.getText(), app.share.modeOf(app.modeString(tab)))), split: !!(tab && tab.editor.secondary), splitSide: !!(tab && tab.el.classList.contains('split-side')), encrypted: !!(tab && tab.enc),
     collabActive: !!(app.collab && app.collab.active),
+    mado: app.mado ? { active: app.mado.active, shown: app.mado.shown, dir: app.mado.root && !app.mado.root.tab ? app.mado.root.dir : '', tabs: app.tabs.length, partner: !!app.mado.partner() || (app.mado.active && !app.mado.shown) } : null,
+    hugeFile: !!(tab && tab.partial),
     current: tab ? { encoding: tab.encoding, lineEnding: tab.lineEnding, languageOverride: tab.languageOverride || '' } : {},
     languages: app.profiles.map(p => p.name), themePreset: app.theme.preset,
   };
@@ -199,6 +203,7 @@ app.pushMenuState = function () {
     api.setMenuState({
       collabActive: state.collabActive, paperMode: state.paperMode, genkoHorizontal: state.genkoHorizontal, hasPath: state.hasPath,
       published: state.published, shareNeedsUpdate: state.shareNeedsUpdate, split: state.split, splitSide: state.splitSide, encrypted: state.encrypted, current: state.current,
+      mado: state.mado, hugeFile: state.hugeFile,
       languages: state.languages, themePreset: state.themePreset,
     });
     if (api.mockMenu) api.mockMenu(menus);
@@ -230,8 +235,7 @@ function newTabObject({ path, text, encoding, lineEnding, enc, mtime }) {
     onChange: u => {
       if (tab.isDirty()) tab.touched = true;
       app.scheduleAutosave(tab);
-      app.updateTabs();
-      app.scheduleStatus();
+      app.scheduleStatus(); // タブの表示 (保存の印) も、ここで次の描画のときにまとめて直す
       if (tab.collab) tab.collab.localUpdate(u);
       if (app.active === tab && app.diff) app.diff.refresh();
       if (tab.remote && !tab.uploading) {
@@ -250,7 +254,10 @@ function newTabObject({ path, text, encoding, lineEnding, enc, mtime }) {
     onLink: url => api.openExternal(url),
   });
   tab.editor.extraCompletions = info => (app.plugins && app.plugins.plugins.some(p => p.running && p.hasCompletion) ? app.plugins.completions(info) : null);
-  tab.editor.onGeometry = () => { if (app.active === tab) { app.scheduleRuler(); if (app.diff) app.diff.syncScroll(); } };
+  tab.editor.onGeometry = () => {
+    if (tab.partial) app.scheduleHugeCheck(tab); // 巨大ファイル: 読んだ範囲の端に近づいたら続きを読む
+    if (app.active === tab) { app.scheduleRuler(); if (app.diff) app.diff.syncScroll(); }
+  };
   tab.editor.configure(app.prefs, tab.profile);
   tab.savedDoc = tab.editor.view.state.doc; tab.editor.clearEditMarks(); if (app.diff) app.diff.refresh(0); // 保存した・開き直した: 目印を消し、差分の「編集前」も新しく
   tab.getText = () => (tab.paper ? tab.paper.getText() : tab.editor.getText());
@@ -270,6 +277,7 @@ app.newTab = function (o = {}) {
 app.activate = function (tab) {
   const changed = app.active !== tab;
   app.active = tab;
+  if (app.mado) app.mado.activated(tab); // 窓割りで並べている文書なら、並びを出してその画面にフォーカス
   // テキスト一覧のフォルダは、このタブで選んでいたものに戻す
   if (app.library && changed && tab.librarySelection && tab.librarySelection !== app.prefs.librarySelectedGroup) app.library.select(tab.librarySelection);
   else if (app.library) app.library.renderList();
@@ -292,19 +300,27 @@ app.focusEditor = function () {
 
 app.updateTabs = function () {
   const bar = app.el.tabs;
-  const want = app.tabs.map(tab => tab.id + '|' + tab.name + '|' + (tab.isDirty() ? 1 : 0) + '|' + (tab.enc ? 1 : 0) + '|' + (tab === app.active ? 1 : 0)).join('\n');
+  if (app.mado) app.mado.titlesChanged();
+  const inMado = tab => !!(app.mado && app.mado.has(tab));
+  const want = app.tabs.map(tab => tab.id + '|' + tab.name + '|' + (tab.isDirty() ? 1 : 0) + '|' + (tab.enc ? 1 : 0) + '|' + (tab === app.active ? 1 : 0) + '|' + (inMado(tab) ? 1 : 0)).join('\n');
   if (bar.dataset.state === want) return;
   bar.dataset.state = want;
   bar.textContent = '';
   for (const tab of app.tabs) {
     bar.append(h('div', {
-      class: 'tab' + (tab === app.active ? ' active' : ''), title: (tab.remote && tab.remote.url) || tab.path || tab.name, role: 'tab',
-      onmousedown: e => { if (e.button === 0) app.activate(tab); else if (e.button === 1) { e.preventDefault(); app.closeTab(tab); } },
+      class: 'tab' + (tab === app.active ? ' active' : '') + (inMado(tab) ? ' in-mado' : ''), title: (tab.remote && tab.remote.url) || tab.path || tab.name, role: 'tab',
+      // 窓割りがオンなら、押したまま編集画面の端へドラッグすると、そこに並べる (動かさずに離したら、ふつうにタブを選ぶ)
+      onmousedown: e => {
+        if (e.button === 0) {
+          if (app.mado && app.mado.enabled && app.tabs.length > 1 && !e.target.closest('.tab-close')) { e.preventDefault(); app.mado.trackDrag(tab, e, () => app.activate(tab)); } else app.activate(tab);
+        } else if (e.button === 1) { e.preventDefault(); app.closeTab(tab); }
+      },
       oncontextmenu: e => {
         e.preventDefault();
         popupMenu([
           { label: t('閉じる'), action: () => app.closeTab(tab) },
           { label: t('ほかのタブを閉じる'), action: async () => { for (const x of app.tabs.slice()) if (x !== tab && !(await app.closeTab(x))) break; } },
+          ...(app.mado && app.mado.enabled && app.mado.has(tab) ? ['sep', { label: t('タブに戻す'), action: () => app.mado.returnToTab(tab) }] : []),
           'sep',
           { label: t('パスをコピー'), disabled: !tab.path, action: () => api.copyText(tab.path) },
           { label: t('エクスプローラーで表示'), disabled: !tab.path, action: () => api.reveal(tab.path) },
@@ -366,11 +382,12 @@ app.closeTab = async function (tab, { noAsk } = {}) {
     const st = RemoteState.get(tab.remote.id, tab.remote.path);
     if (st && (st.state === 'opened' || st.state === 'editing')) RemoteState.clear(tab.remote.id, tab.remote.path);
   }
+  const madoNext = app.mado ? app.mado.remove(tab) : null; // 窓割りの画面なら、その画面だけを閉じる (隣の画面にフォーカス)
   tab.el.remove();
   const i = app.tabs.indexOf(tab);
   app.tabs.splice(i, 1);
   if (app.tabs.length === 0) app.newTab();
-  else if (app.active === tab) app.activate(app.tabs[Math.min(i, app.tabs.length - 1)]);
+  else if (app.active === tab) app.activate(madoNext && app.tabs.includes(madoNext) ? madoNext : app.tabs[Math.min(i, app.tabs.length - 1)]);
   else app.updateTabs();
   return true;
 };
@@ -386,6 +403,7 @@ app.makeBlank = async function (tab) {
   app.untitled += 1;
   tab.name = t('(無題)') + (app.untitled > 1 ? ' ' + app.untitled : '');
   tab.enc = null;
+  tab.partial = null;
   tab.mtime = 0;
   tab.metaDirty = false;
   tab.touched = false;
@@ -470,6 +488,8 @@ app.openPath = async function (path, { line, encoding, forceText, browse } = {})
     tab.metaDirty = false;
     tab.touched = false;
     tab.plainChoice = false;
+    tab.partial = r.partial || null;
+    tab.hugeWarned = false;
     if (tab.paperMode !== 0) app.setPaperMode(tab, 0, { remember: false });
     app.resolveProfile(tab);
     tab.editor.setText(r.text, false);
@@ -478,6 +498,7 @@ app.openPath = async function (path, { line, encoding, forceText, browse } = {})
     app.activate(tab);
   } else {
     tab = app.newTab({ path, text: r.text, encoding: r.encoding, lineEnding: r.lineEnding, enc: r.enc, mtime: r.mtime });
+    tab.partial = r.partial || null;
   }
   const caret = (app.prefs.carets || {})[path];
   if (line) app.goToLine(line);
@@ -485,9 +506,10 @@ app.openPath = async function (path, { line, encoding, forceText, browse } = {})
   app.setLocked(tab, !!r.locked);
   // ファイルに書いてある表示 (原稿用紙の縦・横、A4) で開く。用紙切替を切っているときは、いつも標準エディタ
   const mode = r.mode || (app.library ? app.library.modeFallback(path) : null);
-  if (app.prefs.paperEnabled && mode && !r.enc) app.setPaperMode(tab, mode === 'a4' ? 2 : mode === 'genkoH' ? 3 : 1, { remember: false });
+  if (app.prefs.paperEnabled && mode && !r.enc && !r.partial) app.setPaperMode(tab, mode === 'a4' ? 2 : mode === 'genkoH' ? 3 : 1, { remember: false });
   if (app.library) { app.library.remember(path); app.library.renderList(); }
-  if (!r.enc) api.versionNoteOpened(path);
+  if (!r.enc && !r.partial) api.versionNoteOpened(path); // 巨大ファイルは版の履歴に入れない
+  if (r.partial) app.updateStatus();
   if (app.plugins) app.plugins.emit('open', tab);
   app.pushMenuState();
   return tab;
@@ -661,10 +683,12 @@ app.save = async function (tab, { saveAs, auto, versionNow } = {}) {
   }
   tab.saving = true;
   const writtenDoc = tab.editor.view.state.doc;
+  // 巨大ファイルの一部分を読んでいるときは、その範囲だけを書き戻す (名前を付けて別のファイルに保存したら、読んでいる所だけのファイルになる)
+  const part = tab.partial && tab.path && pathUtil.same(tab.path, path) ? tab.partial : null;
   const r = await api.writeFile({
     path, text, encoding: tab.encoding, lineEnding: tab.lineEnding,
-    encToken: tab.enc ? tab.enc.token : null, backup: !!app.prefs.backupOnSave && !auto,
-    mode: app.modeString(tab), versionNow: !auto || !!versionNow,
+    encToken: tab.enc ? tab.enc.token : null, backup: !!app.prefs.backupOnSave && !auto && !part,
+    mode: app.modeString(tab), versionNow: !auto || !!versionNow, part, noVersion: !!part,
   });
   tab.saving = false;
   if (r.status !== 'ok') {
@@ -673,6 +697,7 @@ app.save = async function (tab, { saveAs, auto, versionNow } = {}) {
     return false;
   }
   tab.autosaveFailed = false;
+  tab.partial = part ? (r.partial || part) : null;
   const oldPath = tab.path;
   tab.path = path;
   tab.remote = null; // 名前を付けてこの PC に保存したら、サーバとのつながりは切る
@@ -732,8 +757,10 @@ app.revert = async function () {
   if (tab.remote) { toast(t('サーバのファイルでは使えません')); return; }
   if (!tab.path) return;
   if (tab.isDirty() && !(await confirmBox(t('保存時の状態に戻しますか？'), t('保存していない変更は失われます。'), t('戻す')))) return;
-  const r = await readWithUnlock(tab.path);
-  if (!r) return;
+  // 巨大ファイルは、同じ範囲を読み直す
+  const r = tab.partial ? await api.readFile(tab.path, { part: tab.partial, encoding: tab.encoding }) : await readWithUnlock(tab.path);
+  if (!r || r.status !== 'ok') { if (r && r.message) await alertBox(t('開けませんでした'), r.message); return; }
+  tab.partial = r.partial || null;
   if (tab.paperMode !== 0) app.setPaperMode(tab, 0);
   tab.encoding = r.encoding; tab.lineEnding = r.lineEnding; tab.enc = r.enc; tab.metaDirty = false;
   tab.editor.setText(r.text, false);
@@ -746,14 +773,112 @@ app.reopenWithEncoding = async function (encoding) {
   const tab = app.active;
   if (!tab.path) { toast(t('まだ保存していない文書です')); return; }
   if (tab.isDirty() && !(await confirmBox(t('開き直しますか？'), t('保存していない変更は失われます。'), t('開き直す')))) return;
-  const r = await readWithUnlock(tab.path, encoding);
-  if (!r) return;
+  const r = tab.partial ? await api.readFile(tab.path, { part: tab.partial, encoding }) : await readWithUnlock(tab.path, encoding);
+  if (!r || r.status !== 'ok') { if (r && r.message) await alertBox(t('開けませんでした'), r.message); return; }
+  tab.partial = r.partial || null;
   tab.encoding = r.encoding; tab.lineEnding = r.lineEnding; tab.enc = r.enc; tab.metaDirty = false;
   if (tab.paperMode !== 0) app.setPaperMode(tab, 0);
   tab.editor.setText(r.text, false);
   tab.editor.configure(app.prefs, tab.profile);
   tab.savedDoc = tab.editor.view.state.doc; tab.editor.clearEditMarks(); if (app.diff) app.diff.refresh(0); // 保存した・開き直した: 目印を消し、差分の「編集前」も新しく
   app.updateTabs(); app.updateStatus(); app.pushMenuState();
+};
+
+// ---------- 巨大ファイル (Mac 版 HugeFileWindow.swift と同じ考え方) ----------
+// 大きなファイル (はじめは 32 MB 以上) は、本体が先頭の近く (8 MB) だけを読んで、すぐに開く。
+// スクロールで読んだ範囲の端に近づいたら、今いちばん上に見えている行のまわりを読み直し、その行を画面の同じ所に残す。
+// 書き換えて保存していないうちは範囲を動かさない (動かすと書き換えが消えるため)。保存すると、その範囲だけがファイルに入る
+
+/// ファイルの大きさ (MB / GB)
+function hugeSize(bytes) {
+  const mb = bytes / 1048576;
+  return mb >= 1024 ? (mb / 1024).toFixed(2) + ' GB' : mb.toFixed(1) + ' MB';
+}
+
+/// ステータスバーに出す: いま読んでいる範囲がファイル全体のどこか
+app.hugeStatusText = function (part) {
+  const total = Math.max(1, part.fileSize);
+  return t('大きなファイル: {size} の {from}〜{to}% を表示中', {
+    size: hugeSize(part.fileSize), from: (part.offset / total * 100).toFixed(1), to: ((part.offset + part.length) / total * 100).toFixed(1),
+  });
+};
+
+app.scheduleHugeCheck = function (tab) {
+  if (tab.hugePending) return;
+  tab.hugePending = true;
+  requestAnimationFrame(() => { tab.hugePending = false; app.hugeCheck(tab); });
+};
+
+/// スクロールしたとき: 読んだ範囲の端 (1/8、少なくとも 2 万字) に入っていたら、その先を読む
+app.hugeCheck = function (tab) {
+  const part = tab.partial;
+  if (!part || tab.hugeSliding || tab.paperMode !== 0 || !app.tabs.includes(tab)) return;
+  const v = tab.editor.view, doc = v.state.doc, len = doc.length;
+  const sc = v.scrollDOM;
+  if (!len || !sc.clientHeight) return;
+  const top = v.lineBlockAtHeight(sc.scrollTop), bottom = v.lineBlockAtHeight(sc.scrollTop + sc.clientHeight);
+  const margin = Math.max(20000, len / 8);
+  const nearEnd = bottom.to > len - margin && part.offset + part.length < part.fileSize;
+  const nearTop = top.from < margin && part.offset > 0;
+  if (!nearEnd && !nearTop) return;
+  if (tab.isDirty()) {
+    if (!tab.hugeWarned) {
+      tab.hugeWarned = true;
+      richToast({ kind: 'info', title: t('この先はまだ読み込んでいません'), detail: t('書き換えを保存すると、続きを読み込めます') });
+    }
+    return;
+  }
+  // 進む向きの先を多めに読む (下へなら今の行を範囲の 1/4 に、上へなら 3/4 に置く)
+  app.hugeLoad(tab, { part, topLine: doc.lineAt(top.from).number - 1, back: nearEnd ? 0.25 : 0.75 }, sc.scrollTop - top.top);
+};
+
+/// 読み直して、今の行 (答えの line) を画面の上から shift の所に出す
+app.hugeLoad = async function (tab, opts, shift) {
+  tab.hugeSliding = true;
+  let r;
+  try { r = await api.hugeSlide(tab.path, Object.assign({ encoding: tab.encoding }, opts)); } catch (e) { r = { status: 'error', message: e.message }; }
+  // 待っているあいだに書き換えた・閉じたときは、読み直さない
+  if (!r || r.status !== 'ok' || !app.tabs.includes(tab) || tab.isDirty()) {
+    tab.hugeSliding = false;
+    if (r && r.status !== 'ok') toast(r.message || t('読み込めませんでした'));
+    return false;
+  }
+  tab.partial = r.partial;
+  tab.hugeWarned = false;
+  tab.editor.setText(r.text, false);
+  tab.editor.configure(app.prefs, tab.profile);
+  tab.savedDoc = tab.editor.view.state.doc; tab.editor.clearEditMarks();
+  const v = tab.editor.view, doc = v.state.doc;
+  const pos = doc.line(Math.max(1, Math.min(doc.lines, (r.line || 0) + 1))).from;
+  v.dispatch({ selection: { anchor: pos } });
+  // 行の高さは出してみないと決まらないので、2 回合わせる
+  const place = () => { v.scrollDOM.scrollTop = Math.max(0, v.lineBlockAt(pos).top + (shift || 0)); };
+  place();
+  requestAnimationFrame(() => {
+    place();
+    requestAnimationFrame(() => {
+      place();
+      // 読み直した直後は、画面の位置がいったん動くので、少しのあいだ端の判定をしない
+      setTimeout(() => { tab.hugeSliding = false; }, 300);
+    });
+  });
+  if (app.diff && app.active === tab) app.diff.refresh(0);
+  app.updateTabs();
+  if (app.active === tab) { app.updateStatus(); app.pushMenuState(); }
+  return true;
+};
+
+/// 「巨大ファイル: 位置へ移動…」: % を聞いて飛ぶ
+app.hugeJump = async function (tab) {
+  if (!tab || !tab.partial) { toast(t('巨大なファイルを開いているときに使えます')); return; }
+  if (tab.isDirty()) { richToast({ kind: 'info', title: t('先に保存してください'), detail: t('書き換えを保存すると、ほかの位置へ移動できます') }); return; }
+  const part = tab.partial;
+  const v = await promptBox(t('ファイルの位置へ移動'), t('全体 {size} のうち、何 % の所へ移動しますか？ (0〜100)', { size: hugeSize(part.fileSize) }), (part.offset / Math.max(1, part.fileSize) * 100).toFixed(1));
+  if (v === null || v === undefined) return;
+  const n = parseFloat(String(v).replace(/[%％]/g, ''));
+  if (!isFinite(n)) return;
+  await app.hugeLoad(tab, { part, fraction: Math.max(0, Math.min(100, n)) / 100, back: 0.5 }, 0);
+  app.focusEditor();
 };
 
 // ---------- 用紙モード ----------
@@ -959,6 +1084,7 @@ app.updateStatus = function () {
   // 暗号化の種類は右側の項目 (押すと変えられる) に出す。流出防止を使っていないときだけ、ここに出す
   if (tab.enc && !app.prefs.encryptionEnabled) notes.push('🔒 ' + t('暗号化') + ` (${tab.enc.label})`);
   if (tab.locked) notes.push('🔒 ' + t('ロック中 (書き換えできません)'));
+  if (tab.partial) notes.push(app.hugeStatusText(tab.partial));
   if (app.library && app.library.isPlaceholder(tab.path)) notes.push(t('新規テキスト: Ctrl+S で名前を付けて保存'));
   if (tab.paperMode === 1 && tab.paper) {
     const i = tab.paper.info();
@@ -1072,7 +1198,7 @@ app.scheduleRuler = function () {
 
 app.updateRuler = function () {
   const tab = app.active;
-  const hidden = !app.prefs.columnRuler || !tab || tab.paperMode !== 0;
+  const hidden = !app.prefs.columnRuler || !tab || tab.paperMode !== 0 || !!(app.mado && app.mado.shown); // 窓割りで並べているあいだは、桁ルーラーを出さない
   app.el.ruler.hidden = hidden;
   if (hidden) return;
   const css = getComputedStyle(document.documentElement);
@@ -1082,29 +1208,36 @@ app.updateRuler = function () {
   });
 };
 
+/// ツールバーに置けるボタン ([絵, 名前, 命令, 説明, 追加機能])。並べるのは TOOLBAR_DEFAULT か、設定で選んだ並び
 const TOOLBAR = [
   ['new', '新規作成', 'file.new', '新規作成 (Ctrl+N)'], ['library', 'テキスト一覧', 'library.toggle', 'テキスト一覧を出す / しまう', 'library'], ['libraryGrid', 'サムネ一覧', 'library.grid', 'テキストをサムネ (カード) で見渡す', 'library'], ['folder', 'フォルダ', 'folder.toggle', 'フォルダツリーを出す / しまう', 'folder'], '-',
   ['open', '開く', 'file.open', 'ファイルを開く'], ['server', 'サーバ', 'server.open', 'サーバ (SFTP / FTP) につないでファイルを開く', 'server'], ['save', '保存', 'file.save', '上書き保存'], '-',
   ['undo', '元に戻す', 'edit.undo', '元に戻す'], ['redo', 'やり直し', 'edit.redo', 'やり直し'], '-',
   ['cut', '切り取り', 'edit.cut', '切り取り'], ['copy', 'コピー', 'edit.copy', 'コピー'], ['paste', '貼り付け', 'edit.paste', '貼り付け'], ['duplicate', '行複製', 'line.duplicate', '行を複製'], '-',
   ['find', '検索', 'find.show', '検索'], ['replace', '置換', 'find.replace', '置換'], ['grep', 'grep', 'grep.show', 'ファイルから検索'], ['goto', '行移動', 'goto.line', '指定行へ移動'], ['diff', '差分', 'view.diff', '差分: 編集前とどこが変わったかを横に表示 (Ctrl+Shift+D)'], '-',
-  ['split', '分割', 'view.split', '上下に分割 / 分割をやめる'], ['splitSide', '左右分割', 'view.splitSide', '左右に分割 / 分割をやめる'], ['share', '共有', 'collab.host', 'この文書を共有して共同編集する', 'collab'], ['paper', '用紙切替', 'paper.cycle', '用紙切替: 標準エディタ → 原稿用紙 → A4用紙', 'paper'], ['publish', '公開', 'share.publish', 'リンクで公開共有 (docs.satoru.net)', 'share'], ['ai', 'AI', 'ai.toggle', 'AI アシスタント', 'ai'],
+  ['split', '分割', 'view.split', '上下に分割 / 分割をやめる'], ['splitSide', '左右分割', 'view.splitSide', '左右に分割 / 分割をやめる'], ['mado', '窓割り', 'mado.toggle', '窓割り: タブを左右に並べる / 並べるのをやめる', 'mado'], ['share', '共有', 'collab.host', 'この文書を共有して共同編集する', 'collab'], ['paper', '用紙', 'paper.cycle', '用紙切替: 標準エディタ → 原稿用紙 → A4用紙', 'paper'], ['publish', '公開', 'share.publish', 'リンクで公開共有 (docs.satoru.net)', 'share'], ['ai', 'AI', 'ai.toggle', 'AI アシスタント', 'ai'],
   'space', ['camera', 'スクショ', 'file.screenshot', 'スクリーンショット (画像にする)'], ['theme', '色・フォント', 'settings.open:theme', '色・フォント'],
 ];
-const FEATURE_PREF = { folder: 'folderTreeEnabled', paper: 'paperEnabled', ai: 'aiEnabled', server: 'serverEnabled', collab: 'collabEnabled', share: 'shareEnabled', library: 'libraryEnabled' };
+/// 最初に並べるもの: よく使うものだけ (Mac 版と同じ。ほかのボタンは「ツールバーを編集…」で足せる)
+const TOOLBAR_DEFAULT = ['new', 'open', 'save', '-', 'undo', 'redo', '-', 'find', '-', 'paper', 'split', 'camera', 'ai', 'space', 'theme'];
+const FEATURE_PREF = { folder: 'folderTreeEnabled', paper: 'paperEnabled', ai: 'aiEnabled', server: 'serverEnabled', collab: 'collabEnabled', share: 'shareEnabled', library: 'libraryEnabled', mado: 'madoEnabled' };
 app.TOOLBAR = TOOLBAR;
+app.TOOLBAR_DEFAULT = TOOLBAR_DEFAULT;
+/// 並べ方を覚えておく設定の名前。並びを大きく変えたときは名前を変える (前の版で覚えた並びではなく、新しい並びから始まるように。Mac 版の SatomaruToolbar13 と同じ)
+const TOOLBAR_PREF = 'toolbarLayout2';
+app.TOOLBAR_PREF = TOOLBAR_PREF;
 
 /// ツールバーに並べるもの (設定で選んだ並びがあればそれ)
 function toolbarLayout() {
-  const custom = app.prefs.toolbarItems;
-  if (!Array.isArray(custom)) return TOOLBAR;
+  const custom = app.prefs[TOOLBAR_PREF];
   const byName = new Map(TOOLBAR.filter(b => Array.isArray(b)).map(b => [b[0], b]));
-  return custom.map(name => (name === '-' || name === 'space' ? name : byName.get(name))).filter(Boolean);
+  const names = Array.isArray(custom) ? custom : TOOLBAR_DEFAULT;
+  return names.map(name => (name === '-' || name === 'space' ? name : byName.get(name))).filter(Boolean);
 }
 
 app.renderToolbar = function () {
   const bar = app.el.toolbar;
-  const key = i18n.language() + JSON.stringify([app.prefs.folderTreeEnabled, app.prefs.paperEnabled, app.prefs.aiEnabled, app.prefs.serverEnabled, app.prefs.collabEnabled, app.prefs.shareEnabled, app.prefs.libraryEnabled, app.prefs.toolbarItems]);
+  const key = i18n.language() + JSON.stringify([app.prefs.folderTreeEnabled, app.prefs.paperEnabled, app.prefs.aiEnabled, app.prefs.serverEnabled, app.prefs.collabEnabled, app.prefs.shareEnabled, app.prefs.libraryEnabled, app.prefs.madoEnabled, app.prefs[TOOLBAR_PREF]]);
   if (bar.dataset.key === key) return;
   bar.dataset.key = key;
   bar.textContent = '';
@@ -1119,7 +1252,7 @@ app.renderToolbar = function () {
       onmousedown: e => e.preventDefault(), // 押しても文章の選択を外さない
       onmouseenter: e => { e.currentTarget.title = t(tip) + accelFor(command); },
       onclick: () => app.run(command),
-    }, icon(name));
+    }, icon(name), h('span', { class: 'tb-label' }, t(label))); // 絵の下に名前を出す (絵だけだと何のボタンか分かりにくい)
     bar.append(btn);
   }
 };
@@ -1172,8 +1305,9 @@ const commands = {
     return app.library.askRename(tab.path);
   },
   'file.revert': () => app.revert(),
+  'huge.jump': () => app.hugeJump(app.active),
   'file.versions': () => { if (app.prefs.versionHistory !== false && app.prefs.libraryEnabled !== false) app.versions.showCurrent(); },
-  'library.toggle': () => app.setPref('libraryVisible', app.prefs.libraryVisible === false),
+  'library.toggle': () => app.setPref('libraryVisible', app.prefs.libraryVisible !== true), // はじめは出さない (Mac 版と同じ)
   'library.new': () => app.library.createBlank(),
   'library.grid': () => app.library.showGrid(),
   'share.publish': () => app.share.publishCurrent(),
@@ -1209,7 +1343,7 @@ const commands = {
     const next = i18n.resolve(lang, navigator.language);
     if (next === i18n.language()) return;
     // 画面を作り直す。保存していない文書があるときは、次に起動したときから切り替える
-    if (app.tabs.some(x => x.isDirty())) { toast(next === 'en' ? 'The language will change the next time you start Satoru Editor.' : '次に起動したときから日本語になります。'); return; }
+    if (app.tabs.some(x => x.isDirty())) { toast(next === 'en' ? 'The language will change the next time you start Editor β.' : '次に起動したときから日本語になります。'); return; }
     try { sessionStorage.setItem('reopen', JSON.stringify(app.tabs.filter(x => x.path).map(x => x.path))); } catch (e) { /* なくてもよい */ }
     location.reload();
   },
@@ -1264,6 +1398,17 @@ const commands = {
     if (!e.secondary) return;
     (e.active === e.view ? e.secondary : e.view).focus();
   },
+  // 窓割り (Mac 版の ⌃⌘→ ⌃⌘↓ ⌃⌘↑ ⌃⌘] ⌃⌘[ と同じ並べ方。キーは Ctrl+Alt)
+  'mado.sideBySide': () => { if (!app.mado.splitTabs('row')) toast(t('並べるには、タブが 2 つ以上いります')); },
+  'mado.stacked': () => { if (!app.mado.splitTabs('col')) toast(t('並べるには、タブが 2 つ以上いります')); },
+  'mado.splitPaneSide': () => { if (!app.mado.splitFocused('row')) toast(t('並べるタブがありません')); },
+  'mado.splitPaneStacked': () => { if (!app.mado.splitFocused('col')) toast(t('並べるタブがありません')); },
+  'mado.unsplit': () => app.mado.unsplit(),
+  'mado.toggle': () => { if (app.mado.active) app.mado.unsplit(); else app.run('mado.sideBySide'); },
+  'mado.next': () => app.mado.move(1),
+  'mado.previous': () => app.mado.move(-1),
+  'mado.equalize': () => app.mado.equalize(),
+  'mado.returnToTab': () => { if (app.mado.has(app.active)) app.mado.returnToTab(app.active); },
   'view.zoomIn': () => { app.theme.fontSize = Math.min(72, app.theme.fontSize + 1); app.saveTheme(); },
   'view.zoomOut': () => { app.theme.fontSize = Math.max(6, app.theme.fontSize - 1); app.saveTheme(); },
   'tab.next': () => app.activate(app.tabs[(app.tabs.indexOf(app.active) + 1) % app.tabs.length]),
@@ -1417,6 +1562,7 @@ async function start() {
   app.share = new ShareLink(app);
   app.versions = new VersionHistory(app);
   app.library = new TextLibrary(app);
+  app.mado = new Mado(app);
 
   window.addEventListener('keydown', onKeyDown, true);
   window.addEventListener('resize', app.scheduleRuler);

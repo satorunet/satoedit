@@ -1,0 +1,437 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>猫丸エディタβ — シンプルで速いテキストエディタ</title>
+<meta name="description" content="猫丸エディタは、書く・まとめる・共有するがサクサクできるテキストエディタです。いまは β テスト版。使ってくれた人の意見をもとに、少しずつ改善していきます。Mac / Windows 対応、無料、オープンソース (MIT)。">
+<meta property="og:site_name" content="猫丸エディタ">
+<meta property="og:title" content="猫丸エディタβ — シンプルで速いテキストエディタ">
+<meta property="og:description" content="編集・管理・共有をサクッとできるテキストエディタ。原稿用紙・AI アシスト・リンクで公開共有も。いまは β テスト版で、みんなの意見をもとに改善中。Mac / Windows・無料・オープンソース。">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://docs.satoru.net/">
+<meta property="og:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261127neko">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="猫丸エディタβ — シンプルで速いテキストエディタ">
+<meta name="twitter:image" content="https://docs.satoru.net/site/og-beta.jpg?v=20261127neko">
+<link rel="icon" href="/site/icon.png?v=6">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&display=swap" rel="stylesheet">
+<style>
+:root{color-scheme:light;--bg:#FBF9F3;--fg:#1F2A44;--mut:#5C667A;--ln:#E7E0CC;--a:#213A63;--a2:#1E3A8A;--card:#F8F4E6;--code:#EFE9D8;--gold:#C4B48A;--gold2:#A8956A;--shu:#c0392b;--mid:#2f8f57}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.8 "Zen Maru Gothic","Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Noto Sans JP",system-ui,sans-serif;letter-spacing:.02em}
+a{color:var(--a2)}
+img{max-width:100%;height:auto;display:block}
+.w{max-width:1040px;margin:0 auto;padding:0 16px}
+nav.top{position:sticky;top:0;z-index:5;background:rgba(251,249,243,.9);backdrop-filter:saturate(1.6) blur(10px);border-bottom:1px solid var(--ln)}
+nav.top .w{display:flex;align-items:center;gap:18px;height:54px}
+nav.top .logo{display:flex;align-items:center;gap:9px;font-weight:700;color:var(--fg);text-decoration:none;margin-right:auto}
+nav.top .logo img{width:28px;height:28px}
+nav.top a.l{color:var(--mut);text-decoration:none;font-size:.9rem}
+nav.top a.l:hover{color:var(--fg)}
+nav.top .dl-s{background:var(--a);color:#fff;text-decoration:none;font-weight:700;font-size:.85rem;padding:6px 14px;border-radius:999px}
+/* スマホ: 上の行にロゴとダウンロード、下の行にタブ (できること・みんなのメモ・ご意見) */
+@media (max-width:640px){
+  nav.top .w{flex-wrap:wrap;height:auto;gap:6px 8px;padding-top:8px;padding-bottom:8px}
+  nav.top .logo{order:1;flex:1 1 calc(100% - 140px)}
+  nav.top .dl-s{order:2}
+  nav.top a.l{order:3;display:inline-block;font-size:.85rem;font-weight:600;padding:5px 14px;border-radius:999px;background:var(--card);border:1px solid var(--ln);color:var(--fg)}
+  nav.top a.l.memo-tab{background:var(--a);border-color:var(--a);color:#fff}
+}
+header.hero{padding:56px 0 24px;text-align:center}
+.kicker{display:inline-block;font-size:.8rem;font-weight:700;letter-spacing:.06em;color:var(--a2);background:var(--code);border-radius:999px;padding:3px 14px}
+h1{font-size:clamp(2rem,5.6vw,3.2rem);line-height:1.25;margin:16px 0 14px;letter-spacing:-.01em}
+h1 em{font-style:normal;background:linear-gradient(transparent 66%,#E6D9B4 66%)}
+.lead{color:var(--mut);margin:0 auto 26px;max-width:680px;font-size:1.05rem}
+.dls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.dl{display:inline-flex;align-items:center;gap:10px;background:var(--a);color:#fff;text-decoration:none;font-weight:700;padding:12px 26px;border-radius:999px;font-size:1.05rem}
+.dl:hover{filter:brightness(1.08)}
+.dl small{font-weight:400;opacity:.85}
+.dl.ghost{background:var(--bg);color:var(--a2);border:1.5px solid var(--a)}
+.meta{color:var(--mut);font-size:.85rem;margin-top:10px}
+.hero-shot{margin:36px auto 0;max-width:1000px;border-radius:12px;overflow:hidden;border:1px solid var(--ln);box-shadow:0 24px 60px rgba(15,20,25,.18)}
+.pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:44px 0 8px}
+.pillars a{display:block;text-decoration:none;color:inherit;border:1px solid var(--ln);border-radius:14px;padding:18px 20px;background:var(--card)}
+.pillars a:hover{border-color:var(--a)}
+.pillars span{font-size:.75rem;font-weight:700;letter-spacing:.1em;color:var(--a2)}
+.pillars b{display:block;font-size:1.25rem;margin:4px 0}
+.pillars p{margin:0;color:var(--mut);font-size:.92rem;line-height:1.7}
+@media (max-width:760px){.pillars{grid-template-columns:1fr}}
+section{padding:56px 0;border-top:1px solid var(--ln)}
+section h2{font-size:clamp(1.4rem,3.4vw,1.9rem);line-height:1.35;margin:6px 0 10px}
+section h2[id]{scroll-margin-top:70px}
+.sec-k{font-size:.8rem;font-weight:700;letter-spacing:.12em;color:var(--a2)}
+.sec-lead{color:var(--mut);margin:0 0 26px;max-width:720px}
+.row{display:grid;grid-template-columns:1.25fr 1fr;gap:34px;align-items:center;margin:30px 0}
+.row.rev{grid-template-columns:1fr 1.25fr}
+.row.rev .pic{order:2}
+.row .pic img{border-radius:10px;border:1px solid var(--ln);box-shadow:0 12px 32px rgba(15,20,25,.14)}
+.row h3{font-size:1.2rem;margin:0 0 6px}
+.row p{margin:0 0 10px;color:var(--mut)}
+.row ul{margin:0;padding-left:1.2em;color:var(--mut)}
+.row ul li{margin:3px 0}
+@media (max-width:760px){.row,.row.rev{grid-template-columns:1fr}.row.rev .pic{order:0}}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.feat>div{background:var(--card);border:1px solid var(--ln);border-radius:12px;padding:14px 16px}
+.feat b{display:block;margin-bottom:4px}
+.feat p{margin:0;color:var(--mut);font-size:.92rem;line-height:1.7}
+.feat .dl{margin-top:12px;font-size:.92rem;padding:8px 18px}
+.feat .dl-sub{display:block;width:max-content;margin-top:10px;color:var(--a);font-weight:700;font-size:.88rem;text-decoration:underline;text-underline-offset:3px}
+.feat .dl-note{margin-top:4px;font-size:.8rem;opacity:.75}
+.badge{font-style:normal;font-size:.7rem;font-weight:700;color:#b26a00;background:#fff3dc;border:1px solid #f5c26b;border-radius:999px;padding:1px 8px;margin-left:8px;vertical-align:1px;white-space:nowrap}
+.demo{margin:8px 0 34px}
+.demo-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 14px}
+.demo-tabs button{font:inherit;font-size:.88rem;font-weight:700;border-radius:999px;padding:5px 16px;border:1.5px solid;background:var(--bg);cursor:pointer;transition:background .15s,color .15s}
+.demo-tabs button[aria-selected="true"].m-ed{background:#334;color:#fff}
+.demo-tabs button[aria-selected="true"].m-gv{background:var(--shu);border-color:var(--shu);color:#fff}
+.demo-tabs button[aria-selected="true"].m-gh{background:var(--mid);border-color:var(--mid);color:#fff}
+.demo-tabs button[aria-selected="true"].m-a4{background:#555;border-color:#555;color:#fff}
+.demo-frame{border-radius:12px;overflow:hidden;border:1px solid var(--ln);box-shadow:0 16px 40px rgba(15,20,25,.16);background:#e9e9e9}
+.demo-frame img{width:100%;transition:opacity .18s}
+.demo-frame img.fade{opacity:.25}
+.demo-cap{color:var(--mut);margin:10px 2px 0;font-size:.95rem}
+.m-ed{color:#334;border-color:#99a}.m-gv{color:var(--shu);border-color:#e3a59d}.m-gh{color:var(--mid);border-color:#93c9a8}.m-a4{color:#555;border-color:#bbb}
+ul.chips{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+ul.chips li{background:var(--card);border:1px solid var(--ln);border-radius:999px;padding:3px 14px;font-size:.88rem;color:var(--mut)}
+code{background:var(--code);border-radius:4px;padding:1px 6px;font-size:.9em}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+td,th{border-bottom:1px solid var(--ln);padding:8px 6px;text-align:left;vertical-align:top}
+th{white-space:nowrap;color:var(--mut);font-weight:600}
+.share-box{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:8px}
+.share-box img{border-radius:10px;border:1px solid var(--ln);box-shadow:0 10px 28px rgba(15,20,25,.12)}
+.share-box figcaption{font-size:.85rem;color:var(--mut);margin-top:8px}
+@media (max-width:760px){.share-box{grid-template-columns:1fr}}
+.public-cta{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:18px 22px;margin-top:26px}
+.public-cta p{margin:0;color:var(--mut)}
+.ft{margin-top:24px;background:linear-gradient(180deg,var(--card),color-mix(in srgb,var(--card) 70%,var(--ln)));border-top:1px solid var(--ln);color:var(--fg)}
+.ft-in{display:grid;grid-template-columns:1.6fr 1fr;gap:36px;padding-top:44px;padding-bottom:34px}
+.ft-logo{display:flex;align-items:center;gap:12px}
+.ft-logo b{font-size:1.15rem;display:block;line-height:1.3}
+.ft-logo span{font-size:.8rem;color:var(--mut)}
+.ft-brand p{color:var(--mut);font-size:.9rem;line-height:1.7;margin:14px 0 16px;max-width:460px}
+.ft-col h3{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:4px 0 12px}
+.ft-col a,.ft-col .ft-store{display:block;color:var(--fg);text-decoration:none;font-size:.9rem;padding:4px 0}
+.ft-col a:hover{color:var(--a)}
+.ft-bottom{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;border-top:1px solid var(--ln);padding-top:16px;padding-bottom:26px;font-size:.8rem;color:var(--mut)}
+.ft-bottom a{color:var(--mut);text-decoration:none;font-weight:700}
+@media (max-width:760px){.ft-in{grid-template-columns:1fr;gap:26px}}
+
+.hero-shot{position:relative}
+.hero-shot .hero-top{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .45s ease}
+.hero-shot .hero-top.on{opacity:1}
+.hero-label{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);background:rgba(15,20,25,.78);color:#fff;font-weight:700;font-size:.9rem;padding:5px 16px;border-radius:999px;transition:background .3s;cursor:pointer;white-space:nowrap}
+.hero-label:hover{filter:brightness(1.15)}
+.hero-label select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
+.beta-note{display:flex;gap:14px;align-items:flex-start;text-align:left;max-width:720px;margin:26px auto 0;background:#fff7ea;border:1px solid #f5c26b;border-radius:14px;padding:14px 18px;color:#6b4a00;font-size:.95rem;line-height:1.7}
+.beta-note b{color:#b26a00}
+.beta-note .ic{font-size:1.4rem;line-height:1}
+.kicker.beta{color:#fff;background:#ff8c1a}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.cards>div{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:16px 18px}
+.cards b{display:block;font-size:1.05rem;margin-bottom:4px}
+.cards p{margin:0;color:var(--mut);font-size:.93rem;line-height:1.75}
+.cards .exp{font-style:normal;font-size:.68rem;font-weight:700;color:#b26a00;background:#fff3dc;border:1px solid #f5c26b;border-radius:999px;padding:0 7px;margin-left:6px;vertical-align:2px}
+.steps{counter-reset:s;list-style:none;padding:0;margin:0;display:grid;gap:10px;max-width:760px}
+.steps li{counter-increment:s;position:relative;padding:12px 16px 12px 52px;background:var(--card);border:1px solid var(--ln);border-radius:12px;color:var(--mut)}
+.steps li b{color:var(--fg)}
+.steps li::before{content:counter(s);position:absolute;left:16px;top:12px;width:24px;height:24px;border-radius:50%;background:#ff8c1a;color:#fff;font-weight:700;font-size:.85rem;display:flex;align-items:center;justify-content:center}
+.four{display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.four>div{background:var(--card);border:1px solid var(--ln);border-radius:14px;padding:14px;overflow:hidden}
+.four img{border-radius:8px;border:1px solid var(--ln);margin-bottom:10px}
+.four b{display:block;font-size:1.1rem;margin-bottom:2px}
+.four p{margin:0;color:var(--mut);font-size:.93rem;line-height:1.7}
+.four .wide{grid-column:1/-1;display:grid;grid-template-columns:1.2fr 1fr;gap:18px;align-items:center}
+.four .wide img{margin-bottom:0}
+.gk-swap{position:relative;margin-bottom:10px}.gk-swap img{display:block;margin-bottom:0}
+.gk-swap .gk-b{position:absolute;inset:0;width:100%;height:100%;opacity:0;transition:opacity .8s}
+.gk-swap.h .gk-b{opacity:1}
+.sample-shot{position:relative;display:block}
+.sample-pill{position:absolute;right:10px;bottom:20px;font-size:.8rem;font-weight:700;padding:6px 16px;border-radius:999px;background:var(--a);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.18);transition:background .15s}
+.sample-shot:hover .sample-pill{background:var(--a2)}
+.gk-tabs{position:absolute;right:10px;bottom:10px;z-index:2;display:flex;gap:4px;padding:3px;border-radius:999px;background:rgba(255,255,255,.92);box-shadow:0 2px 8px rgba(0,0,0,.15)}
+.gk-tabs button{font:inherit;font-size:.8rem;font-weight:700;padding:3px 14px;border-radius:999px;border:1.5px solid var(--ln);background:var(--bg);color:var(--mut);cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.gk-tabs button[aria-selected="true"][data-k="v"]{background:var(--shu);border-color:var(--shu);color:#fff}
+.gk-tabs button[aria-selected="true"][data-k="h"]{background:var(--mid);border-color:var(--mid);color:#fff}
+.four .env{grid-column:1/-1;display:flex;gap:20px;align-items:center;padding:20px 22px}
+.env-icons{display:flex;gap:6px;font-size:2rem;flex:none}.env-icons .soon{opacity:.45}
+.env-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px!important}
+.env-tags span{font-size:.8rem;font-weight:600;padding:3px 10px;border-radius:999px;background:var(--bg);border:1px solid var(--ln);color:var(--fg)}
+.env-tags span.soon{color:var(--mut);border-style:dashed}
+@media (max-width:760px){.four .env{flex-direction:column;align-items:flex-start}}
+@media (max-width:760px){.four{grid-template-columns:1fr}.four .wide{grid-template-columns:1fr}}
+.cust{position:relative;cursor:pointer;user-select:none}
+.cust img{transition:opacity .2s}
+.cust img.fade{opacity:.2}
+.cust-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px}
+.cust-cap{font-weight:700;font-size:.92rem}
+.cust-cap small{font-weight:400;color:var(--mut);margin-left:6px}
+.cust-dots{display:flex;gap:5px}
+.cust-dots i{width:7px;height:7px;border-radius:50%;background:var(--ln);display:block}
+.cust-dots i.on{background:var(--a)}
+.cust{position:relative}
+.cust-hl{position:absolute;left:0;width:18.6%;border-radius:6px;background:rgba(29,155,240,.28);box-shadow:inset 0 0 0 2px rgba(29,155,240,.85);pointer-events:none;z-index:1;transition:top .08s}
+.memos{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin:14px 0 8px}
+.memo{display:block;background:var(--card,#fff);border:1px solid var(--ln);border-radius:12px;padding:14px 16px;color:inherit;text-decoration:none;transition:box-shadow .15s,transform .15s}
+.memo:hover{box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-1px)}
+.memo{padding:0 0 14px;overflow:hidden}.memo b,.memo span,.memo small{margin-left:16px;margin-right:16px}
+.memo-thumb{display:block;width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;background:#eee;border-bottom:1px solid var(--ln);margin-bottom:10px}
+.memo span{display:block}
+.memo b{display:block;font-size:1rem;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.memo span{font-size:.75rem;color:var(--mut)}
+.memo small{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;color:var(--mut);font-size:.85rem;margin-top:6px;line-height:1.5}
+.memo-empty{color:var(--mut);grid-column:1/-1}
+.memo-more{font-weight:600;color:var(--a);text-decoration:none}
+
+/* ---- 猫丸エディタ: コンセプトアートの雰囲気 (アイボリーの地・紺・金、丸み、細い線) ---- */
+.board{display:flex;align-items:center;gap:18px;font-size:.78rem;letter-spacing:.22em;color:var(--mut);padding-top:26px}
+.board i{flex:1;height:1px;background:#B9B4A6}
+.board b{font-weight:500;letter-spacing:.16em;color:var(--fg)}
+header.hero{padding:26px 0 24px}
+.brand{display:flex;align-items:center;justify-content:center;gap:34px;flex-wrap:wrap;margin:8px 0 6px}
+.brand img{width:min(300px,56vw);height:auto;filter:drop-shadow(0 18px 28px rgba(31,42,68,.16))}
+.wordmark{text-align:left}
+.wordmark .name{font-size:clamp(2.4rem,7vw,4.2rem);font-weight:900;line-height:1.15;color:var(--a);letter-spacing:.04em}
+.wordmark svg{display:block;width:100%;max-width:440px;height:auto;margin-top:2px}
+h1{font-size:clamp(1.5rem,3.8vw,2.1rem);font-weight:700;color:var(--fg)}
+.kicker.beta{color:var(--a);background:#EFE6CC;border:1px solid var(--gold)}
+.dl,.nav-dl,nav.top .dl-s{background:var(--a)}
+.dl.ghost{background:transparent;color:var(--a);border:1.5px solid var(--a)}
+.beta-note{background:var(--card);border:1px solid var(--gold);color:var(--fg)}
+.beta-note b{color:var(--gold2)}
+.hero-shot{border-radius:18px;border:1px solid var(--ln);box-shadow:0 24px 60px rgba(31,42,68,.16)}
+section{border-top:0;padding:52px 0}
+.rule{display:flex;align-items:center;gap:22px;color:var(--mut);font-size:.95rem;letter-spacing:.18em;margin-bottom:22px}
+.rule i{flex:1;height:1px;background:#B9B4A6}
+.sec-k{display:flex;align-items:center;gap:18px;color:var(--mut);font-weight:500;letter-spacing:.2em}
+.sec-k::after{content:"";flex:1;height:1px;background:#B9B4A6}
+section h2{color:var(--a)}
+.concept{text-align:center}
+.concept h2{font-size:clamp(1.3rem,3.4vw,1.9rem);letter-spacing:.12em;color:var(--fg);margin:0 0 10px}
+.concept p.c-lead{color:var(--mut);margin:0 auto 30px;max-width:620px;letter-spacing:.1em;line-height:2}
+.trio{display:grid;grid-template-columns:repeat(3,1fr);text-align:left}
+.trio>div{display:flex;align-items:center;gap:18px;padding:6px 26px;border-left:1px solid #CFC9B8}
+.trio>div:first-child{border-left:0}
+.trio .ic{flex:none;width:76px;height:76px;border-radius:50%;background:#F3EAD3;display:flex;align-items:center;justify-content:center;color:var(--a)}
+.trio .ic svg{width:38px;height:38px}
+.trio b{display:block;font-size:1.15rem;letter-spacing:.12em;color:var(--fg)}
+.trio span{color:var(--mut);font-size:.9rem;letter-spacing:.08em}
+@media (max-width:760px){.trio{grid-template-columns:1fr;gap:14px}.trio>div{border-left:0;padding:0}.wordmark{text-align:center}.wordmark svg{margin:2px auto 0}}
+.palette{display:flex;gap:34px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+.palette div{text-align:center;font-size:.85rem;letter-spacing:.1em;color:var(--fg)}
+.palette i{display:block;width:84px;height:84px;border-radius:50%;margin:0 auto 10px;border:1px solid var(--ln)}
+.palette small{display:block;color:var(--mut);letter-spacing:.06em}
+.four>div,.cards>div,.feat>div,.pillars a,.public-cta,.steps li{border-radius:20px;background:var(--card);border:1px solid var(--ln);box-shadow:0 8px 22px rgba(31,42,68,.05)}
+.four img,.row .pic img,.share-box img{border-radius:12px}
+.badge,.cards .exp{color:var(--gold2);background:#F3EAD3;border-color:var(--gold)}
+.steps li::before{background:var(--gold2)}
+.cust-dots i.on,.sample-pill{background:var(--a)}
+.ft{background:linear-gradient(180deg,var(--card),#EFE9D8)}
+</style>
+</head>
+<body>
+<nav class="top"><div class="w">
+  <a class="logo" href="/"><img src="/site/icon.png?v=6" alt="">猫丸エディタβ</a>
+  <a class="l" href="#features">できること</a>
+  <a class="l" href="#feedback">ご意見</a>
+  <a class="dl-s" href="#download">ダウンロード</a>
+</div></nav>
+
+<header class="hero"><div class="w">
+  <div class="board"><span>NEKOMARU EDITOR</span><i></i><b>猫丸エディタ</b><span>｜</span><b>β テスト版</b></div>
+  <div class="brand">
+    <img src="/site/icon.png?v=6" width="512" height="512" alt="猫丸エディタのアイコン: ノートの上で丸まって眠る猫">
+    <div class="wordmark">
+      <div class="name">猫丸エディタ</div>
+      <svg viewBox="0 0 440 46" aria-hidden="true"><path d="M4 30 C 90 4, 190 6, 250 20 S 350 34, 388 22" fill="none" stroke="#C4B48A" stroke-width="3.2" stroke-linecap="round"/>
+        <g fill="#C4A46A" transform="translate(410 20)"><ellipse cx="0" cy="6" rx="9" ry="7.5"/><ellipse cx="-11" cy="-4" rx="3.6" ry="4.6" transform="rotate(-25 -11 -4)"/><ellipse cx="-3.6" cy="-9" rx="3.6" ry="4.8"/><ellipse cx="4.8" cy="-9" rx="3.6" ry="4.8"/><ellipse cx="12" cy="-3" rx="3.6" ry="4.6" transform="rotate(25 12 -3)"/></g></svg>
+    </div>
+  </div>
+  <span class="kicker beta">β テスト版 ・ 実験中</span>
+  <h1>シンプルで、<em>速い</em>エディタ。</h1>
+  <p class="lead">画面はシンプル、動きは軽快。書くことに集中できるテキストエディタ。いまは β テスト版です。</p>
+  <div class="dls">
+    <a class="dl" href="#download">⬇ 無料でダウンロード <small>Mac / Windows</small></a>
+    <a class="dl ghost" href="#feedback">💬 意見を送る</a>
+  </div>
+  <div class="beta-note"><span class="ic">🧪</span><div><b>実験中です。</b> みんなの意見で、どんどん変わります。</div></div>
+  <div class="hero-shot" id="hero-shot">
+    <img id="hero-a" src="/site/demo-editor.jpg?v=20261127mado" width="1800" height="1520" alt="猫丸エディタの画面。同じ文章が、標準エディタ・原稿用紙 (縦書き)・原稿用紙 (横書き)・A4 用紙と切り替わる">
+    <img id="hero-b" class="hero-top" src="/site/demo-editor.jpg?v=20261127mado" width="1800" height="1520" alt="" aria-hidden="true">
+    <label class="hero-label" id="hero-label-box"><span id="hero-label">標準エディタ</span> ▼
+      <select id="hero-pick" aria-label="表示を選ぶ"><option value="auto">自動で切り替え</option><option value="0">標準エディタ</option><option value="1">原稿用紙 (縦書き)</option><option value="2">原稿用紙 (横書き)</option><option value="3">A4用紙</option></select></label>
+  </div>
+</div></header>
+
+<main class="w">
+<section class="concept">
+  <div class="rule"><i></i><span>Concept</span><i></i></div>
+  <h2>書く・つくる・ととのう、ねこのエディタ</h2>
+  <p class="c-lead">まるい猫がノートの上でくつろぐ。執筆にもコーディングにも使える、やさしく上質なエディタです。</p>
+  <div class="trio">
+    <div><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 3.5l6 6L11 19l-7 1.5L5.5 13.5z"/><path d="M12.5 5.5l6 6"/><circle cx="10.5" cy="13.5" r="1.3"/><path d="M4 20.5l5.6-6.1"/></svg></span><div><b>Writing</b><span>執筆に集中できる</span></div></div>
+    <div><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7l-5 5 5 5"/><path d="M16 7l5 5-5 5"/><path d="M13.5 5l-3 14"/></svg></span><div><b>Coding</b><span>快適なコーディング</span></div></div>
+    <div><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.5C10 5 6.5 4.6 3.5 5.3v13c3-.7 6.5-.3 8.5 1.2 2-1.5 5.500-1.900 8.500-1.200v-13C17.500 4.600 14 5 12 6.500z"/><path d="M12 6.500v13"/></svg></span><div><b>Note</b><span>メモや構想もひとつに</span></div></div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="sec-k">FEATURES</div>
+  <h2>できること</h2>
+  <div class="four">
+    <div><img src="/site/shot-editor.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="標準エディタの画面"><b>エディタ表示</b><p>行番号つきの軽いエディタ。書いたものは一覧にまとまり、版の履歴も残ります。</p></div>
+    <div><div class="gk-swap" id="gk-swap"><div class="gk-tabs" id="gk-tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-k="v">縦書き</button><button type="button" role="tab" aria-selected="false" data-k="h">横書き</button></div><img src="/site/shot-genko.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (縦書き) の画面"><img class="gk-b" src="/site/shot-genkoH.jpg?v=20261122m" width="1800" height="1520" loading="lazy" alt="原稿用紙 (横書き) の画面"></div><b>原稿用紙</b><p>縦書き・横書き・A4 にボタン 1 つで。ふりがなや段落の下げも自動。</p></div>
+    <div><img src="/site/shot-ai-proof.jpg?v=20261121y" width="1800" height="1520" loading="lazy" alt="AI に誤字を直してもらっている画面"><b>AI 補正 <i class="badge">実験中</i></b><p>誤字直し・要約・続きを書く などを、横から出る欄で頼めます。</p></div>
+    <div><a class="sample-shot" href="https://docs.satoru.net/r/76Zc7VLS" target="_blank" rel="noopener"><img src="/site/page-sample.jpg?v=20261122a" width="1280" height="900" loading="lazy" alt="公開した作文のページ"><span class="sample-pill">見本を見る ↗</span></a><b>共有機能 <i class="badge">実験中</i></b><p>URL ひとつで、そのままの見た目で公開。</p></div>
+    <div class="wide">
+      <div class="cust" id="cust">
+        <span class="cust-hl" id="cust-hl" hidden></span>
+        <img id="cust-img" src="/site/custom-1.jpg?v=20261122h" width="1840" height="1296" loading="lazy" alt="設定の画面" title="押すと次の設定へ">
+        <div class="cust-bar"><span class="cust-cap" id="cust-cap"></span><span class="cust-dots" id="cust-dots"></span></div>
+      </div>
+      <div><b>用途に応じたカスタマイズ</b><p>使う機能だけをオンにして、色・字・キー・メニューも自分好みに。メモ用にも、作文用にも、仕事用にも、自分に合ったエディタにできます。</p><p class="meta">画面を押すと、次の設定に切り替わります。</p></div>
+    </div>
+    <div class="env">
+      <div class="env-icons" aria-hidden="true"><span>🍎</span><span>🪟</span><span class="soon">📱</span></div>
+      <div><b>Mac でも Windows でも、同じように動く！</b><p>パソコンの種類に関係なく、同じ機能・同じ使い心地。書いたテキストはふつうのファイルなので、どこへでも持っていけます。</p>
+      <p class="env-tags"><span>Mac ✓</span><span>Windows ✓</span><span class="soon">iPhone / iPad (開発中)</span><span class="soon">Android (開発中)</span></p></div>
+    </div>
+  </div>
+</section>
+
+<section id="feedback">
+  <div class="sec-k">BETA</div>
+  <h2>ご意見募集中</h2>
+  <p class="sec-lead">使ってみて気づいたことを、ひとことで教えてください。意見をもとに改善して、新しい版はアプリに自動で届きます。</p>
+  <div class="dls" style="justify-content:flex-start">
+    <a class="dl ghost" href="https://x.com/satorunet" target="_blank" rel="noopener">X で送る (@satorunet)</a>
+    <a class="dl ghost" href="https://github.com/satorunet/satoedit/issues" target="_blank" rel="noopener">GitHub の Issues</a>
+    <a class="dl ghost" href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">ソースコード (MIT)</a>
+  </div>
+</section>
+
+<section id="download">
+  <div class="sec-k">DOWNLOAD</div>
+  <h2>ダウンロード (無料)</h2>
+  <div class="feat">
+    <div><b>Mac 版</b><p>macOS 11 以降 (Apple シリコン / Intel)</p><a class="dl" href="/SatoruEditor-1.0.3-mac.dmg?v=20261122r" download>⬇ ダウンロード (7.3 MB)</a></div>
+    <div><b>Windows 版</b><p>Windows 10 / 11 (64 ビット)</p><a class="dl" href="/SatoruEditor-1.0.3-win-x64-setup.exe?v=20261122r" download>⬇ インストーラー (2.5 MB)</a><a class="dl-sub" href="/SatoruEditor-1.0.3-win-x64-portable.zip?v=20261122r" download>ポータブル版 (zip・2.4 MB)</a><p class="dl-note">インストール不要版、その場ですぐ使える</p></div>
+  </div>
+  <p class="meta">Windows で「PC が保護されました」と出たら、「詳細情報」→「実行」で起動できます。</p>
+</section>
+</main>
+
+<footer class="ft"><div class="w ft-in">
+  <div class="ft-brand">
+    <div class="ft-logo"><img src="/site/icon.png?v=6" alt="" width="40" height="40"><div><b>猫丸エディタ</b><span>旧名: さとるエディタ ・ β テスト版 ・ Mac / Windows ・ 無料 ・ MIT ライセンス</span></div></div>
+    <p>書いて、まとめて、リンクで共有。<br>みんなの声で、少しずつ育てていきます。</p>
+  </div>
+  <nav class="ft-col"><h3>リンク</h3>
+    <a href="#download">ダウンロード</a>
+    <a href="#feedback">ご意見・不具合の報告</a>
+    <a href="https://x.com/satorunet" target="_blank" rel="noopener">@satorunet</a>
+    <a href="https://github.com/satorunet/satoedit" target="_blank" rel="noopener">GitHub (ソースコード)</a>
+    <a href="https://satoru.net/app/">ほかのアプリ</a>
+  </nav>
+</div>
+<div class="w ft-bottom"><span>© 2026 <a href="https://satoru.net/">satoru.net</a></span><span>Made with care in Japan</span></div>
+</footer>
+<script>
+// トップの画像: 同じ文章を 標準エディタ → 原稿用紙 (縦) → 原稿用紙 (横) → A4 とぱっぱと切り替える
+(function(){
+  var views=[["editor","標準エディタ","#334"],["genko","原稿用紙 (縦書き)","#c0392b"],["genkoH","原稿用紙 (横書き)","#2f8f57"],["a4","A4用紙","#555"]];
+  var a=document.getElementById("hero-a"),b=document.getElementById("hero-b"),label=document.getElementById("hero-label"),box=document.getElementById("hero-label-box"),pick=document.getElementById("hero-pick");
+  if(!a||!b)return;
+  views.forEach(function(v){var i=new Image();i.src="/site/demo-"+v[0]+".jpg?v=20261127mado"});
+  var n=0,timer=null;
+  function go(k){
+    n=k;var v=views[n];
+    b.src="/site/demo-"+v[0]+".jpg?v=20261127mado";
+    var show=function(){b.classList.add("on");label.textContent=v[1];box.style.background=v[2];
+      setTimeout(function(){a.src=b.src;b.classList.remove("on")},500)};
+    if(b.complete)show();else b.onload=show;
+  }
+  function auto(){if(timer)return;timer=setInterval(function(){go((n+1)%views.length)},2200)}
+  // ▼ で表示を選ぶと、その表示で止める (「自動で切り替え」でまた動かす)
+  pick.addEventListener("change",function(){
+    if(pick.value==="auto"){auto();return}
+    clearInterval(timer);timer=null;go(+pick.value);
+  });
+  if(!(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))auto();
+})();
+// デモのタブ: 押した表示の画像に切り替える (画像は先に読んでおく)
+(function(){
+  var caps={editor:["標準エディタ","行番号・改行の印つきの、軽いエディタ。メモやコードにも。"],
+    genko:["原稿用紙 (縦書き)","同じ文章が、そのまま縦書きの原稿用紙に。ふりがなと、題名・名前・段落の下げも自動で。"],
+    genkoH:["原稿用紙 (横書き)","横書きの原稿用紙 (緑のマス目) にも、ボタン 1 つで。"],
+    a4:["A4用紙","A4 の紙の見た目で。そのまま印刷・PDF に。"]};
+  var img=document.getElementById("demo-img"),cap=document.getElementById("demo-cap"),tabs=document.querySelectorAll("#demo .demo-tabs button");
+  Object.keys(caps).forEach(function(v){var i=new Image();i.src="/site/demo-"+v+".jpg?v=20261127mado"});
+  tabs.forEach(function(b){b.addEventListener("click",function(){
+    var v=b.getAttribute("data-v");
+    tabs.forEach(function(x){x.setAttribute("aria-selected",x===b?"true":"false")});
+    img.classList.add("fade");
+    setTimeout(function(){img.src="/site/demo-"+v+".jpg?v=20261127mado";img.alt="同じ文章を"+caps[v][0]+"で表示したところ";cap.textContent=caps[v][1]},120);
+    img.onload=function(){img.classList.remove("fade")};
+  })});
+})();
+</script>
+<script>
+// カスタマイズ: 押すたびに、いろいろな設定の画面に切り替える
+(function(){
+  var list=[["追加機能","使う機能だけスイッチでオン"],["動作環境","表示・編集・文字コードなどの基本"],["ファイルタイプ別の設定","言語ごとのタブ幅・色分け・キーワード"],["色・フォント","テーマ 8 種類。色や字を好みに"],["用紙モード","切り替えに出す用紙・ふりがな"],
+    ["キー割り当て","ショートカットを自由に"],["メニュー編集","メニューの並びや表示を変える"],["AI アシスタント","ChatGPT・Claude・Gemini・手元の AI"],
+    ["読み上げ・音声入力","声の種類・速さ・高さ"],["バックアップ","iCloud・バックアップ・版の履歴の数"]];
+  var files=[1,9,10,2,3,4,5,6,7,8];
+  var box=document.getElementById("cust"),img=document.getElementById("cust-img"),cap=document.getElementById("cust-cap"),dots=document.getElementById("cust-dots");
+  if(!box)return;
+  var n=0;
+  list.forEach(function(v,k){var d=document.createElement("i");dots.appendChild(d);var im=new Image();im.src="/site/custom-"+files[k]+".jpg?v=20261122h"});
+  function show(){cap.innerHTML=list[n][0]+"<small>"+list[n][1]+"</small>";
+    [].forEach.call(dots.children,function(d,k){d.className=k===n?"on":""});}
+  show();
+  // 画面の左の設定の一覧 (高さの割合) → 切り替える先。関連付けは見本が無いので、押しても次へ
+  var side=[[.121,1],[.160,2],[.201,3],[.240,4],[.281,5],[.321,6],[.401,9],[.490,0],[.531,7],[.572,8]];
+  function go(k){
+    if(k===n)return;
+    n=k;img.classList.add("fade");
+    setTimeout(function(){img.src="/site/custom-"+files[n]+".jpg?v=20261122h";img.alt="設定の「"+list[n][0]+"」の画面";show()},150);
+    img.onload=function(){img.classList.remove("fade")};
+  }
+  // 押せる場所 (左の設定の一覧の項目) にマウスが来たら、その項目を光らせる
+  var hl=document.getElementById("cust-hl");
+  function sideAt(e){
+    var r=img.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+    if(fx<0||fx>=0.2)return null;
+    for(var i=0;i<side.length;i++){if(Math.abs(fy-side[i][0])<0.02)return side[i]}
+    return null;
+  }
+  box.addEventListener("mousemove",function(e){
+    var it=sideAt(e);
+    if(!it){hl.hidden=true;return}
+    var r=img.getBoundingClientRect(),br=box.getBoundingClientRect();
+    hl.style.top=(r.top-br.top+r.height*(it[0]-0.019))+"px";
+    hl.style.height=(r.height*0.038)+"px";
+    hl.style.left=(r.left-br.left+r.width*0.006)+"px";
+    hl.hidden=false;
+  });
+  box.addEventListener("mouseleave",function(){hl.hidden=true});
+  box.addEventListener("click",function(e){
+    var r=img.getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+    if(fx>=0&&fx<0.2){
+      for(var i=0;i<side.length;i++){if(Math.abs(fy-side[i][0])<0.02){go(side[i][1]);return}}
+    }
+    go((n+1)%list.length);
+  });
+})();
+</script>
+<script>
+// 原稿用紙: 縦書き・横書きのタブを自動で交互に。タブを押したら、その表示で止める
+(function(){
+  var box=document.getElementById("gk-swap"),tabs=document.querySelectorAll("#gk-tabs button");if(!box)return;
+  function show(h){box.classList.toggle("h",h);tabs.forEach(function(t){t.setAttribute("aria-selected",String((t.dataset.k==="h")===h))})}
+  var timer=setInterval(function(){show(!box.classList.contains("h"))},3000);
+  tabs.forEach(function(t){t.addEventListener("click",function(){clearInterval(timer);show(t.dataset.k==="h")})});
+})();
+</script>
+</body></html>

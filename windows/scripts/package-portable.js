@@ -2,7 +2,7 @@
 // ポータブル版 (zip を広げて、その場ですぐ動く) を作る: node scripts/package-portable.js
 //   先に node scripts/package-host.js で build/satoruEditor-lite/satoruEditor を作っておく (なければここで作る)
 //   → build/SatoruEditor-<版>-win-x64-portable.zip
-// 中身はインストール版と同じ。exe の横に portable.txt があると、設定・テキスト・記録をすべて exe の横の data フォルダに置く
+// 中身はインストール版と同じ (exe 1 つ)。data\\portable.txt があると、設定・テキスト・記録をすべて exe の横の data フォルダに置く
 // (host/src/Program.cs の Portable)。アップデートは setup.exe を /portable=<場所> で起動して、その場で入れ替える
 const fs = require('fs');
 const path = require('path');
@@ -23,18 +23,19 @@ fs.mkdirSync(stage, { recursive: true });
 run('cp', ['-R', lite, out]);
 fs.rmSync(path.join(out, 'README.txt'), { force: true });
 
-fs.writeFileSync(path.join(out, 'portable.txt'), [
-  'このファイルがあると、さとるエディタはポータブル版として動きます。',
+fs.mkdirSync(path.join(out, 'data'), { recursive: true });
+// 目印は data の中に置く (開いたときに見えるのは exe・README・data だけにする)
+fs.writeFileSync(path.join(out, 'data', 'portable.txt'), [
+  'このファイルがあると、エディタβはポータブル版として動きます。',
   '設定・テキスト・版の履歴は、すべてこのフォルダの中の data フォルダに入ります (この PC には残しません)。',
   'このファイルは消さないでください。',
   '',
-  'While this file exists, Satoru Editor runs as a portable app.',
+  'While this file exists, Editor β runs as a portable app.',
   'Settings, texts and version history are all kept in the "data" folder here (nothing is left on this PC).',
   'Please do not delete this file.', '',
 ].join('\r\n'));
-fs.mkdirSync(path.join(out, 'data'), { recursive: true });
 fs.writeFileSync(path.join(out, 'README.txt'), [
-  'さとるエディタ ' + pkg.version + ' (ポータブル版)', '',
+  'エディタβ ' + pkg.version + ' (ポータブル版)', '',
   'satoruEditor.exe をダブルクリックすると、インストールしないで、すぐ使えます。',
   'フォルダごと好きな場所 (USB メモリなど) に置いてください。書いたテキストや設定は data フォルダに入ります。',
   'ほかのパソコンで続きを書くときは、このフォルダごと持っていってください。', '',

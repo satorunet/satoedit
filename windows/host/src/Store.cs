@@ -47,8 +47,8 @@ namespace SatoEdit {
   ""encDefaultKind"": ""device"", ""aiProvider"": ""openai"", ""aiModels"": {}, ""aiCustomBaseURL"": ""http://localhost:11434/v1"", ""aiVerified"": {},
   ""folderTreeVisible"": false, ""folderTreeRoot"": """", ""folderTreeWidth"": 240, ""aiVisible"": false, ""diffVisible"": false, ""remotePlaces"": {}, ""remoteTreeVisible"": false, ""remoteTreeWidth"": 260, ""pluginsDisabled"": [], ""pluginSources"": {}, ""pluginStorage"": {}, ""diffWidth"": 360, ""aiWidth"": 340, ""iconColor"": ""ai"",
   ""recent"": [], ""carets"": {}, ""lastKeyFileDir"": """", ""windowBounds"": null, ""language"": ""auto"",
-  ""collabEnabled"": false, ""collabChatVisible"": true, ""collabPort"": 7650, ""collabName"": """", ""aiApply"": ""confirm"", ""keys"": {}, ""hiddenMenu"": [], ""toolbarItems"": null, ""servers"": [], ""serverEnabled"": false, ""remoteAutoUpload"": true, ""aiPrices"": {}, ""aiYenPerDollar"": 150,
-  ""libraryEnabled"": true, ""libraryVisible"": true, ""libraryFiles"": [], ""librarySeeded"": false, ""libraryPinned"": [], ""libraryModes"": {}, ""libraryFolderIcons"": {}, ""libraryFolderOrder"": [],
+  ""collabEnabled"": false, ""collabChatVisible"": true, ""collabPort"": 7650, ""collabName"": """", ""aiApply"": ""confirm"", ""keys"": {}, ""hiddenMenu"": [], ""toolbarItems"": null, ""toolbarLayout2"": null, ""madoEnabled"": true, ""hugeFileMB"": 32, ""hugeWindowMB"": 8, ""servers"": [], ""serverEnabled"": false, ""remoteAutoUpload"": true, ""aiPrices"": {}, ""aiYenPerDollar"": 150,
+  ""libraryEnabled"": true, ""libraryVisible"": false, ""libraryFiles"": [], ""librarySeeded"": false, ""libraryPinned"": [], ""libraryModes"": {}, ""libraryFolderIcons"": {}, ""libraryFolderOrder"": [],
   ""librarySelectedGroup"": ""all"", ""libraryFolderExpanded"": [], ""libraryListWidth"": 220, ""libraryFolderWidth"": 140, ""libraryOneColumn"": true,
   ""paperCandidates"": null,
   ""versionHistory"": true, ""versionHistoryMax"": 20,
@@ -61,7 +61,7 @@ namespace SatoEdit {
     public static readonly HashSet<string> KeepOnReset = new HashSet<string> {
       "recent", "carets", "windowBounds", "lastKeyFileDir", "servers", "remotePlaces", "folderTreeRoot",
       "libraryFiles", "librarySeeded", "libraryPinned", "libraryModes", "libraryFolderIcons", "libraryFolderOrder", "sharedLinks",
-      "aiVerified", "aiPrices", "pluginsDisabled", "pluginSources", "pluginStorage", "collabName", "toolbarItems", "updateLastCheck",
+      "aiVerified", "aiPrices", "pluginsDisabled", "pluginSources", "pluginStorage", "collabName", "toolbarItems", "toolbarLayout2", "updateLastCheck",
     };
 
     /// すべての設定を最初の状態に戻す (自分のデータは残す)。色・フォントとファイルタイプ別の設定も消す

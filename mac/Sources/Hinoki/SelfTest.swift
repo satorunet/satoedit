@@ -23,6 +23,15 @@ enum SelfTest {
                 // 2 行目を書き換え、途中に 1 行足す
                 let line2 = ns.lineRange(for: NSRange(location: ns.lineRange(for: NSRange(location: 0, length: 0)).length, length: 0))
                 let mode = ProcessInfo.processInfo.environment["SATORU_SNAPSHOT_MODE"] ?? "diff"
+                // 窓の大きさ (サイトの画像用): SATORU_SNAPSHOT_SIZE=幅x高さ (pt)
+                if let size = ProcessInfo.processInfo.environment["SATORU_SNAPSHOT_SIZE"]?.split(separator: "x").compactMap({ Double($0) }), size.count == 2 {
+                    ed.window?.setContentSize(NSSize(width: size[0], height: size[1]))
+                }
+                // 選択の見え方の確認用: SATORU_SNAPSHOT_SELECT=位置,長さ
+                if let sel = ProcessInfo.processInfo.environment["SATORU_SNAPSHOT_SELECT"]?.split(separator: ",").compactMap({ Int($0) }),
+                   sel.count == 2, sel[0] + sel[1] <= ns.length {
+                    tv.setSelectedRange(NSRange(location: sel[0], length: sel[1]))
+                }
                 if mode == "a4shot" || mode == "genkoshot" {
                     ed.applyPaperMode(mode == "a4shot" ? .a4 : .genko)
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
@@ -30,6 +39,8 @@ enum SelfTest {
                             try? data.write(to: url.appendingPathExtension("a4.png"))
                         }
                     }
+                } else if mode == "selshot" {
+                    // 選択の見え方の確認用: SATORU_SNAPSHOT_SELECT=位置,長さ (genkoshot でも効く)
                 } else if mode == "shot" {
                     // スクリーンショットの「アプリ全体」で撮った画像を、そのまま書き出す
                     if let s = ed.screenshot(scope: .window), let data = Screenshot.png(s) {

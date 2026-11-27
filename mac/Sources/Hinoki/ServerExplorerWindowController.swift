@@ -744,7 +744,7 @@ enum RemoteDocuments {
         if let doc = openDocument(server: client.server, path: path), doc.isDocumentEdited {
             doc.showWindows()
             doc.editor?.focusEditor()
-            Toast.show(in: doc.editor?.window, key: "remote", kind: .info, title: L("編集中のタブを出しました"),
+            Toast.show(in: doc.editor?.presentingWindow, key: "remote", kind: .info, title: L("編集中のタブを出しました"),
                        detail: L("保存していない変更があるので、サーバから取り直していません。") + "\n" + path)
             done?(nil)
             return
@@ -770,7 +770,7 @@ enum RemoteDocuments {
                         let info = describe(entry)
                         if !info.isEmpty { lines.append(info) }
                         lines.append(L("{0} 秒で取得。保存するとサーバへ送ります。", String(format: "%.1f", secs)))
-                        Toast.show(in: doc.editor?.window, key: "remote", kind: .success,
+                        Toast.show(in: doc.editor?.presentingWindow, key: "remote", kind: .success,
                                    title: L("サーバから読み込みました"), detail: lines.joined(separator: "\n"))
                     }
                 }

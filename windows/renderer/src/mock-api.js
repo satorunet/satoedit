@@ -21,7 +21,7 @@ export function installMockAPI() {
     lineCounting: 'logical', lineSpacing: 2, genkoFullWidth: false, genkoFurigana: false, genkoAutoFormat: true, a4AutoFormat: true, linkURLs: true, paperSavePDF: true,
     encDefaultKind: 'device', aiProvider: 'openai', aiModels: {}, aiCustomBaseURL: 'http://localhost:11434/v1', aiVerified: {},
     folderTreeVisible: false, folderTreeRoot: '', folderTreeWidth: 240, aiVisible: false, diffVisible: false, remotePlaces: {}, remoteTreeVisible: false, remoteTreeWidth: 260, pluginsDisabled: [], pluginSources: {}, pluginStorage: {}, diffWidth: 360, aiWidth: 340, iconColor: 'ai',
-    recent: [], carets: {}, lastKeyFileDir: '', windowBounds: null, language: 'auto', collabEnabled: false, collabChatVisible: true, collabPort: 7650, collabName: '', aiApply: 'confirm', keys: {}, hiddenMenu: [], toolbarItems: null, aiPrices: {}, aiYenPerDollar: 150, servers: [], serverEnabled: false, remoteAutoUpload: true,
+    recent: [], carets: {}, lastKeyFileDir: '', windowBounds: null, language: 'auto', collabEnabled: false, collabChatVisible: true, collabPort: 7650, collabName: '', aiApply: 'confirm', keys: {}, hiddenMenu: [], toolbarItems: null, toolbarLayout2: null, madoEnabled: true, hugeFileMB: 32, hugeWindowMB: 8, aiPrices: {}, aiYenPerDollar: 150, servers: [], serverEnabled: false, remoteAutoUpload: true,
     autoUpdateCheck: true, updateSkipVersion: '', updateLastCheck: 0,
   };
   try { Object.assign(prefs, JSON.parse(sessionStorage.getItem('mock-prefs') || '{}')); } catch (e) { /* なし */ }

@@ -254,7 +254,7 @@ final class CollabSession {
             self.showNextApproval()
         }
         NSApp.requestUserAttention(.criticalRequest)
-        if let w = editor?.window {
+        if let w = editor?.presentingWindow {
             alert.beginSheetModal(for: w, completionHandler: done)
         } else {
             done(alert.runModal())

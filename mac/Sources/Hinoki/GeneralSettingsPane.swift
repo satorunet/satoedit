@@ -10,10 +10,10 @@ enum Prefs {
         "defaultEncoding": TextEncoding.utf8.rawValue, "defaultLineEnding": LineEnding.lf.rawValue,
         "backupOnSave": false, "trimTrailingOnSave": false, "lineCounting": "logical",
         "remoteAutoUpload": true, "collabEnabled": false, "encryptAlways": false, "aiEnabled": true,
-        "serverEnabled": false, "encryptionEnabled": false, "paperEnabled": true, "publishEnabled": true, "libraryEnabled": true, "versionHistory": true, "folderTreeEnabled": false,
+        "serverEnabled": false, "encryptionEnabled": false, "paperEnabled": true, "publishEnabled": true, "libraryEnabled": true, "madoEnabled": true, "versionHistory": true, "folderTreeEnabled": false,
         "lineSpacing": 2.0, "genkoAutoIndent": true, "genkoFullWidth": false,
         "genkoAutoFormat": true, "a4AutoFormat": true, "linkURLs": true, "paperSavePDF": true,
-        "genkoFurigana": true, "language": "auto", "hugeFileMB": 200, "hugePartMB": 64,
+        "genkoFurigana": true, "language": "auto", "hugeFileMB": 32, "hugePartMB": 64, "hugeWindowMB": 8,
     ]
 
     static func bool(_ key: String) -> Bool { UserDefaults.standard.bool(forKey: key) }

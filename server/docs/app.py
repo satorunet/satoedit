@@ -310,7 +310,7 @@ DEFAULT_THEME = {"background": "#1E1F22", "text": "#E6E6E6", "gutterBackground":
                  "gutterSeparator": "#34363C", "newlineMark": "#4FC3D9", "eof": "#4FC3D9", "chrome": "#2B2D31", "chromeText": "#9A9CA3",
                  "currentLine": "#2A2D33", "currentLineText": "#F5C451", "gutterCurrentText": "#E6E6E6", "selection": "#264F78", "caret": "#E6E6E6",
                  "currentLineOn": True,
-                 "marks": False, "ruler": False}
+                 "marks": False, "ruler": False, "wrap": True, "lineNumbers": True, "lineCounting": "logical"}
 
 
 def clean_theme(o):
@@ -319,16 +319,55 @@ def clean_theme(o):
     if isinstance(o, dict):
         for k in THEME_KEYS:
             v = o.get(k)
-            if isinstance(v, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", v):
+            if isinstance(v, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?", v):   # 半透明 (#RRGGBBAA) も
                 t[k] = v.upper()
+        if o.get("v") == 2:
+            t["v"] = 2
         t["marks"] = o.get("marks") is True
         t["ruler"] = o.get("ruler") is True
         t["currentLineOn"] = o.get("currentLineOn") is not False
+        # 文字の形と大きさ・行間 (アプリと同じ見た目に)。フォント名は CSS に入れるので、使える字だけ
+        f = o.get("fontFamily")
+        if isinstance(f, str) and re.fullmatch(r"[\w .\-()&+\u3000-\u30ff\u4e00-\u9fff\uff00-\uffef]{1,64}", f):
+            t["fontFamily"] = f.strip()
+        sz = o.get("fontSize")
+        if isinstance(sz, (int, float)) and not isinstance(sz, bool) and 6 <= sz <= 72:
+            t["fontSize"] = round(float(sz), 1)
+        t["wrap"] = o.get("wrap") is not False
+        t["lineNumbers"] = o.get("lineNumbers") is not False
+        t["lineCounting"] = "visual" if o.get("lineCounting") == "visual" else "logical"
+        ls = o.get("lineSpacing")
+        if isinstance(ls, (int, float)) and not isinstance(ls, bool) and 0 <= ls <= 40:
+            t["lineSpacing"] = round(float(ls), 1)
     return t
 
 
 def _rgb(h):
     return tuple(int(h[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def _lum(h):
+    r, g, b = _rgb(h)
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255
+
+
+def fix_theme(th):
+    """ページに出す前に色を整える。
+    - 前の版のアプリは透明さを落として送っていた (カーソル行の背景が真っ白になる): よくある半透明の色に戻す
+    - カーソル行の文字が透明 (= 色を変えない) なら、ふつうの文字の色
+    - ウインドウの題名の文字が背景とほとんど同じ色なら、読める色に"""
+    th = dict(th)
+    if th.get("v") != 2:
+        bg_dark = _lum(th["background"]) < 0.5
+        if th.get("currentLine") == "#FFFFFF" and bg_dark:
+            th["currentLine"] = "#FFFFFF0B"
+        elif th.get("currentLine") == "#000000" and not bg_dark:
+            th["currentLine"] = "#0000000A"
+    if len(th.get("currentLineText", "")) == 9 and th["currentLineText"].endswith("00"):
+        th["currentLineText"] = th["text"]
+    if abs(_lum(th["chrome"][:7]) - _lum(th["chromeText"][:7])) < 0.3:
+        th["chromeText"] = "#3A3A3C" if _lum(th["chrome"][:7]) > 0.5 else "#E5E5E5"
+    return th
 
 
 # ---------- 読み上げ (このサーバの VOICEVOX ENGINE、ずんだもん) ----------
@@ -682,8 +721,8 @@ header h1{font:600 20px/1.4 "Hiragino Sans",sans-serif;color:inherit;margin:0;fl
 @media (prefers-color-scheme:dark){header h1{color:#eee}}
 header a{color:var(--muted)}
 .paper{background:var(--paper);box-shadow:0 2px 10px rgba(0,0,0,.18);border-radius:4px}
-.text{max-width:860px;margin:8px auto 40px;padding:40px 44px;font-size:17px;line-height:2;white-space:pre-wrap;overflow-wrap:anywhere}
-@media (max-width:600px){.text{padding:24px 18px;margin:8px 8px 32px;font-size:16px}}
+.text{width:calc(100% - 32px);max-width:860px;margin:8px auto 40px;padding:40px 44px;font-size:17px;line-height:2;white-space:pre-wrap;overflow-wrap:anywhere}
+@media (max-width:600px){.text{width:calc(100% - 16px);padding:24px 18px;margin:8px auto 32px;font-size:16px}}
 .genko-wrap{overflow-x:auto;padding:8px 16px 40px;direction:rtl;display:flex;justify-content:safe center}
 .genko{display:inline-flex;flex-direction:row-reverse;gap:0;padding:28px 24px;direction:ltr;border:0}
 .genko.h{flex-direction:column;direction:ltr}
@@ -697,17 +736,19 @@ header a{color:var(--muted)}
 .genko.h .cell{writing-mode:horizontal-tb;border-bottom:0;border-right:1px solid var(--line)}
 .genko.h .col .cell:last-child{border-right:0}
 .genko.h{--line:#38a05c}
-.sheets{display:flex;flex-direction:column;align-items:center;gap:20px;padding:8px 12px 32px}
+.sheets{display:flex;flex-direction:column;align-items:center;gap:20px;padding:8px 16px 32px}
+@media (max-width:600px){.sheets{padding:8px 8px 32px}}
 .sheets svg{width:100%;max-width:1100px;height:auto;box-shadow:0 2px 10px rgba(0,0,0,.18);border-radius:3px;background:#fffdf7}
 .sheets.h svg{max-width:760px}
-.ed{max-width:960px;margin:8px auto 40px;border-radius:10px;overflow:hidden;background:var(--bg);box-shadow:0 4px 18px rgba(0,0,0,.28)}
+/* 画面の幅にかかわらず、まわりに少し隙間を残す (左右 16px、スマホは 8px) */
+.ed{width:calc(100% - 32px);max-width:960px;margin:8px auto 40px;border-radius:10px;overflow:hidden;background:var(--bg);box-shadow:0 4px 18px rgba(0,0,0,.28)}
 .ed-bar{display:flex;align-items:center;gap:7px;padding:9px 12px;background:var(--chrome);color:var(--chrome-fg);font:12px/1.4 -apple-system,"Hiragino Sans",sans-serif;border-bottom:1px solid rgba(128,128,128,.25)}
 .ed-bar i{width:11px;height:11px;border-radius:50%;background:#ff5f57}.ed-bar i:nth-child(2){background:#febc2e}.ed-bar i:nth-child(3){background:#28c840}
 .ed-bar span{flex:1;text-align:center;margin-right:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ed-body{display:grid;grid-template-columns:calc(var(--w) + 18px) 1fr;padding:0;font:15px/1.75 "SF Mono",Menlo,Consolas,"Hiragino Sans","Noto Sans JP",monospace;color:var(--fg)}
 .ln{color:var(--gfg);background:var(--gbg);text-align:right;padding-right:12px;border-right:1px solid var(--gsep);user-select:none;font-variant-numeric:tabular-nums}
 .ln:first-child,.ln:first-child+.lc{padding-top:10px}.ed-body{padding-bottom:16px;background:linear-gradient(to right,var(--gbg) calc(var(--w) + 18px),transparent 0)}
-.ed-body{font-family:"BIZ UDGothic","SF Mono",Menlo,Consolas,monospace;caret-color:var(--caret);outline:none}
+.ed-body{font-family:var(--font,"BIZ UDGothic"),"BIZ UDGothic","SF Mono",Menlo,Consolas,monospace;font-size:var(--fs,15px);line-height:var(--lh,1.75);caret-color:var(--caret);outline:none}
 .ed-body ::selection{background:var(--sel)}
 .ed-body.boxing ::selection{background:transparent}
 ::highlight(satoru-box){background-color:var(--sel)}
@@ -747,8 +788,10 @@ background-size:100% 4px,100% 7px,100% 10px;background-position:left bottom;back
 .toast.on{opacity:1;transform:translate(-50%,0)}.copy.done{border-color:#2f8f57;color:#2f8f57}
 .nl{color:var(--nl);font-weight:400;user-select:none;margin-left:2px}.eof{color:var(--eof);font-weight:400;user-select:none}
 .lc{white-space:pre-wrap;overflow-wrap:anywhere;padding:0 18px 0 14px;min-width:0}
-@media (max-width:600px){.ed{margin:8px 8px 32px}.ed-body{font-size:13.5px}}
-.oldrev{max-width:900px;margin:0 auto 8px;padding:8px 14px;background:#fff3dc;border:1px solid #f5c26b;border-radius:8px;font:14px/1.6 -apple-system,"Hiragino Sans",sans-serif;color:#7a4b00}
+@media (max-width:600px){.ed{width:calc(100% - 16px);margin:8px auto 32px}.ed-body{font-size:13.5px}}
+.ed.nowrap .ed-body{grid-template-columns:calc(var(--w) + 18px) max-content;overflow-x:auto}.ed.nowrap .lc{white-space:pre;overflow-wrap:normal}
+.ed.nonum .ed-body{grid-template-columns:0 1fr;background:none}.ed.nonum.nowrap .ed-body{grid-template-columns:0 max-content}.ed.nonum .ln{visibility:hidden;padding:0;border:0;overflow:hidden}
+.oldrev{width:calc(100% - 32px);max-width:900px;margin:0 auto 8px;padding:8px 14px;background:#fff3dc;border:1px solid #f5c26b;border-radius:8px;font:14px/1.6 -apple-system,"Hiragino Sans",sans-serif;color:#7a4b00}
 .hist{max-width:900px;margin:0 auto 28px;padding:0 16px;font:14px/1.7 -apple-system,"Hiragino Sans",sans-serif;color:var(--muted)}
 .hist h2{font-size:15px;margin:0 0 6px;color:inherit}
 .hist ol{list-style:none;margin:0;padding:0;border-top:1px solid rgba(128,128,128,.25)}
@@ -763,6 +806,29 @@ HISTORY_MAX = 50
 
 # 公開ページのエディタの動き (読むだけ)。f-string の外に置く (波かっこをそのまま書くため)
 EDITOR_JS = '\n// 公開ページのエディタ (読むだけ): カーソルを置く・動かす・選ぶ・列 (矩形) で選ぶ はできるが、書き換えはできない\n(function () {\n  var ed = document.getElementById("edbody");\n  if (!ed) return;\n  var rows = Array.prototype.slice.call(ed.querySelectorAll(".lc:not(.rl)"));\n  var original = ed.innerHTML;          // 書き換えられたら、この形に戻す\n  var lastPos = null;                   // 最後のカーソル (行, 行の中の位置)\n\n  // --- 行の中の位置 <-> DOM の位置 ---\n  function lineOf(node) {\n    var n = node && (node.nodeType === 1 ? node : node.parentNode);\n    while (n && n !== ed && !(n.classList && n.classList.contains("lc"))) n = n.parentNode;\n    return n && n !== ed && !n.classList.contains("rl") ? n : null;\n  }\n  function textNodes(el) {\n    var out = [], w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {\n      acceptNode: function (t) { return t.parentNode.closest && t.parentNode.closest(".nl,.eof") ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; }\n    });\n    while (w.nextNode()) out.push(w.currentNode);\n    return out;\n  }\n  function offsetIn(el, node, off) {\n    var n = 0, list = textNodes(el);\n    for (var i = 0; i < list.length; i++) {\n      if (list[i] === node) return n + off;\n      n += list[i].data.length;\n    }\n    return n;\n  }\n  function pointAt(el, off) {\n    var list = textNodes(el);\n    for (var i = 0; i < list.length; i++) {\n      if (off <= list[i].data.length) return [list[i], off];\n      off -= list[i].data.length;\n    }\n    return list.length ? [list[list.length - 1], list[list.length - 1].data.length] : [el, 0];\n  }\n\n  // 読み上げから使う: n 行目の from〜to 字目の範囲\n  window.__satoruLineRange = function (n, from, to) {\n    var line = rows[n];\n    if (!line) return null;\n    var a = pointAt(line, from), b = pointAt(line, to), r = document.createRange();\n    r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]);\n    return r;\n  };\n\n  // --- カーソルのある行に色を付ける (アプリと同じ) ---\n  var cur = null;\n  function markLine() {\n    var s = window.getSelection();\n    if (!s || !s.focusNode) return;\n    var line = lineOf(s.focusNode);\n    if (!line) return;\n    lastPos = [rows.indexOf(line), offsetIn(line, s.focusNode, s.focusOffset)];\n    if (cur === line) return;\n    if (cur) { cur.classList.remove("cur"); if (cur.previousElementSibling) cur.previousElementSibling.classList.remove("cur"); }\n    line.classList.add("cur");\n    if (line.previousElementSibling) line.previousElementSibling.classList.add("cur");\n    cur = line;\n  }\n  document.addEventListener("selectionchange", markLine);\n\n  // --- 選んでいる行の行番号を光らせる (ふつうの選択も、列の選択も) ---\n  var lit = [];\n  function lightNumbers(lines) {\n    lit.forEach(function (n) { n.classList.remove("sel"); });\n    lit = [];\n    lines.forEach(function (line) {\n      var n = line.previousElementSibling;\n      if (n && n.classList.contains("ln")) { n.classList.add("sel"); lit.push(n); }\n    });\n  }\n  document.addEventListener("selectionchange", function () {\n    if (box) return;\n    var s = window.getSelection();\n    if (!s || s.rangeCount === 0 || s.isCollapsed) { lightNumbers([]); return; }\n    var r = s.getRangeAt(0);\n    lightNumbers(rows.filter(function (line) { return r.intersectsNode(line) && r.toString() !== ""; }));\n  });\n\n  // --- 書き換えさせない ---\n  ["beforeinput", "paste", "drop", "cut", "dragstart"].forEach(function (t) {\n    ed.addEventListener(t, function (e) { e.preventDefault(); });\n  });\n  ed.addEventListener("keydown", function (e) {\n    var k = e.key;\n    if ((k.length === 1 && !(e.metaKey || e.ctrlKey)) || k === "Enter" || k === "Backspace" || k === "Delete" || k === "Tab") e.preventDefault();\n  });\n  // 日本語入力 (変換中の文字) は止められないことがあるので、入ってしまったら元に戻して、カーソルも戻す\n  function restore() {\n    if (ed.innerHTML === original) return;\n    var pos = lastPos;\n    ed.innerHTML = original;\n    rows = Array.prototype.slice.call(ed.querySelectorAll(".lc:not(.rl)"));\n    cur = null;\n    if (pos && rows[pos[0]]) {\n      var p = pointAt(rows[pos[0]], pos[1]), r = document.createRange();\n      r.setStart(p[0], Math.min(p[1], p[0].length || 0));\n      r.collapse(true);\n      var s = window.getSelection(); s.removeAllRanges(); s.addRange(r);\n    }\n    markLine();\n  }\n  ed.addEventListener("input", function () { setTimeout(restore, 0); });\n  ed.addEventListener("compositionend", function () { setTimeout(restore, 0); });\n\n  // --- 行番号を押すと、その行を選ぶ (⇧を押しながらなら、そこまで広げる) ---\n  ed.addEventListener("mousedown", function (e) {\n    var ln = e.target.closest && e.target.closest(".ln");\n    if (!ln || ln.classList.contains("rl")) return;\n    var line = ln.nextElementSibling;\n    if (!line) return;\n    e.preventDefault();\n    var s = window.getSelection(), r = document.createRange();\n    if (e.shiftKey && s.anchorNode && lineOf(s.anchorNode)) {\n      var a = lineOf(s.anchorNode), ai = rows.indexOf(a), li = rows.indexOf(line);\n      var first = rows[Math.min(ai, li)], last = rows[Math.max(ai, li)];\n      r.setStart(first, 0); r.setEndAfter(last.lastChild || last);\n    } else {\n      r.selectNodeContents(line);\n    }\n    s.removeAllRanges(); s.addRange(r);\n    ed.focus({ preventScroll: true });\n  });\n\n  // --- 列 (矩形) の選択: ⌥ (Alt) を押しながらドラッグ ---\n  var box = null, boxText = "";\n  var canHighlight = window.CSS && CSS.highlights && window.Highlight;\n  function caretAt(x, y) {\n    if (document.caretRangeFromPoint) { var r = document.caretRangeFromPoint(x, y); return r && [r.startContainer, r.startOffset]; }\n    if (document.caretPositionFromPoint) { var p = document.caretPositionFromPoint(x, y); return p && [p.offsetNode, p.offset]; }\n    return null;\n  }\n  function clearBox() {\n    box = null; boxText = "";\n    lightNumbers([]);\n    if (canHighlight) CSS.highlights.delete("satoru-box");\n    ed.classList.remove("boxing");\n  }\n  function drawBox(x0, y0, x1, y1) {\n    var top = Math.min(y0, y1), bottom = Math.max(y0, y1), left = Math.min(x0, x1), right = Math.max(x0, x1);\n    var ranges = [], lines = [], hit = [];\n    rows.forEach(function (line) {\n      var rc = line.getBoundingClientRect();\n      if (rc.bottom < top || rc.top > bottom) return;\n      var y = Math.max(rc.top + 2, Math.min(rc.bottom - 2, (rc.top + rc.bottom) / 2));\n      var a = caretAt(left, y), b = caretAt(right, y);\n      if (!a || !b || lineOf(a[0]) !== line || lineOf(b[0]) !== line) { lines.push(""); return; }\n      var r = document.createRange();\n      r.setStart(a[0], a[1]); r.setEnd(b[0], b[1]);\n      if (r.collapsed) { lines.push(""); return; }\n      ranges.push(r);\n      hit.push(line);\n      lines.push(r.toString());\n    });\n    boxText = lines.join("\\n");\n    lightNumbers(hit);\n    if (canHighlight) CSS.highlights.set("satoru-box", new Highlight(...ranges));\n  }\n  ed.addEventListener("mousedown", function (e) {\n    if (!e.altKey || e.button !== 0) { if (box) clearBox(); return; }\n    e.preventDefault();\n    box = { x: e.clientX, y: e.clientY };\n    ed.classList.add("boxing");\n    window.getSelection().removeAllRanges();\n    function move(ev) { drawBox(box.x, box.y, ev.clientX, ev.clientY); }\n    function up() { document.removeEventListener("mousemove", move); document.removeEventListener("mouseup", up); }\n    document.addEventListener("mousemove", move);\n    document.addEventListener("mouseup", up);\n  });\n  // 列で選んでいるときのコピーは、選んだ列だけを行ごとに\n  document.addEventListener("copy", function (e) {\n    if (!box || !boxText) return;\n    e.clipboardData.setData("text/plain", boxText);\n    e.preventDefault();\n  });\n  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && box) clearBox(); });\n})();\n'
+
+# ワープロ的な行番号の数え方: 折り返した行にも番号を付ける (見る人の画面の幅で折り返すので、ページの中で数え直す)
+EDITOR_JS += '''
+(function () {
+  var ed = document.querySelector(".ed.visual .ed-body");
+  if (!ed) return;
+  function count() {
+    var lh = parseFloat(getComputedStyle(ed).lineHeight) || 20, n = 1;
+    ed.querySelectorAll(".lc:not(.rl)").forEach(function (lc) {
+      var ln = lc.previousElementSibling;
+      if (!ln || !ln.classList.contains("ln")) return;
+      if (lc.querySelector(".eof") && lc.textContent === "[EOF]") { ln.textContent = ""; return; }
+      var k = Math.max(1, Math.round(lc.getBoundingClientRect().height / lh)), out = [];
+      for (var i = 0; i < k; i++) out.push(n++);
+      ln.innerHTML = out.join("<br>");
+    });
+  }
+  count();
+  addEventListener("resize", count);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(count);
+  ed.addEventListener("input", function () { setTimeout(count, 10); });
+})();
+'''
 
 
 
@@ -959,17 +1025,26 @@ def page(doc, i, rev=None, links=True, view=None):
             cols = 300   # 画面の幅いっぱいまで (はみ出すぶんは隠れる)
             labels = "".join('<span style="left:%dch">%d</span>' % (n, n) for n in range(10, cols + 1, 10))
             rows = '<div class="ln rl" contenteditable="false"></div><div class="lc rl" contenteditable="false"><div class="ruler" style="width:%dch">%s</div></div>' % (cols, labels) + rows
-        th = dict(DEFAULT_THEME, **th)   # 前に公開したもの (色が足りない) にも既定の色を
+        th = fix_theme(dict(DEFAULT_THEME, **th))   # 前に公開したもの (色が足りない) にも既定の色を
         style = ("--w:%dch;--bg:%s;--fg:%s;--gbg:%s;--gfg:%s;--gsep:%s;--nl:%s;--eof:%s;--chrome:%s;--chrome-fg:%s;"
                  "--cl:%s;--clt:%s;--gct:%s;--sel:%s;--caret:%s") % (
             len(str(len(lines))) + 1, th["background"], th["text"], th["gutterBackground"], th["gutterText"], th["gutterSeparator"],
             th["newlineMark"], th["eof"], th["chrome"], th["chromeText"],
             th["currentLine"], th["currentLineText"], th["gutterCurrentText"], th["selection"], th["caret"])
+        if th.get("fontFamily"):
+            style += ";--font:'%s'" % th["fontFamily"].replace("'", "")   # 属性は " で囲むので、名前は ' で囲む
+        if th.get("fontSize"):
+            # アプリの行の高さ = 文字の高さ (約 1.2 倍) + 行間
+            fs = th["fontSize"]
+            style += ";--fs:%.1fpx;--lh:%.1fpx" % (fs, fs * 1.25 + (th.get("lineSpacing") or 0))
         # 読むだけのエディタ: クリックでカーソルを置ける・矢印で動ける・選べる (書き換えはできない)
+        cls = (" curline" if th.get("currentLineOn") else "") + ("" if th.get("wrap", True) else " nowrap") + ("" if th.get("lineNumbers", True) else " nonum")
+        if th.get("wrap", True) and th.get("lineNumbers", True) and th.get("lineCounting") == "visual":
+            cls += " visual"   # ワープロ的: 折り返した行にも番号 (見る人の画面の幅で数えるので、ページの中で数える)
         body = ('<div class="ed%s" style="%s"><div class="ed-bar"><i></i><i></i><i></i><span>%s</span></div>'
                 '<div class="ed-body" id="edbody" contenteditable="true" spellcheck="false" inputmode="none" '
                 'autocorrect="off" autocapitalize="off" role="textbox" aria-readonly="true" aria-multiline="true">%s</div></div>') % (
-            " curline" if th.get("currentLineOn") else "", style, esc(title), rows)
+            cls, style, esc(title), rows)
     else:
         # A4用紙 (紙のテキスト): 1 行ずつ分けておく (読み上げで、読んでいる行・字を光らせるため)
         body = '<div class="text paper">%s</div>' % "".join(
@@ -1565,7 +1640,7 @@ class Handler(BaseHTTPRequestHandler):
         token = secrets.token_urlsafe(24)
         layout = clean_layout(o.get("layout")) if mode in ("genko", "genkoH") else None
         doc = {"title": title, "text": text, "mode": mode, "created": now, "visibility": vis, "layout": layout,
-               "theme": clean_theme(o.get("theme")) if mode == "editor" else None,
+               "theme": clean_theme(o.get("theme")) if o.get("theme") is not None or mode == "editor" else None,
                "expires": custom if custom else (now + days * 86400 if days else None), "token": token,
                "keepHistory": o.get("keepHistory") is not False,
                "listed": bool(o.get("listed")) and vis == "public"}   # 「みんなのメモ」に載せてよい (「公開」のものだけ)
@@ -1667,7 +1742,7 @@ class Handler(BaseHTTPRequestHandler):
                 doc["title"] = o["title"].strip()[:120]
             doc["mode"] = mode
             doc["layout"] = clean_layout(o.get("layout")) if mode in ("genko", "genkoH") else None
-            doc["theme"] = clean_theme(o.get("theme")) if mode == "editor" else None
+            doc["theme"] = clean_theme(o.get("theme")) if o.get("theme") is not None or mode == "editor" else None
             doc["updated"] = time.time()
         save(i, doc)
         try:   # カード画像も作り直す

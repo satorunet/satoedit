@@ -24,6 +24,9 @@ final class Document: NSDocument {
 
     var editor: EditorWindowController? { windowControllers.first as? EditorWindowController }
 
+    /// 確認・保存の画面を出すウインドウ。窓割りの画面の文書は、分割しているウインドウに出す (自分のウインドウは隠れているため)
+    override var windowForSheet: NSWindow? { editor?.presentingWindow ?? super.windowForSheet }
+
     /// 暗号化して保存する文書の鍵 (パスワードから作ったもの。メモリの中だけに持つ)
     var encryptionKey: FileCrypto.Key? {
         didSet { editor?.encryptionChanged() }
@@ -31,8 +34,14 @@ final class Document: NSDocument {
     var isEncrypted: Bool { encryptionKey != nil }
     /// 巨大なファイルの一部分だけを読み込んでいるとき、その範囲 (保存すると、その部分だけを差し替える)
     var partial: PartialFile.Part? {
-        didSet { editor?.encryptionChanged() }
+        didSet {
+            editor?.encryptionChanged()
+            // 一部分だけ読んでいる間は、スクロールに合わせて近くを読み直す (AOI)
+            if partial == nil { hugeWindow = nil } else if hugeWindow == nil { hugeWindow = HugeFileWindow(doc: self) }
+        }
     }
+    /// 大きなファイルを、見ている所の近くだけ読む係
+    private(set) var hugeWindow: HugeFileWindow?
     /// 次に読み込むときの範囲 (「読み込む範囲を変える」用)
     var nextPart: (offset: UInt64, length: UInt64)?
     /// 保存で書き出した、一部分のバイト数 (保存が成功したら partial に反映する)
@@ -154,7 +163,7 @@ final class Document: NSDocument {
         editor?.remoteStatusChanged(L("↑ {0} に送信中…", r.server.displayName))
         let client = RemoteClient(server: r.server)
         let started = Date()
-        let window = editor?.window
+        let window = editor?.presentingWindow
         RemoteDocuments.setState(.uploading, server: r.server, path: r.path)
         Toast.show(in: window, key: "remote", kind: .progress, title: L("サーバへ送信中…"),
                    detail: L("接続: {0}", client.connectionText) + "\n" + r.path)
@@ -192,7 +201,7 @@ final class Document: NSDocument {
                 let alert = NSAlert()
                 alert.messageText = L("{0} をサーバに送れませんでした", r.path)
                 alert.informativeText = e.localizedDescription + L("\n\n手元には保存済み。もう一度保存で送り直します。")
-                if let w = self.editor?.window { alert.beginSheetModal(for: w) } else { alert.runModal() }
+                if let w = self.editor?.presentingWindow { alert.beginSheetModal(for: w) } else { alert.runModal() }
             }
             if self.uploadAgain {
                 self.uploadAgain = false
@@ -350,11 +359,8 @@ final class Document: NSDocument {
         } else if let p = partial {
             wanted = (p.offset, p.length) // 「保存時の状態に戻す」などは、同じ範囲を読み直す
         } else if canPart, HugeFile.thresholdMB > 0, size >= UInt64(HugeFile.thresholdMB) * 1_048_576 {
-            switch HugeFile.ask(name: url.lastPathComponent, size: size) {
-            case .whole: break
-            case .part(let o, let l): wanted = (o, l)
-            case .cancel: throw CocoaError(.userCancelled)
-            }
+            // 大きなファイルは聞かずに、先頭の近くだけを読む (全部は読まない。続きはスクロールに合わせて読む)
+            wanted = (0, HugeFileWindow.windowBytes)
         }
         nextPart = nil
         if canPart, let w = wanted {
@@ -443,7 +449,7 @@ final class Document: NSDocument {
     private func offerPublishUpdate(_ url: URL) {
         guard EditorExtension.publish.isOn, let r = ShareLink.record(for: url),
               let (text, _, mode) = TextLibraryActions.shareContent(url), ShareLink.needsUpdate(r, text: text, mode: mode) else { return }
-        let w = editor?.window
+        let w = editor?.presentingWindow
         let a = NSAlert()
         a.messageText = L("公開中のページにも反映しますか？")
         a.informativeText = L("このテキストはリンクで公開中です。保存した内容を、公開中のページにも反映できます。") + "\n\n" + r.url

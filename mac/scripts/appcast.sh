@@ -28,11 +28,11 @@ cat > appcast.xml <<XML
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>さとるエディタ</title>
+    <title>エディタβ</title>
     <link>https://github.com/satorunet/satoedit</link>
     <language>ja</language>
     <item>
-      <title>さとるエディタ ${VER}</title>
+      <title>エディタβ ${VER}</title>
       <pubDate>${DATE}</pubDate>
       <sparkle:version>${VER}</sparkle:version>
       <sparkle:shortVersionString>${VER}</sparkle:shortVersionString>

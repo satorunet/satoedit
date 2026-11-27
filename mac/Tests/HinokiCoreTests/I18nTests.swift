@@ -130,7 +130,7 @@ final class I18nTests: XCTestCase {
             let folder = root.appendingPathComponent(dir)
             for name in try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted() where name.hasSuffix(".swift") {
                 // PluginDocs.swift は拡張機能を作る人向けの説明とひな形 (日本語のまま)。Furigana.swift の日本語は読みを調べるための言葉の一覧、SelfTest.swift は開発用の確かめ。PrivacyScan.swift は探す決まり (正規表現・名字の一覧)。種類の名前は画面に出すとき L() で訳す
-                if name == "I18nEnglish.swift" || name == "PluginDocs.swift" || name == "Furigana.swift" || name == "SelfTest.swift" || name == "PrivacyScan.swift" { continue }
+                if name == "I18nEnglish.swift" || name == "PluginDocs.swift" || name == "Furigana.swift" || name == "SelfTest.swift" || name == "SelfTestMado.swift" || name == "SelfTestLatency.swift" || name == "PrivacyScan.swift" { continue }
                 let code = try String(contentsOf: folder.appendingPathComponent(name), encoding: .utf8)
                 out += literals(in: code, file: name)
             }

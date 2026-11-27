@@ -3,7 +3,7 @@ import HinokiCore
 
 /// 巨大なファイルを開くときの聞き方と、その設定
 enum HugeFile {
-    /// これ以上の大きさのファイルは、開く前に「全部か一部分か」を聞く (MB)。0 なら聞かない
+    /// これ以上の大きさのファイルは、全部は読まずに見ている所の近くだけを読む (MB。HugeFileWindow)。0 なら全部読む
     static var thresholdMB: Int {
         let v = UserDefaults.standard.integer(forKey: "hugeFileMB")
         return v < 0 ? 0 : v

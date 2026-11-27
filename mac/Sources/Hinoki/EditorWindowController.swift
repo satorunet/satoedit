@@ -44,7 +44,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     private let formatCheck = NSButton(checkboxWithTitle: L("自動整形"), target: nil, action: nil)
     /// フッター右側: 行・列 | 選択 | 言語 | 文字コード | 改行コード (クリックで変更)
     private let statusCells = StatusCellsView()
-    private var highlighter: SyntaxHighlighter!
+    private(set) var highlighter: SyntaxHighlighter!
     /// init 中はまだ document が設定されていないので自前で持つ
     private weak var ownerDocument: Document?
     private(set) var profile: LanguageProfile?
@@ -71,6 +71,36 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     static var editorFont: NSFont { Theme.font }
     private let divider = NSView()
 
+    // MARK: 窓割り (Mado*.swift。ほかのタブと 1 つのウインドウに並べる)
+
+    /// ウインドウの中身 (編集面・横の欄・ステータスバー)。窓割りのときは、この入れ物ごと画面 (ペイン) に移す
+    let contentRoot = EditorContentView()
+    /// 窓割りで並べているとき、その分割 (画面になっている間だけ)
+    weak var madoSplit: TabSplit?
+    /// 画面のときの、このエディタの次の応答者 (画面のビュー → 分割のウインドウ)。
+    /// 画面の本文 → 中身 → このエディタ → 画面 … の順にして、メニューの動作をこのエディタで受ける
+    weak var paneNextResponder: NSResponder?
+    override var nextResponder: NSResponder? {
+        get { paneNextResponder ?? super.nextResponder }
+        set { super.nextResponder = newValue }
+    }
+    /// 窓割りに使うタブとして選んだ印 (TabMarks)。タブの題の前に「✓ 」を付ける
+    var tabMarked = false
+    /// 印を付けたときのタブの組 (ほかの組に移ったら印を消す)
+    weak var tabMarkGroup: NSWindowTabGroup?
+    /// 窓割りの画面で「この画面を選ぶ」の印 (次の「この画面を左右/上下に分割」で、その画面の隣に移す)
+    var paneMarked = false
+    /// タブの組から分けたときの元のウインドウのエディタ (TabTearOff。元のウインドウのタブに戻す)
+    weak var tearOffOrigin: EditorWindowController?
+    /// 前に見たときの、同じタブの組のほかのウインドウ (タブを引き出したかを見分ける)
+    var tabSiblings: [WeakWindow] = []
+    /// 前に見たときのウインドウの位置 (2 つのタブの組が分かれたとき、動いた方を見分ける)
+    var tabFrame: NSRect = .zero
+    /// 一度でも出したか (窓割りで開く場所を選ぶのは、はじめて出すときだけ)
+    var madoShown = false
+    /// シート・確認を出すウインドウ。窓割りの中では (このエディタのウインドウは隠れているので) 分割しているウインドウ
+    var presentingWindow: NSWindow? { madoSplit?.hostWindow ?? window }
+
     init(document: Document) {
         primary = EditorPane()
 
@@ -93,6 +123,8 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak window] in EditorToolbar.restyleOverflowButton(in: window) }
         }
         window.toolbarStyle = .expanded
+        // 中身は自分の入れ物にする (窓割りで、ほかのウインドウの画面に移せるように)
+        window.contentView = contentRoot
         super.init(window: window)
         window.delegate = self
         ownerDocument = document
@@ -155,6 +187,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
             guard let self = self, let pane = pane else { return }
             self.secondaryIsActive = pane === self.secondary
             self.updateStatus()
+            self.madoSplit?.paneFocused(self)   // 窓割りの中なら、その画面にフォーカスを移す
         }
 
         let font = Self.editorFont
@@ -185,7 +218,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     }
 
     private func setUpLayout(in window: NSWindow) {
-        let content = window.contentView!
+        let content: NSView = contentRoot
         splitView.isVertical = false // 上下に並べる
         splitView.dividerStyle = .thin
         splitView.delegate = self
@@ -294,7 +327,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
             lower.detach()
             secondary = nil
             splitView.adjustSubviews()
-            window?.makeFirstResponder(primary.textView.focusTarget)
+            presentingWindow?.makeFirstResponder(primary.textView.focusTarget)
         } else {
             guard let storage = primary.textView.textStorage else { return }
             let lower = EditorPane(sharing: storage)
@@ -310,7 +343,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
             let sel = primary.textView.selectedRange()
             lower.textView.setSelectedRange(sel)
             lower.textView.scrollRangeToVisible(sel)
-            window?.makeFirstResponder(lower.textView.focusTarget)
+            presentingWindow?.makeFirstResponder(lower.textView.focusTarget)
         }
         updateStatus()
     }
@@ -318,7 +351,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     /// 上と下のカーソルを行き来する
     @objc func switchSplitPaneHM(_ sender: Any?) {
         guard let lower = secondary else { NSSound.beep(); return }
-        window?.makeFirstResponder((secondaryIsActive ? primary.textView : lower.textView).focusTarget)
+        presentingWindow?.makeFirstResponder((secondaryIsActive ? primary.textView : lower.textView).focusTarget)
     }
 
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate proposedMinimumPosition: CGFloat, ofSubviewAt dividerIndex: Int) -> CGFloat {
@@ -460,7 +493,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     // MARK: 指定行へ移動
 
     @objc func goToLineHM(_ sender: Any?) {
-        guard let window = window else { return }
+        guard let window = presentingWindow else { return }
         let total = ruler.lineCount
         let alert = NSAlert()
         alert.messageText = L("指定行へ移動")
@@ -500,6 +533,9 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     }
 
     func windowWillClose(_ notification: Notification) {
+        // 窓割りの画面なら外す (残りが 1 つなら並べるのをやめる)
+        madoSplit?.remove(self)
+        TabMarks.set(self, false)
         collabSession?.stop()
         saveCaretPosition()
         closeDetachedAIWindow() // 取り出した AI のウインドウだけ残らないように
@@ -513,7 +549,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     override func windowDidLoad() {
         super.windowDidLoad()
         DispatchQueue.main.async { [weak self] in self?.updateAITab() }
-        window?.makeFirstResponder(primary.textView.focusTarget)
+        presentingWindow?.makeFirstResponder(primary.textView.focusTarget)
     }
 
     /// 本文に入力できるようにする (左のツリーからファイルを開いたあとなど)
@@ -536,12 +572,14 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     }
 
     func focusEditor() {
-        window?.makeKeyAndOrderFront(nil)
-        window?.makeFirstResponder(primary.textView.focusTarget)
+        presentingWindow?.makeKeyAndOrderFront(nil)
+        presentingWindow?.makeFirstResponder(primary.textView.focusTarget)
     }
 
-    /// ⌘T とタブバーの「＋」ボタン
+    /// ⌘T とタブバーの「＋」ボタン: 窓割りをしていても聞かずに、いつも新しいタブで開く
     override func newWindowForTab(_ sender: Any?) {
+        Mado.forceTab = true
+        defer { Mado.forceTab = false }
         do {
             try NSDocumentController.shared.openUntitledDocumentAndDisplay(true)
         } catch {
@@ -551,6 +589,12 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
 
     /// 起動直後や 1 枚目からタブバーを出しておく (右端の＋でタブを増やせる)
     override func showWindow(_ sender: Any?) {
+        // 窓割りの画面なら、隠れているウインドウは出さずに、分割しているウインドウのその画面を前に出す
+        if madoSplit != nil { bringToFront(); return }
+        // 窓割りしているウインドウから開いた新しい文書: 開く場所 (窓内 / タブ / 新しいウインドウ) を選ぶ
+        let first = !madoShown
+        madoShown = true
+        if first, Mado.openNewEditor(self) { return }
         super.showWindow(sender)
         updateAITab()
         if let w = window, let group = w.tabGroup, !group.isTabBarVisible {
@@ -682,13 +726,13 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     }
 
     @objc private func applyLibraryPanel() {
-        if TextLibrary.isVisible && !remoteTreeShown {
+        if TextLibrary.isVisible && !remoteTreeShown && madoAllowsSidePanels {
             if !libraryPanelCreated {
                 libraryPanelCreated = true
                 arrangeLibraryPanels()
                 // 一覧の検索欄に入力の場所を取られないよう、本文に戻す
                 DispatchQueue.main.async { [weak self] in
-                    guard let self = self, let w = self.window, (w.firstResponder as? NSTextView)?.isFieldEditor == true else { return }
+                    guard let self = self, let w = self.presentingWindow, (w.firstResponder as? NSTextView)?.isFieldEditor == true else { return }
                     w.makeFirstResponder(self.textView.focusTarget)
                 }
             }
@@ -712,7 +756,8 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     }
 
     func showLibraryGrid() {
-        guard libraryGrid == nil, let content = window?.contentView else { return }
+        guard libraryGrid == nil else { return }
+        let content: NSView = contentRoot
         let g = TextLibraryGrid()
         g.onClose = { [weak self] in self?.closeLibraryGrid() }
         content.addSubview(g)
@@ -723,17 +768,17 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
             g.trailingAnchor.constraint(equalTo: editorArea.trailingAnchor),
         ])
         libraryGrid = g
-        window?.makeFirstResponder(g)
+        presentingWindow?.makeFirstResponder(g)
     }
 
     func closeLibraryGrid() {
         libraryGrid?.removeFromSuperview()
         libraryGrid = nil
-        window?.makeFirstResponder(textView.focusTarget)
+        presentingWindow?.makeFirstResponder(textView.focusTarget)
     }
 
     @objc private func applyFolderTree() {
-        let show = EditorExtension.folder.isOn && FolderTree.isVisible
+        let show = EditorExtension.folder.isOn && FolderTree.isVisible && madoAllowsSidePanels
         if show {
             if !folderPanelCreated {
                 folderPanelCreated = true
@@ -751,7 +796,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     @objc private func applyRemoteTree() {
         // サーバのファイルを編集しているタブは、閉じるボタンで消すまで自動で出す
         let remoteTab = hdoc?.remote != nil && !remoteTreeDismissed
-        let show = EditorExtension.server.isOn && (RemoteTree.isVisible || remoteTab)
+        let show = EditorExtension.server.isOn && (RemoteTree.isVisible || remoteTab) && madoAllowsSidePanels
         if show {
             if !remotePanelCreated {
                 remotePanelCreated = true
@@ -774,6 +819,15 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
         guard let r = hdoc?.remote else { return applyRemoteTree() }
         remoteTreeDismissed = false
         if RemoteTree.server?.id != r.server.id { RemoteTree.setServer(r.server, show: false) }
+        applyRemoteTree()
+    }
+
+    /// 窓割りの中では、左の欄 (テキスト一覧・ツリー) はいちばん左上の画面だけに出す
+    var madoAllowsSidePanels: Bool { madoSplit.map { $0.panes.first?.editor === self } ?? true }
+
+    /// 窓割りの並びが変わったとき: 左の欄を出す画面を決め直す
+    func madoPanelsChanged() {
+        applyFolderTree()
         applyRemoteTree()
     }
 
@@ -908,7 +962,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
         }
         if let r = remoteStatus { notes.append(r) }
         if let p = doc.partial {
-            notes.append(L("一部分だけ読み込み中: {0} 〜 {1} (全体 {2})", HugeFile.sizeText(p.offset), HugeFile.sizeText(p.end), HugeFile.sizeText(p.fileSize)))
+            notes.append(HugeFileWindow.statusText(p))
         }
         // 右下の自動整形チェック
         let mode = paperMode
@@ -1132,6 +1186,7 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
     }
 
     func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if let r = validateMadoItem(item) { return r }
         guard let doc = hdoc else { return false }
         let raw = item.representedObject as? String
         switch item.action {
@@ -1302,7 +1357,7 @@ extension EditorWindowController {
 
     /// この文書を共有する
     @objc func startShareHM(_ sender: Any?) {
-        guard let window = window else { return }
+        guard let window = presentingWindow else { return }
         if hdoc?.isEncrypted == true {
             let alert = NSAlert()
             alert.messageText = L("暗号化した文書は共有できません")
@@ -1467,6 +1522,13 @@ extension EditorWindowController {
     override func setDocumentEdited(_ dirtyFlag: Bool) {
         super.setDocumentEdited(dirtyFlag)
         editedStateChanged(dirtyFlag)
+        madoSplit?.titlesChanged()   // 窓割り: 分割しているウインドウの閉じるボタンの点は、フォーカスのある画面の文書
+    }
+
+    /// タイトルを付け直したら、窓割りの見出しと、タブの印 (✓) も合わせる
+    override func synchronizeWindowTitleWithDocumentName() {
+        super.synchronizeWindowTitleWithDocumentName()
+        madoTitleChanged()
     }
 
     func editedStateChanged(_ flag: Bool? = nil) {
@@ -1500,6 +1562,13 @@ extension EditorWindowController {
         iv.widthAnchor.constraint(equalToConstant: 16).isActive = true
         iv.heightAnchor.constraint(equalToConstant: 16).isActive = true
         w.tab.accessoryView = iv
+        if madoSplit != nil { PaneCountBadge.refreshAll() }   // 窓割りの画面の数のバッジを付け直す
+    }
+
+    /// タブのアイコンを作り直す (窓割りのバッジを外したあと)
+    func resetTabIcon() {
+        shownTabIconExt = nil
+        updateTabIcon()
     }
 
     /// 暗号化して保存する (暗号化済みならパスワードを変える)
@@ -1551,7 +1620,7 @@ extension EditorWindowController {
 
     /// この文書の暗号化の設定 (ステータスバーとは別の画面): いまの方法を見て、方法の変更・鍵の変更・解除を選ぶ
     @objc func openEncryptionSettingsHM(_ sender: Any?) {
-        guard let doc = hdoc, let window = window else { return }
+        guard let doc = hdoc, let window = presentingWindow else { return }
         let alert = NSAlert()
         alert.messageText = L("この文書の暗号化の設定")
         let popup = NSPopUpButton()
@@ -1600,7 +1669,7 @@ extension EditorWindowController {
 
     /// 暗号化をやめて普通のテキストとして保存する
     @objc func decryptDocumentHM(_ sender: Any?) {
-        guard let doc = hdoc, doc.isEncrypted, let window = window else { return }
+        guard let doc = hdoc, doc.isEncrypted, let window = presentingWindow else { return }
         let alert = NSAlert()
         alert.messageText = L("暗号化を解除しますか？")
         alert.informativeText = L("だれでも読めるファイルに戻ります。")
@@ -1682,7 +1751,7 @@ extension EditorWindowController {
                 // 右はしから枠ごと滑らせて戻す
                 p.isHidden = true
                 editorArea.layoutSubtreeIfNeeded()
-                window?.makeKeyAndOrderFront(nil)
+                presentingWindow?.makeKeyAndOrderFront(nil)
                 slideAIPanel(p, open: true)
             } else {
                 p.isHidden = false
@@ -1747,7 +1816,7 @@ extension EditorWindowController {
             } else {
                 toggleAIDetached(animated: false) // しまうときは、エディタの横に戻してから隠す
                 p.isHidden = true
-                window?.makeFirstResponder(textView.focusTarget)
+                presentingWindow?.makeFirstResponder(textView.focusTarget)
             }
             return
         }
@@ -1763,7 +1832,7 @@ extension EditorWindowController {
             p.refreshApplyMode()
             if wasHidden { slideAIPanel(p, open: true) } else { p.isHidden = false }
         } else {
-            window?.makeFirstResponder(textView.focusTarget)
+            presentingWindow?.makeFirstResponder(textView.focusTarget)
             slideAIPanel(p, open: false)
         }
     }
@@ -1855,7 +1924,7 @@ extension EditorWindowController {
 
     /// 使えない状態なら説明して設定へ案内する
     private func ensureAIReady() -> Bool {
-        guard let window = window else { return false }
+        guard let window = presentingWindow else { return false }
         if !AISettings.isEnabled {
             let alert = NSAlert()
             alert.messageText = L("AI アシスタントはオフになっています")
@@ -1969,7 +2038,7 @@ extension EditorWindowController {
     var aiPanelForTesting: AIPanel { aiPanel }
 
     func runAI(_ instruction: String, kind: AIPanel.ApplyKind, shown: String) {
-        guard let window = window, let doc = hdoc else { return }
+        guard let window = presentingWindow, let doc = hdoc else { return }
         let panel = aiPanel
         guard !panel.running else { return }
         // 設定と接続の確認が済むまでは送らない
@@ -2007,7 +2076,7 @@ extension EditorWindowController {
             return
         }
         let job = AIJob(from: selected ? sel.location : 0, to: selected ? NSMaxRange(sel) : ns.length, original: target, kind: kind)
-        var system = L("あなたはテキストエディタ「さとるエディタ」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。")
+        var system = L("あなたはテキストエディタ「エディタβ」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。")
         // 原稿用紙 (作文) を開いているときは、作文の書き方の決まりを守ってもらう
         if paperMode == .genko {
             system += L("\n\nいま書いているのは、原稿用紙 (縦書き 400 字詰め) の作文です。作文の形と、原稿用紙の書き方の決まりを守ってください。\n作文の形: 1 行目に題名、2 行目に名前、3 行目は空けて、4 行目から本文。題名・名前の行には空白を入れない (題名を 3 マス下げる・名前を下に寄せるのは、アプリが自動で行う)。文書全体を書き直すときは、この形のまま出力する。\n本文の決まり: 段落の初めは全角スペース 1 つで 1 字下げる。会話は「」で囲み、行を改める (会話の行は字下げしない)。数字は漢数字で書く。英字・記号・半角の文字はできるだけ使わない (使うときは全角)。句読点やかっこも 1 字として数える。文体 (です・ます / だ・である) はもとの作文にそろえる。マークダウンや箇条書きは使わない。")
@@ -2083,7 +2152,7 @@ extension EditorWindowController {
             let alert = NSAlert()
             alert.messageText = L("書き換えられませんでした")
             alert.informativeText = L("頼んだあとに文章が変わったので、置き換える場所が分からなくなりました。「コピー」して貼り付けてください。")
-            if let w = window { alert.beginSheetModal(for: w) } else { alert.runModal() }
+            if let w = presentingWindow { alert.beginSheetModal(for: w) } else { alert.runModal() }
             return
         }
         // 入れるのは中身だけ (ユーザーへのひとことは入れない)
@@ -2105,7 +2174,7 @@ extension EditorWindowController {
             remoteStatusChanged("✓ " + L("足しました (⌘Z で戻せます)"))
         }
         guessLanguageIfUnnamed()
-        window?.makeFirstResponder(tv.focusTarget)
+        presentingWindow?.makeFirstResponder(tv.focusTarget)
     }
 }
 
@@ -2123,7 +2192,7 @@ extension EditorWindowController {
         guard tv.replace(all, with: text, select: NSRange(location: 0, length: length)) else { NSSound.beep(); return }
         typeIn(NSRange(location: 0, length: length))
         remoteStatusChanged("✓ " + L("本文を答えに置き換えました (⌘Z で戻せます)"))
-        window?.makeFirstResponder(tv.focusTarget)
+        presentingWindow?.makeFirstResponder(tv.focusTarget)
     }
 }
 
@@ -2473,9 +2542,9 @@ extension EditorWindowController {
             // 文字の面が残した「横書きの I」を、縦書き用に替える (外へ出て戻ったときも縦のままに)
             pane.scrollView.documentCursor = g.horizontal ? .iBeam : .iBeamCursorForVerticalLayout
             if pane.scrollView.documentView !== g {
-                let focused = window?.firstResponder === tv
+                let focused = presentingWindow?.firstResponder === tv
                 pane.scrollView.documentView = g
-                if focused { window?.makeFirstResponder(g) }
+                if focused { presentingWindow?.makeFirstResponder(g) }
             }
             g.settingsChanged()
         }
@@ -2484,11 +2553,11 @@ extension EditorWindowController {
     /// 原稿用紙をやめるとき: 文字の面を画面に戻す
     private func showTextView(in pane: EditorPane) {
         guard let g = pane.genkoView, pane.scrollView.documentView === g else { return }
-        let focused = window?.firstResponder === g
+        let focused = presentingWindow?.firstResponder === g
         pane.textView.genkoProxy = nil
         pane.scrollView.documentCursor = .iBeam
         pane.scrollView.documentView = pane.textView
-        if focused { window?.makeFirstResponder(pane.textView) }
+        if focused { presentingWindow?.makeFirstResponder(pane.textView) }
     }
 
     // MARK: 自動整形
@@ -2586,7 +2655,7 @@ extension EditorWindowController {
         guard paperMode != .normal else { return }
         UserDefaults.standard.set(sender.state == .on, forKey: paperMode == .genko ? "genkoAutoFormat" : "a4AutoFormat")
         NotificationCenter.default.post(name: .viewSettingsDidChange, object: nil)
-        window?.makeFirstResponder(textView.focusTarget)
+        presentingWindow?.makeFirstResponder(textView.focusTarget)
     }
 
     /// 自動整形のオン・オフ
@@ -2736,7 +2805,7 @@ extension EditorWindowController {
                 NSApp.presentError(error)
             }
         }
-        if let w = window {
+        if let w = presentingWindow {
             panel.beginSheetModal(for: w) { r in if r == .OK, let u = panel.url { run(u) } }
         } else if panel.runModal() == .OK, let u = panel.url {
             run(u)
@@ -2772,7 +2841,7 @@ extension EditorWindowController {
                 throw NSError(domain: "Satoru", code: 36, userInfo: [NSLocalizedDescriptionKey: L("印刷の準備ができませんでした")])
             }
             op.jobTitle = hdoc?.displayName ?? L("文書")
-            if let w = window {
+            if let w = presentingWindow {
                 op.runModal(for: w, delegate: nil, didRun: nil, contextInfo: nil)
             } else {
                 op.run()
@@ -2799,7 +2868,7 @@ extension EditorWindowController {
                     NSApp.presentError(error)
                 }
             }
-            if let w = window {
+            if let w = presentingWindow {
                 panel.beginSheetModal(for: w) { r in if r == .OK, let u = panel.url { run(u) } }
             } else if panel.runModal() == .OK, let u = panel.url {
                 run(u)
@@ -2808,7 +2877,7 @@ extension EditorWindowController {
         }
         let pitch = (842 - 99 - 85 - 0.5) / 36.0
         PDFExport.export(text: a4AttributedString(fontSize: 10.5, pitch: CGFloat(pitch)),
-                         suggestedName: doc.fileURL?.lastPathComponent ?? doc.displayName ?? L("文書"), from: window)
+                         suggestedName: doc.fileURL?.lastPathComponent ?? doc.displayName ?? L("文書"), from: presentingWindow)
     }
 }
 

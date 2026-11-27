@@ -11,7 +11,8 @@ enum WindowTiling {
         var out: [NSWindow] = []
         var seen = Set<ObjectIdentifier>()
         let all = NSApp.orderedWindows + NSApp.windows // 前にあるものを先に。隠れているタブも拾う
-        for w in all where w.windowController is EditorWindowController && !w.isMiniaturized {
+        // 窓割りの画面として隠しているウインドウは除く
+        for w in all where w.windowController is EditorWindowController && !w.isMiniaturized && (w.windowController as? EditorWindowController)?.madoSplit == nil {
             guard !seen.contains(ObjectIdentifier(w)) else { continue }
             for t in w.tabbedWindows ?? [w] where t.windowController is EditorWindowController {
                 if seen.insert(ObjectIdentifier(t)).inserted { out.append(t) }
@@ -23,6 +24,8 @@ enum WindowTiling {
     static var canTile: Bool { editorWindows().count >= 2 }
 
     static func tile(_ direction: Direction) {
+        // 窓割りで並べているときは、やめてタブに戻してから並べる (隠している画面のウインドウを拾わないように)
+        TabSplit.unsplitAll()
         let windows = editorWindows()
         guard windows.count >= 2 else { NSSound.beep(); return }
         let screen = (NSApp.keyWindow?.screen ?? NSScreen.main ?? NSScreen.screens.first)?.visibleFrame ?? .zero

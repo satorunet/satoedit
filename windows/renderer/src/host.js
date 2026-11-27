@@ -77,7 +77,7 @@ export function installHostAPI() {
   let locale = navigator.language || 'ja';
   let theme = themeDef.defaults();
   let menuState = {};
-  let version = '1.0.3';
+  let version = '1.0.4';
   let priceOverrides = {};
   let menuTimer = null;
 
@@ -414,7 +414,7 @@ export function installHostAPI() {
     'grepStart', 'grepCancel', 'serverSave', 'serverDelete', 'serverForgetKey', 'serverHasPassword', 'remoteCall', 'remoteRead', 'remoteWrite',
     'aiSetKey', 'assocStatus', 'exportPDF', 'print', 'exportDocx', 'screenshot',
     'collabHost', 'collabJoin', 'collabSend', 'collabClose', 'collabStop', 'attention', 'editCommand', 'setTitle', 'closeWindow', 'quit', 'fileIcon', 'growWindow',
-    'pluginToken', 'pluginReply', 'readClipboard', 'makeKey', 'readFile', 'writeFile',
+    'pluginToken', 'pluginReply', 'readClipboard', 'makeKey', 'readFile', 'writeFile', 'hugeSlide',
     // テキスト一覧・版の履歴・バックアップ・リンクで公開 (docs.satoru.net への送信)
     'libraryInfo', 'libraryItems', 'libraryTree', 'librarySetRoot', 'libraryScan', 'libraryRead', 'beep', 'libraryCreateFolder', 'libraryRenameFolder', 'libraryMoveFolder', 'libraryTrash', 'libraryCreateBlank',
     'libraryGetMode', 'librarySetMode', 'librarySetLocked', 'libraryDuplicate', 'libraryMove', 'libraryFolderPath', 'libraryReadText', 'libraryRemoveEmpty',
@@ -502,7 +502,7 @@ export function installHostAPI() {
     async clearRecent() { prefs.recent = []; await call('clearRecent'); rebuildMenu(); return true; },
 
     // 暗号化
-    totpBegin(account) { return call('totpBegin', account || 'document', t('さとるエディタ')); },
+    totpBegin(account) { return call('totpBegin', account || 'document', t('エディタβ')); },
     newKeyFile() { return call('newKeyFile', { title: t('鍵ファイルを作る (USB メモリなどに置く)'), filters: [{ name: t('鍵ファイル'), extensions: ['satorukey'] }] }); },
 
     // ふりがな
@@ -538,11 +538,11 @@ export function installHostAPI() {
     },
 
     // 関連付け
-    assocApply(o) { return call('assocApply', Object.assign({}, o, { labels: { open: t('さとるエディタで開く'), grep: t('さとるエディタで grep') } })); },
+    assocApply(o) { return call('assocApply', Object.assign({}, o, { labels: { open: t('エディタβで開く'), grep: t('エディタβで grep') } })); },
 
     async about() {
       return call('about', {
-        title: t('さとるエディタについて'), message: `${t('さとるエディタ')} ${version}`,
+        title: t('エディタβについて'), message: `${t('エディタβ')} ${version}`,
         detail: t('Windows 用の軽いテキストエディタです。\n\nMIT License') + '\n\n' + t('公式サイト') + ': ' + OFFICIAL_URL,
         buttons: ['OK', t('公式サイトを開く')], url: OFFICIAL_URL,
       });

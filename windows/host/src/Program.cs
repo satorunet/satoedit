@@ -7,7 +7,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 namespace SatoEdit {
-  /// さとるエディタ 軽量版の入口。1 つしか起動しないようにして、2 つめはファイルを 1 つめに渡して終わる
+  /// エディタβ 軽量版の入口。1 つしか起動しないようにして、2 つめはファイルを 1 つめに渡して終わる
   static class Program {
     /// アプリの版 (AssemblyInfo.cs の AssemblyInformationalVersion。package.json の版とそろえる)
     public static readonly string Version =
@@ -18,6 +18,9 @@ namespace SatoEdit {
     /// アプリの画面の部品 (renderer・assets) が入っているフォルダ
     public static string AppRoot {
       get {
+        // 配布物は exe 1 つ。画面の部品は exe の中に入っていて、はじめて使うときに広げる
+        var unpacked = Embedded.AppDir();
+        if (unpacked != null) return unpacked;
         var exeDir = AppDomain.CurrentDomain.BaseDirectory;
         var packed = Path.Combine(exeDir, "app");
         if (Directory.Exists(Path.Combine(packed, "renderer"))) return packed;
@@ -31,6 +34,14 @@ namespace SatoEdit {
 
     [STAThread]
     static void Main(string[] args) {
+      // exe の中に入れた部品 (DLL) を読めるようにしてから、本体を動かす (本体の型を読む前に)
+      Embedded.Hook();
+      Run(args);
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    static void Run(string[] args) {
+      Embedded.PrepareNative();
       var selftest = args.FirstOrDefault(a => a.StartsWith("--selftest="));
       // 自己点検のときは、ほかに起動していても動く (そのときは受け取り口は作らない)
       mutex = new Mutex(true, "Local\\satoruEditor-single-instance" + Portable.Tag, out bool first);
@@ -108,7 +119,8 @@ namespace SatoEdit {
   /// (USB メモリなどに入れて、その場ですぐ動かす。この PC には何も残さない)
   static class Portable {
     public static readonly string ExeDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
-    public static readonly bool On = File.Exists(Path.Combine(ExeDir, "portable.txt"));
+    /// 目印: data\portable.txt (前の版は exe の横の portable.txt)
+    public static readonly bool On = File.Exists(Path.Combine(ExeDir, "data", "portable.txt")) || File.Exists(Path.Combine(ExeDir, "portable.txt"));
     public static string Data => Path.Combine(ExeDir, "data");
     /// インストール版や、別の場所のポータブル版と同時に動かせるよう、1 つだけ起動の印に場所を混ぜる
     public static string Tag {
@@ -133,6 +145,96 @@ namespace SatoEdit {
         if (File.Exists(f) && new FileInfo(f).Length > 512 * 1024) File.Delete(f);
         File.AppendAllText(f, DateTime.Now.ToString("s") + " " + line + "\r\n");
       } catch { }
+    }
+  }
+
+  /// exe 1 つで動かすため、exe の中に入れた部品 (package-host.js が入れる):
+  ///   lib/*.dll                  … WebView2・SSH などの部品。読むときにメモリから読む
+  ///   native/WebView2Loader.dll  … WebView2 の入口。ファイルでないと読めないので、ローカルの置き場に書き出す
+  ///   app.zip                    … 画面 (renderer・assets・pdfjs)。ローカルの置き場に広げる
+  /// 開発中の exe (build/host-bin) には入っていないので、そのときは今までどおり横のファイルを使う
+  static class Embedded {
+    static readonly System.Reflection.Assembly Me = typeof(Embedded).Assembly;
+    static string cacheDir;
+
+    static bool Has(string name) => Me.GetManifestResourceInfo(name) != null;
+
+    public static void Hook() {
+      AppDomain.CurrentDomain.AssemblyResolve += (s, e) => {
+        try {
+          var name = new System.Reflection.AssemblyName(e.Name).Name;
+          using (var st = Me.GetManifestResourceStream("lib/" + name + ".dll")) {
+            if (st == null) return null;
+            var ms = new MemoryStream();
+            st.CopyTo(ms);
+            return System.Reflection.Assembly.Load(ms.ToArray());
+          }
+        } catch { return null; }
+      };
+    }
+
+    /// 広げる先: %LOCALAPPDATA%\satoruEditor\bin\<版>-<作った回の印> (ポータブル版は data\local\bin\…)。版が変わったら古いものは消す
+    static string CacheDir {
+      get {
+        if (cacheDir != null) return cacheDir;
+        var root = Path.Combine(Log.Dir, "bin");
+        var dir = Path.Combine(root, Program.Version + "-" + Me.ManifestModule.ModuleVersionId.ToString("N").Substring(0, 12));
+        try {
+          if (Directory.Exists(root))
+            foreach (var old in Directory.GetDirectories(root))
+              if (!string.Equals(old, dir, StringComparison.OrdinalIgnoreCase)) { try { Directory.Delete(old, true); } catch { } } // 動いている別の版が使っていれば残る
+        } catch { }
+        return cacheDir = dir;
+      }
+    }
+
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.NoInlining)]
+    public static void PrepareNative() {
+      try {
+        if (!Has("native/WebView2Loader.dll")) return;
+        var dir = Path.Combine(CacheDir, "native");
+        var f = Path.Combine(dir, "WebView2Loader.dll");
+        if (!File.Exists(f)) {
+          Directory.CreateDirectory(dir);
+          var tmp = f + "." + Guid.NewGuid().ToString("N");
+          using (var st = Me.GetManifestResourceStream("native/WebView2Loader.dll"))
+          using (var o = File.Create(tmp)) st.CopyTo(o);
+          try { File.Move(tmp, f); } catch { File.Delete(tmp); } // ほかの起動が先に書いた
+        }
+        Microsoft.Web.WebView2.Core.CoreWebView2Environment.SetLoaderDllFolderPath(dir);
+      } catch (Exception e) { Log.Error("native", e); }
+    }
+
+    static string appDir;
+    /// 画面の部品を広げたフォルダ (exe に入っていなければ null)
+    public static string AppDir() {
+      if (appDir != null) return appDir;
+      if (!Has("app.zip")) return null;
+      var dir = Path.Combine(CacheDir, "app");
+      var done = Path.Combine(dir, ".ok");
+      if (!File.Exists(done)) {
+        var tmp = dir + "." + Guid.NewGuid().ToString("N");
+        using (var st = Me.GetManifestResourceStream("app.zip"))
+        using (var zip = new System.IO.Compression.ZipArchive(st, System.IO.Compression.ZipArchiveMode.Read)) {
+          var top = Path.GetFullPath(tmp) + "\\";
+          foreach (var e in zip.Entries) {
+            if (e.FullName.EndsWith("/")) continue;
+            var target = Path.GetFullPath(Path.Combine(tmp, e.FullName.Replace('/', '\\')));
+            if (!target.StartsWith(top, StringComparison.OrdinalIgnoreCase)) continue;
+            Directory.CreateDirectory(Path.GetDirectoryName(target));
+            using (var i = e.Open()) using (var o = File.Create(target)) i.CopyTo(o);
+          }
+        }
+        File.WriteAllText(Path.Combine(tmp, ".ok"), Program.Version);
+        try {
+          if (Directory.Exists(dir)) Directory.Delete(dir, true);
+          Directory.Move(tmp, dir);
+        } catch {
+          try { Directory.Delete(tmp, true); } catch { }
+          if (!File.Exists(done)) throw;
+        }
+      }
+      return appDir = dir;
     }
   }
 }

@@ -157,8 +157,8 @@ final class FindPanelController: NSWindowController, NSWindowDelegate {
     // MARK: 本体
 
     private var target: EditorTextView? {
-        let editors = NSApp.orderedWindows.compactMap { $0.windowController as? EditorWindowController }
-        return ((NSApp.mainWindow?.windowController as? EditorWindowController) ?? editors.first)?.textView
+        let editors = NSApp.orderedWindows.compactMap { $0.frontEditor }
+        return (NSApp.mainWindow?.frontEditor ?? editors.first)?.textView
     }
 
     private func message(_ s: String) { messageLabel.stringValue = s }

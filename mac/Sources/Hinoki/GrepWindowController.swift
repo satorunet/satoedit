@@ -214,7 +214,7 @@ final class GrepWindowController: NSWindowController, NSTableViewDataSource, NST
         NSDocumentController.shared.openDocument(withContentsOf: m.url, display: true) { doc, _, error in
             if let error = error { NSApp.presentError(error); return }
             (doc as? Document)?.editor?.textView.goTo(line: m.line)
-            (doc as? Document)?.editor?.window?.makeKeyAndOrderFront(nil)
+            (doc as? Document)?.editor?.bringToFront()
         }
     }
 

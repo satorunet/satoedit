@@ -41,28 +41,29 @@ final class EditorToolbar: NSObject, NSToolbarDelegate {
         Button(id: "splitSide", label: L("左右分割"), symbol: "rectangle.split.2x1", action: "toggleSplitSideHM:", tip: L("左右に分割 / 分割をやめる (⌃⌥⌘S)")),
         Button(id: "share", label: L("共有"), symbol: "person.2", action: "startShareHM:", tip: L("この文書を共有して共同編集する")),
         Button(id: "screenshot", label: L("スクショ"), symbol: "camera", action: "screenshotHM:", tip: L("スクリーンショット (画像にする): 見えている部分か文書全体を、コピーまたは PNG で保存")),
-        Button(id: "paper", label: L("用紙切替"), symbol: "doc.plaintext", action: "cyclePaperModeHM:", tip: L("用紙切替: 標準エディタ → 原稿用紙 → A4用紙")),
+        Button(id: "paper", label: L("用紙"), symbol: "doc.plaintext", action: "cyclePaperModeHM:", tip: L("用紙切替: 標準エディタ → 原稿用紙 → A4用紙")),
         Button(id: "speak", label: L("読み上げ"), symbol: "speaker.wave.2", action: "readAloudHM:", tip: L("読み上げる / 止める (⌥⌘R)")),
         Button(id: "dictate", label: L("音声入力"), symbol: "mic", action: "toggleDictationHM:", tip: L("声で入力。もう一度押すと止まる")),
-        Button(id: "ai", label: L("AIアシスト"), symbol: "sparkles", action: "toggleAIHM:", tip: L("AI アシスタント (⇧⌘A)")),
+        Button(id: "ai", label: L("AI"), symbol: "sparkles", action: "toggleAIHM:", tip: L("AI アシスタント (⇧⌘A)")),
         Button(id: "theme", label: L("色・フォント"), symbol: "paintpalette", action: "openThemeHM:", tip: L("色・フォント (⌘,)")),
     ]
 
     private static func id(_ s: String) -> NSToolbarItem.Identifier { NSToolbarItem.Identifier("satomaru.\(s)") }
 
-    /// 最初に並べるもの
+    /// 最初に並べるもの: よく使うものだけ (ほかのボタンは「ツールバーをカスタマイズ…」で足せる)
     private static let defaultOrder: [NSToolbarItem.Identifier] = [
-        id("new"), id("library"), id("libraryGrid"), id("folder"), .space, id("open"), id("server"), id("save"), .space,
+        id("new"), id("open"), id("save"), .space,
         id("undo"), id("redo"), .space,
-        id("cut"), id("copy"), id("paste"), id("duplicate"), .space,
-        id("find"), id("replace"), id("grep"), id("goto"), id("diff"), .space, id("split"), id("splitSide"), id("screenshot"), id("paper"), id("speak"), id("dictate"), id("share"), id("ai"),
+        id("find"), .space,
+        id("paper"), id("split"), id("screenshot"), id("ai"),
         .flexibleSpace, id("theme"),
     ]
 
     func makeToolbar() -> NSToolbar {
         let toolbar = NSToolbar(identifier: Self.identifier)
         toolbar.delegate = self
-        toolbar.displayMode = .iconOnly
+        // アイコンの下に名前を出す (アイコンだけだと何のボタンか分かりにくい)
+        toolbar.displayMode = .iconAndLabel
         toolbar.allowsUserCustomization = true
         toolbar.autosavesConfiguration = true
         // 前の版で足した「≡」ボタンが並びに残っていたら外す
@@ -98,7 +99,8 @@ final class EditorToolbar: NSObject, NSToolbarDelegate {
         walk(root)
     }
 
-    static let identifier = "SatomaruToolbar11"
+    /// 並びを大きく変えたときは名前を変える (前の版で覚えた並びではなく、新しい並びから始まるように)
+    static let identifier = "SatomaruToolbar13"
 
     /// 使っていない拡張機能のボタンは出さない
     private static func enabled(_ ident: NSToolbarItem.Identifier) -> Bool {

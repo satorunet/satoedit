@@ -3,7 +3,7 @@ import HinokiCore
 
 /// 後から足した機能 (拡張機能)。それぞれ使う・使わないを選べ、使わないものはメニュー・ツールバー・設定画面から消える。
 enum EditorExtension: String, CaseIterable {
-    case collab, server, ai, encryption, paper, folder, speech, publish, versions, library
+    case collab, server, ai, encryption, paper, folder, speech, publish, versions, library, mado
 
     var prefKey: String {
         switch self {
@@ -17,6 +17,7 @@ enum EditorExtension: String, CaseIterable {
         case .publish: return "publishEnabled"
         case .versions: return VersionStore.prefKey   // 設定 > バックアップ の「版を残す」と同じ
         case .library: return "libraryEnabled"
+        case .mado: return "madoEnabled"
         }
     }
 
@@ -36,6 +37,7 @@ enum EditorExtension: String, CaseIterable {
         case .publish: return "リンクで公開共有"
         case .versions: return "版の履歴 (バージョン管理)"
         case .library: return "テキスト管理 (テキスト一覧、履歴)"
+        case .mado: return "窓割り (タブを並べて表示)"
         }
     }
 
@@ -51,6 +53,7 @@ enum EditorExtension: String, CaseIterable {
         case .publish: return L("テキストを docs.satoru.net に置いて、リンクで読めるようにします。公開・リンクだけ・パスワードを選べます。")
         case .versions: return L("保存のたびに、テキストごとの版を残します。前の版を見たり、違いを見たり、戻したりできます。")
         case .library: return L("左にフォルダとテキストの一覧 (履歴) を出し、サムネで見わたせます。書いたものは自動で保存され、テキストごとに版の履歴も残ります。")
+        case .mado: return L("ちがうタブの文書を、1 つのウインドウに左右・上下に並べます。タブをほかのウインドウの端へドラッグしても並べられます。")
         }
     }
 
@@ -66,6 +69,7 @@ enum EditorExtension: String, CaseIterable {
         case .speech: return ["speak", "dictate"]
         case .publish, .versions: return []
         case .library: return ["library", "libraryGrid"]
+        case .mado: return []
         }
     }
 
@@ -80,7 +84,7 @@ enum EditorExtension: String, CaseIterable {
         case .folder: return []
         case .speech: return ["音声"]
         case .publish: return ["公開"]
-        case .versions, .library: return []
+        case .versions, .library, .mado: return []
         }
     }
 
@@ -99,12 +103,15 @@ enum EditorExtension: String, CaseIterable {
                                "unpublishCurrentHM:", "showSharedLinksHM:", "togglePrivacyCheckHM:", "openPublishPrefsHM:"]
         case .versions: return ["versionHistoryHM:"]
         case .library: return ["toggleTextLibraryHM:", "showLibraryGridHM:", "versionHistoryHM:", "openLibraryPrefsHM:"]
+        case .mado: return ["madoSplitTabsSideBySideHM:", "madoSplitTabsStackedHM:", "madoSplitPaneSideBySideHM:", "madoSplitPaneStackedHM:",
+                            "madoUnsplitHM:", "madoEqualizeHM:", "madoNextPaneHM:", "madoPreviousPaneHM:", "madoToggleMarkHM:",
+                            "madoClearMarksHM:", "madoMoveToNewWindowHM:", "madoSetOpenPlaceHM:"]
         }
     }
 
     /// 見出しで消すサブメニュー
     var subMenus: [String] {
-        []
+        self == .mado ? ["窓割り"] : []
     }
 
     /// 画面とメニューに並べる順 (身近なものを上に、サーバなど設定が要るものを下に)
@@ -113,7 +120,7 @@ enum EditorExtension: String, CaseIterable {
     /// (データ暗号化は、いちばん下。最初はオフ)
     /// (用紙切替は、最初からオン。切ることもできる)
     /// (版の履歴は、テキスト管理の中の機能。細かい入り切りは 設定 > バックアップ で)
-    static let displayOrder: [EditorExtension] = [.ai, .paper, .library, .publish, .speech, .server, .encryption]
+    static let displayOrder: [EditorExtension] = [.ai, .paper, .library, .mado, .publish, .speech, .server, .encryption]
     /// 一覧に出さない (見えない) 機能。前にオンにしていてもオフにする
     /// 見せない機能 (メニュー・ツールバー・設定に出さず、いつもオフ)。
     /// フォルダツリーは、左のテキスト一覧 (フォルダと履歴) とぶつかるので、いったん見せない
@@ -169,7 +176,7 @@ enum EditorExtension: String, CaseIterable {
             a.addButton(withTitle: L("オンにする"))
             a.addButton(withTitle: L("やめる"))
             return a.runModal() == .alertFirstButtonReturn
-        case .publish, .versions, .library:
+        case .publish, .versions, .library, .mado:
             return true
         }
     }
@@ -183,6 +190,7 @@ enum EditorExtension: String, CaseIterable {
         UserDefaults.standard.set(on, forKey: prefKey)
         if !on && self == .server { ServerExplorerWindowController.closeIfOpen() }
         if !on && self == .encryption { UserDefaults.standard.set(false, forKey: "encryptAlways") }
+        if self == .mado { if on { Mado.install() } else { Mado.uninstall() } }   // 窓割り: すぐに効く
         ExtensionUI.apply()
         NotificationCenter.default.post(name: .viewSettingsDidChange, object: nil)
         if on { reveal() }
@@ -197,7 +205,7 @@ enum EditorExtension: String, CaseIterable {
             ServerExplorerWindowController.shared.showForSetup()
         case .ai, .paper:
             guard let w = NSApp.orderedWindows.first(where: { $0.windowController is EditorWindowController }),
-                  let editor = w.windowController as? EditorWindowController else { return }
+                  let editor = w.frontEditor else { return }
             if self == .ai { editor.revealAIPanel() } else { editor.applyPaperMode(.genko) }
             // 設定ウインドウから切り替えたときも見えるように、エディタをそのすぐ後ろへ持ってくる
             if let key = NSApp.keyWindow, key !== w { w.order(.below, relativeTo: key.windowNumber) }
@@ -205,7 +213,7 @@ enum EditorExtension: String, CaseIterable {
             // 左にツリーを出す。まだフォルダを選んでいなければ、続けて選んでもらう
             FolderTree.setVisible(true)
             if FolderTree.root == nil { FolderTree.chooseRoot() }
-        case .collab, .encryption, .speech, .publish, .versions:
+        case .collab, .encryption, .speech, .publish, .versions, .mado:
             break
         case .library:
             TextLibrary.setVisible(true)
@@ -264,6 +272,7 @@ extension EditorExtension {
         case .publish: return "🔗"
         case .versions: return "🕘"
         case .library: return "🗂"
+        case .mado: return "🪟"
         }
     }
 
@@ -271,7 +280,7 @@ extension EditorExtension {
     var hasDetailSettings: Bool {
         switch self {
         case .ai, .encryption, .paper, .server, .speech, .versions, .library: return true
-        case .collab, .folder, .publish: return false
+        case .collab, .folder, .publish, .mado: return false
         }
     }
 
@@ -284,7 +293,7 @@ extension EditorExtension {
         case .server: NSApp.sendAction(#selector(AppDelegate.openServersHM(_:)), to: nil, from: nil)
         case .speech: SettingsWindowController.shared.show(.speech)
         case .versions, .library: SettingsWindowController.shared.show(.backup)
-        case .collab, .folder, .publish: break
+        case .collab, .folder, .publish, .mado: break
         }
     }
 }
@@ -518,6 +527,9 @@ extension EditorExtension {
         case .publish:
             return FlowDiagramView(steps: [S(icon: "📝", title: L("テキスト")), S(icon: "🔗", title: "docs.satoru.net"), S(icon: "👀", title: L("リンクで読める"))],
                                    arrows: [A(label: L("公開"), both: false), A(label: L("URL を送る"), both: false)], width: width)
+        case .mado:
+            return FlowDiagramView(steps: [S(icon: "🗂", title: L("タブ")), S(icon: "🪟", title: L("1 つのウインドウに並べる"))],
+                                   arrows: [A(label: L("左右・上下に"), both: true)], width: width)
         }
     }
 }

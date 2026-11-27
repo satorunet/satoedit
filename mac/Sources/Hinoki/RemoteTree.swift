@@ -733,7 +733,7 @@ final class RemoteTreePanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
 
     @objc private func openExplorer(_ sender: Any?) { ServerExplorerWindowController.shared.show() }
     @objc private func closeClicked(_ sender: Any?) {
-        if let editor = window?.windowController as? EditorWindowController { editor.dismissRemoteTree() }
+        if let editor = owningEditor { editor.dismissRemoteTree() }
         else { RemoteTree.setVisible(false) }
     }
 

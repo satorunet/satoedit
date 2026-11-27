@@ -35,13 +35,48 @@ enum GenkoRenderer {
         NSFont(name: "HiraMinProN-W3", size: size) ?? .systemFont(ofSize: size)
     }
 
+    /// 字の形 (CTLine) と幅を覚えておく。用紙 1 枚 400 字を描くたびに作り直すと遅い (1 枚 17 ms → 2 ms)
+    private struct GlyphKey: Hashable {
+        var text: String
+        var font: String
+        var size: CGFloat
+        var vertical: Bool
+        var color: ObjectIdentifier
+    }
+    private static var glyphs: [GlyphKey: (line: CTLine, width: CGFloat)] = [:]
+    private static let glyphLock = NSLock()
+    private static var fonts: [CGFloat: NSFont] = [:]
+
+    private static func glyph(_ s: String, font: NSFont, vertical: Bool, color: NSColor) -> (line: CTLine, width: CGFloat) {
+        let key = GlyphKey(text: s, font: font.fontName, size: font.pointSize, vertical: vertical, color: ObjectIdentifier(color))
+        glyphLock.lock()
+        defer { glyphLock.unlock() }
+        if let g = glyphs[key] { return g }
+        var attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        if vertical { attrs[.verticalGlyphForm] = true }
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: s, attributes: attrs))
+        let g = (line, CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil)))
+        // 大きさを変え続けたときに増え続けないように
+        if glyphs.count > 20000 { glyphs.removeAll(keepingCapacity: true) }
+        glyphs[key] = g
+        return g
+    }
+
+    /// 明朝体 (大きさごとに覚えておく)
+    private static func cachedFont(_ size: CGFloat) -> NSFont {
+        glyphLock.lock()
+        defer { glyphLock.unlock() }
+        if let f = fonts[size] { return f }
+        if fonts.count > 200 { fonts.removeAll() }
+        let f = font(size)
+        fonts[size] = f
+        return f
+    }
+
     /// 縦書きの 1 文字を、center がマスの真ん中に来るように描く。
     /// 縦書き用の字形 (句読点は右上、かっこ・長音は縦向き) を使うため、字を横に寝かせて並べる CoreText の縦組みで作り、90° 回して立てる。
     static func drawVertical(_ s: String, center: CGPoint, size: CGFloat, color: NSColor, in ctx: CGContext) {
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: s, attributes: [
-            .font: font(size), .foregroundColor: color, .verticalGlyphForm: true,
-        ]))
-        let advance = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+        let (line, advance) = glyph(s, font: cachedFont(size), vertical: true, color: color)
         ctx.saveGState()
         ctx.translateBy(x: center.x, y: center.y)
         ctx.scaleBy(x: 1, y: -1)
@@ -55,8 +90,7 @@ enum GenkoRenderer {
 
     /// 横向きの文字 (半角の英数字、用紙の下の小さな表示) を描く。center は文字の箱の真ん中
     static func drawHorizontal(_ s: String, center: CGPoint, font: NSFont, color: NSColor, in ctx: CGContext) {
-        let line = CTLineCreateWithAttributedString(NSAttributedString(string: s, attributes: [.font: font, .foregroundColor: color]))
-        let width = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+        let (line, width) = glyph(s, font: font, vertical: false, color: color)
         ctx.saveGState()
         ctx.translateBy(x: center.x, y: center.y)
         ctx.scaleBy(x: 1, y: -1)
@@ -67,7 +101,7 @@ enum GenkoRenderer {
     }
 
     private static func textWidth(_ s: String, _ font: NSFont) -> CGFloat {
-        CGFloat(CTLineGetTypographicBounds(CTLineCreateWithAttributedString(NSAttributedString(string: s, attributes: [.font: font])), nil, nil, nil))
+        glyph(s, font: font, vertical: false, color: ink).width
     }
 
     /// 半角の英数字など、立てずに横向きのままマスに入れる文字か
@@ -110,75 +144,50 @@ enum GenkoRenderer {
 
     /// index 枚目 (0 始まり) を描く。origin は用紙の左上。horizontal = 横書きの原稿用紙
     static func drawSheet(_ index: Int, of total: Int, columns: [Genko.Column], ruby: [Int: [Genko.RubyPlacement]],
-                          at origin: CGPoint, u: CGFloat, paper: NSColor, marks: Marks = Marks(), horizontal: Bool = false, in ctx: CGContext) {
+                          at origin: CGPoint, u: CGFloat, paper: NSColor, marks: Marks = Marks(), horizontal: Bool = false,
+                          blank: Bool = true, in ctx: CGContext) {
         typealias S = Genko.Sheet
         func P(_ x: Double, _ y: Double) -> CGPoint { point(x, y, origin: origin, u: u, horizontal: horizontal) }
         func R(_ x: Double, _ y: Double, _ w: Double, _ h: Double) -> CGRect { rect(x, y, w, h, origin: origin, u: u, horizontal: horizontal) }
         let cell = CGFloat(S.cell) * u
-        let y0 = S.top, y1 = S.top + S.gridHeight
+        let y0 = S.top
         let firstColumn = index * Genko.columnsPerSheet
 
         ctx.saveGState()
-        ctx.setFillColor(paper.cgColor)
-        ctx.fill(CGRect(origin: origin, size: sheetSize(u: u, horizontal: horizontal)))
+        // 描き直す範囲 (カーソルの点滅などでは小さい)。外の列は描かない
+        let clip = ctx.boundingBoxOfClipPath
+        func visible(_ k: Int) -> Bool {
+            R(columnX(k, horizontal: horizontal), y0, S.pitch, S.gridHeight).insetBy(dx: -2, dy: -2).intersects(clip)
+        }
+        if blank {
+            ctx.setFillColor(paper.cgColor)
+            ctx.fill(CGRect(origin: origin, size: sheetSize(u: u, horizontal: horizontal)))
+        }
 
-        // 選択 (枠線が見えたままになるよう、線より先に薄い色を敷く)
+        // 選択: 字の入っているマスだけ。線より先に薄い色を敷く。
+        // 罫線を描いた用紙の上に重ねるとき (blank = false) は「乗算」で重ねて、線が隠れないようにする (紙の上では同じ色になる)
         func fillCells(_ range: NSRange, _ color: NSColor) {
             guard range.length > 0 else { return }
             ctx.setFillColor(color.cgColor)
-            for k in 0..<Genko.columnsPerSheet where firstColumn + k < columns.count {
+            for k in 0..<Genko.columnsPerSheet where firstColumn + k < columns.count && visible(k) {
                 let col = columns[firstColumn + k]
                 let x = columnX(k, horizontal: horizontal)
                 for r in 0..<Genko.rows where col.offs[r] >= 0 && NSLocationInRange(col.offs[r], range) {
                     ctx.fill(R(x, y0 + Double(r) * S.cell, S.cell, S.cell))
                 }
-                // 何も書いていない列を選んだとき (改行だけの段落) も選択が見えるように
-                if col.last, NSLocationInRange(col.to, range), col.end < Genko.rows {
-                    ctx.fill(R(x, y0 + Double(col.end) * S.cell, S.cell, S.cell))
-                }
             }
         }
+        if !blank { ctx.setBlendMode(.multiply) }
         if let sel = marks.selection { fillCells(sel, selectionColor) }
         for r in marks.remote { fillCells(r.range, r.color.withAlphaComponent(0.25)) }
-
-        // 細い線: マスの左端・マスとふりがな枠の境・ふりがな枠の右端、マスの区切り
-        let lineColor = lineColor(horizontal: horizontal)
-        ctx.setStrokeColor(lineColor.cgColor)
-        ctx.setLineWidth(max(0.4, 0.18 * u))
-        for k in 0..<Genko.columnsPerSheet {
-            let x = columnX(k, horizontal: horizontal)
-            for vx in [x, x + S.cell, x + S.pitch] {
-                ctx.move(to: P(vx, y0))
-                ctx.addLine(to: P(vx, y1))
-            }
-            for r in 1..<Genko.rows {
-                let y = y0 + Double(r) * S.cell
-                ctx.move(to: P(x, y))
-                ctx.addLine(to: P(x + S.cell, y))
-            }
-        }
-        ctx.strokePath()
-        // 中央の余白の魚尾 (上下の小さな印)。横書きには真ん中の余白がないので描かない
-        let cx = Genko.columnX(Genko.columnsPerSheet / 2 - 1) - S.center / 2
-        ctx.setLineWidth(max(0.5, 0.3 * u))
-        for fy in horizontal ? [] : [y0 + S.gridHeight * 0.25, y0 + S.gridHeight * 0.7] {
-            ctx.move(to: P(cx - 3.2, fy))
-            ctx.addLine(to: P(cx + 3.2, fy))
-            ctx.move(to: P(cx - 3.2, fy + 5))
-            ctx.addLine(to: P(cx, fy + 2.6))
-            ctx.addLine(to: P(cx + 3.2, fy + 5))
-        }
-        ctx.strokePath()
-        // 外枠
-        ctx.setLineWidth(max(1, 0.6 * u))
-        let span = gridSpan(horizontal: horizontal)
-        ctx.stroke(R(span.x, y0, span.width, S.gridHeight))
+        ctx.setBlendMode(.normal)
+        if blank { drawGrid(origin: origin, u: u, horizontal: horizontal, in: ctx) }
 
         // 文字とふりがな (横書きでは字を立てずにそのまま書く)
         let size = cell * 0.72
-        let half = font(size)
-        let full = font(size)
-        for k in 0..<Genko.columnsPerSheet where firstColumn + k < columns.count {
+        let half = cachedFont(size)
+        let full = half
+        for k in 0..<Genko.columnsPerSheet where firstColumn + k < columns.count && visible(k) {
             let col = columns[firstColumn + k]
             let x = columnX(k, horizontal: horizontal)
             for rb in ruby[firstColumn + k] ?? [] {
@@ -191,7 +200,7 @@ enum GenkoRenderer {
                 for (i, ch) in chars.enumerated() {
                     let c = P(x + S.cell + S.ruby / 2, top + (Double(i) + 0.5) * rsize)
                     if horizontal {
-                        drawHorizontal(String(ch), center: c, font: font(CGFloat(rsize) * u), color: rubyInk, in: ctx)
+                        drawHorizontal(String(ch), center: c, font: cachedFont(CGFloat(rsize) * u), color: rubyInk, in: ctx)
                     } else {
                         drawVertical(String(ch), center: c, size: CGFloat(rsize) * u, color: rubyInk, in: ctx)
                     }
@@ -225,12 +234,54 @@ enum GenkoRenderer {
 
         // 用紙の下の小さな表示 (枠の左下と右下)
         let small = NSFont.systemFont(ofSize: 2.6 * u)
+        let lineColor = lineColor(horizontal: horizontal)
+        let span = gridSpan(horizontal: horizontal)
         let frame = R(span.x, y0, span.width, S.gridHeight)
         let labelY = frame.maxY + (2 + 1.6) * u
         let left = "20 × 20", right = "No. \(index + 1) / \(total)"
         drawHorizontal(left, center: CGPoint(x: frame.minX + textWidth(left, small) / 2, y: labelY), font: small, color: lineColor, in: ctx)
         drawHorizontal(right, center: CGPoint(x: frame.maxX - textWidth(right, small) / 2, y: labelY), font: small, color: lineColor, in: ctx)
         ctx.restoreGState()
+    }
+
+    /// 罫線・魚尾・外枠 (どの用紙も同じ。画面では一度描いたものを使い回す)
+    static func drawGrid(origin: CGPoint, u: CGFloat, horizontal: Bool, in ctx: CGContext) {
+        typealias S = Genko.Sheet
+        func P(_ x: Double, _ y: Double) -> CGPoint { point(x, y, origin: origin, u: u, horizontal: horizontal) }
+        func R(_ x: Double, _ y: Double, _ w: Double, _ h: Double) -> CGRect { rect(x, y, w, h, origin: origin, u: u, horizontal: horizontal) }
+        let y0 = S.top, y1 = S.top + S.gridHeight
+        // 細い線: マスの左端・マスとふりがな枠の境・ふりがな枠の右端、マスの区切り
+        let lineColor = lineColor(horizontal: horizontal)
+        ctx.setStrokeColor(lineColor.cgColor)
+        ctx.setLineWidth(max(0.4, 0.18 * u))
+        for k in 0..<Genko.columnsPerSheet {
+            let x = columnX(k, horizontal: horizontal)
+            for vx in [x, x + S.cell, x + S.pitch] {
+                ctx.move(to: P(vx, y0))
+                ctx.addLine(to: P(vx, y1))
+            }
+            for r in 1..<Genko.rows {
+                let y = y0 + Double(r) * S.cell
+                ctx.move(to: P(x, y))
+                ctx.addLine(to: P(x + S.cell, y))
+            }
+        }
+        ctx.strokePath()
+        // 中央の余白の魚尾 (上下の小さな印)。横書きには真ん中の余白がないので描かない
+        let cx = Genko.columnX(Genko.columnsPerSheet / 2 - 1) - S.center / 2
+        ctx.setLineWidth(max(0.5, 0.3 * u))
+        for fy in horizontal ? [] : [y0 + S.gridHeight * 0.25, y0 + S.gridHeight * 0.7] {
+            ctx.move(to: P(cx - 3.2, fy))
+            ctx.addLine(to: P(cx + 3.2, fy))
+            ctx.move(to: P(cx - 3.2, fy + 5))
+            ctx.addLine(to: P(cx, fy + 2.6))
+            ctx.addLine(to: P(cx + 3.2, fy + 5))
+        }
+        ctx.strokePath()
+        // 外枠
+        ctx.setLineWidth(max(1, 0.6 * u))
+        let span = gridSpan(horizontal: horizontal)
+        ctx.stroke(R(span.x, y0, span.width, S.gridHeight))
     }
 }
 
@@ -285,7 +336,7 @@ final class GenkoView: NSView, NSTextInputClient {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         guard FileDrop.handles(sender) else { return false }
         let urls = FileDrop.fileURLs(sender)
-        let target = window?.windowController as? EditorWindowController
+        let target = owningEditor
         DispatchQueue.main.async { FileDrop.open(urls, into: target) }
         return true
     }
@@ -423,7 +474,12 @@ final class GenkoView: NSView, NSTextInputClient {
 
     /// 文章・設定が変わったら並べ直す
     func reload() {
-        columns = Genko.layout(displayText, autoFormat: autoFormat)
+        // 同じ文章なら並べ直さない (打つたびに、入力の処理と文字データの知らせの 2 回呼ばれる)
+        let text = displayText, format = autoFormat
+        if laidOut?.text != text || laidOut?.autoFormat != format {
+            columns = Genko.layout(text, autoFormat: format)
+            laidOut = (text, format)
+        }
         // 変換中は、変換中の文字の後ろのふりがなを、その字数ぶんずらして置く (消すとちらつく)
         if marked.isEmpty {
             rubyByColumn = Genko.placeRuby(columns, ruby)
@@ -435,6 +491,9 @@ final class GenkoView: NSView, NSTextInputClient {
         fit()
         needsDisplay = true
     }
+
+    /// いま並べてある文章
+    private var laidOut: (text: String, autoFormat: Bool)?
 
     /// 用紙の大きさをウインドウの幅に合わせ、枚数ぶんの高さにする
     func fit() {
@@ -474,7 +533,7 @@ final class GenkoView: NSView, NSTextInputClient {
 
     private func sheetOrigin(_ i: Int) -> NSPoint {
         NSPoint(x: max(Self.pad, floor((bounds.width - sheetSize.width) / 2)),
-                y: Self.pad + CGFloat(i) * (sheetSize.height + Self.gap))
+                y: floor(Self.pad + CGFloat(i) * (sheetSize.height + Self.gap)))
     }
 
     override func viewDidMoveToSuperview() {
@@ -543,18 +602,14 @@ final class GenkoView: NSView, NSTextInputClient {
         }
         for i in 0..<total {
             let rect = NSRect(origin: sheetOrigin(i), size: sheetSize)
-            guard rect.insetBy(dx: -8, dy: -8).intersects(dirtyRect) else { continue }
-            NSGraphicsContext.saveGraphicsState()
-            let shadow = NSShadow()
-            shadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
-            shadow.shadowBlurRadius = 6
-            shadow.shadowOffset = NSSize(width: 0, height: -2)
-            shadow.set()
-            GenkoRenderer.paperColor.setFill()
-            rect.fill()
-            NSGraphicsContext.restoreGraphicsState()
+            guard rect.insetBy(dx: -Self.shadowMargin, dy: -Self.shadowMargin).intersects(dirtyRect) else { continue }
+            // 影・紙・罫線は、一度描いたものを貼る (毎回描くと 1 枚 10 ms ほどかかる)
+            let blank = blankSheet(ctx)
+            if let blank = blank {
+                ctx.draw(blank, in: NSRect(origin: NSPoint(x: rect.minX - Self.shadowMargin, y: rect.minY - Self.shadowMargin), size: blankLayerSize))
+            }
             GenkoRenderer.drawSheet(i, of: total, columns: columns, ruby: shownRuby, at: rect.origin, u: u,
-                                    paper: GenkoRenderer.paperColor, marks: marks, horizontal: horizontal, in: ctx)
+                                    paper: GenkoRenderer.paperColor, marks: marks, horizontal: horizontal, blank: blank == nil, in: ctx)
         }
         // 共同編集の相手のカーソルと名札
         if marked.isEmpty {
@@ -574,6 +629,38 @@ final class GenkoView: NSView, NSTextInputClient {
             caretRect(at: caretOffset).fill()
         }
     }
+
+    /// 影・紙・罫線だけの用紙 (まわりに影のぶんの余白つき)。大きさ・向き・画面の解像度が変わったら描き直す
+    private static let shadowMargin: CGFloat = 10
+    private var blankCache: (key: String, layer: CGLayer)?
+
+    private func blankSheet(_ ctx: CGContext) -> CGLayer? {
+        let scale = window?.backingScaleFactor ?? 2
+        let key = "\(u) \(horizontal) \(scale)"
+        if let c = blankCache, c.key == key { return c.layer }
+        let m = Self.shadowMargin
+        let size = NSSize(width: ceil(sheetSize.width + m * 2), height: ceil(sheetSize.height + m * 2))
+        // 画面の点の大きさで作り、描くときに縮める (Retina でぼやけないように)
+        guard let layer = CGLayer(ctx, size: CGSize(width: size.width * scale, height: size.height * scale), auxiliaryInfo: nil),
+              let lc = layer.context else { return nil }
+        lc.scaleBy(x: scale, y: scale)
+        // このレイヤーは上下を返した画面に貼るので、ここでは上が y = 0 の向きのまま描けばよい。
+        // まわりは透明のまま (隣の用紙の影を消さないように)。影のずらしは上下を返さない座標で効くので、下へ落とすには + にする
+        let paper = CGRect(origin: CGPoint(x: m, y: m), size: sheetSize)
+        lc.saveGState()
+        lc.setShadow(offset: CGSize(width: 0, height: 2 * scale), blur: 6 * scale, color: NSColor.black.withAlphaComponent(0.35).cgColor)
+        lc.setFillColor(GenkoRenderer.paperColor.cgColor)
+        lc.fill(paper)
+        lc.restoreGState()
+        lc.saveGState()
+        GenkoRenderer.drawGrid(origin: paper.origin, u: u, horizontal: horizontal, in: lc)
+        lc.restoreGState()
+        // レイヤーの大きさは画素で持っているので、貼るときの大きさ (点) を覚えておく
+        blankCache = (key, layer)
+        blankLayerSize = size
+        return layer
+    }
+    private var blankLayerSize = NSSize.zero
 
     /// カーソルのあるマスが見えるようにスクロールする
     func reveal() {

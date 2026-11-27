@@ -468,7 +468,7 @@ enum PasswordPrompt {
     private static func createKeyFile() -> Data? {
         let panel = NSSavePanel()
         panel.message = L("鍵ファイルを置く場所を選んでください (USB メモリなど)")
-        panel.nameFieldStringValue = L("さとるエディタの鍵.") + FileCrypto.keyFileExtension
+        panel.nameFieldStringValue = L("エディタβの鍵.") + FileCrypto.keyFileExtension
         panel.allowedFileTypes = [FileCrypto.keyFileExtension]
         if let usb = removableVolume() { panel.directoryURL = usb }
         guard panel.runModal() == .OK, let url = panel.url else { return nil }

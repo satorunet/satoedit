@@ -94,7 +94,7 @@ final class LineNumberRulerView: NSRulerView {
         guard let r = pendingEdit else { return }
         pendingEdit = nil
         guard let tv = textView, let storage = tv.textStorage, storage.length > 0,
-              (tv.window?.windowController as? EditorWindowController)?.hdoc?.isDocumentEdited == true else { return }
+              tv.owningEditor?.hdoc?.isDocumentEdited == true else { return }
         let ns = storage.string as NSString
         let loc = min(r.location, ns.length)
         let range = ns.lineRange(for: NSRange(location: loc, length: min(r.length, ns.length - loc)))
@@ -240,30 +240,42 @@ final class LineNumberRulerView: NSRulerView {
                 fragment = lm.lineFragmentRect(forGlyphAt: lm.glyphIndexForCharacter(at: start), effectiveRange: nil)
             }
 
-            let edited = isEdited(at: start)
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: edited ? editedFont : font,
-                .foregroundColor: line == currentLine ? Theme.gutterCurrentText : Theme.gutterText,
-            ]
-            let label = "\(line + 1)" as NSString
-            let size = label.size(withAttributes: attrs)
-            let lineHeight = fragment.height > 0 ? fragment.height : size.height
-            let y = yOffset + fragment.minY + (lineHeight - size.height) / 2
-            label.draw(at: NSPoint(x: ruleThickness - size.width - 8, y: y), withAttributes: attrs)
+            // 描き直す範囲 (rect) にかからない行は描かない
+            let top = yOffset + fragment.minY
+            if top <= rect.maxY && top + max(fragment.height, 1) >= rect.minY {
+                drawLabel(line + 1, current: line == currentLine, edited: isEdited(at: start), fragment: fragment, yOffset: yOffset)
+            }
             line += 1
         }
     }
 
+    /// 番号の字の形 (番号・太さ・色ごとに覚えておく。打つたびに全部の番号を組み直すと重い)
+    private var labelCache: [String: (line: CTLine, width: CGFloat, ascent: CGFloat, height: CGFloat)] = [:]
+
     private func drawLabel(_ number: Int, current: Bool, edited: Bool = false, fragment: NSRect, yOffset: CGFloat) {
-        let attrs: [NSAttributedString.Key: Any] = [
-            .font: edited ? editedFont : font,
-            .foregroundColor: current ? Theme.gutterCurrentText : Theme.gutterText,
-        ]
-        let label = "\(number)" as NSString
-        let size = label.size(withAttributes: attrs)
-        let lineHeight = fragment.height > 0 ? fragment.height : size.height
-        let y = yOffset + fragment.minY + (lineHeight - size.height) / 2
-        label.draw(at: NSPoint(x: ruleThickness - size.width - 8, y: y), withAttributes: attrs)
+        let color = current ? Theme.gutterCurrentText : Theme.gutterText
+        let key = "\(number) \(edited) \(ObjectIdentifier(color).hashValue)"
+        let label: (line: CTLine, width: CGFloat, ascent: CGFloat, height: CGFloat)
+        if let c = labelCache[key] {
+            label = c
+        } else {
+            let attrs: [NSAttributedString.Key: Any] = [.font: edited ? editedFont : font, .foregroundColor: color]
+            let line = CTLineCreateWithAttributedString(NSAttributedString(string: "\(number)", attributes: attrs))
+            var ascent: CGFloat = 0, descent: CGFloat = 0, leading: CGFloat = 0
+            let width = CGFloat(CTLineGetTypographicBounds(line, &ascent, &descent, &leading))
+            label = (line, width, ascent, ceil(ascent + descent + leading))
+            if labelCache.count > 4000 { labelCache.removeAll() }
+            labelCache[key] = label
+        }
+        guard let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let lineHeight = fragment.height > 0 ? fragment.height : label.height
+        let y = yOffset + fragment.minY + (lineHeight - label.height) / 2
+        ctx.saveGState()
+        // このビューは上下を返しているので、字も返して描く
+        ctx.textMatrix = CGAffineTransform(scaleX: 1, y: -1)
+        ctx.textPosition = CGPoint(x: ruleThickness - label.width - 8, y: y + label.ascent)
+        CTLineDraw(label.line, ctx)
+        ctx.restoreGState()
     }
 
     /// ワープロ的: 見えている行 (折り返し含む) すべてに番号を付ける

@@ -53,11 +53,13 @@ textarea { resize: vertical; }
 .mock-menu { border: none; background: transparent; border-radius: 0; padding: 2px 9px; }
 
 /* ツールバー */
-#toolbar { display: flex; align-items: center; gap: 1px; padding: 3px 6px; border-bottom: 1px solid var(--chrome-border); background: var(--chrome-bg); min-height: 32px; overflow: hidden; }
+#toolbar { display: flex; align-items: center; gap: 1px; padding: 2px 6px; border-bottom: 1px solid var(--chrome-border); background: var(--chrome-bg); min-height: 44px; overflow: hidden; }
 body.no-toolbar #toolbar { display: none; }
-.tb-button { border: 1px solid transparent; background: transparent; padding: 3px 5px; min-height: 26px; display: inline-flex; align-items: center; border-radius: 3px; }
+/* ボタンは絵の下に名前を出す */
+.tb-button { border: 1px solid transparent; background: transparent; padding: 2px 4px 1px; min-height: 40px; min-width: 44px; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; border-radius: 3px; }
 .tb-button:hover { border-color: var(--chrome-border); }
-.tb-sep { width: 1px; height: 18px; background: var(--chrome-border); margin: 0 5px; flex: 0 0 auto; }
+.tb-label { font-size: 10.5px; line-height: 1.2; color: var(--chrome-fg); white-space: nowrap; }
+.tb-sep { width: 1px; height: 30px; background: var(--chrome-border); margin: 0 5px; flex: 0 0 auto; }
 
 /* タブ */
 #tabbar { display: flex; align-items: flex-end; background: var(--chrome-bg2); border-bottom: 1px solid var(--chrome-border); padding: 3px 4px 0; min-height: 28px; }
@@ -657,3 +659,27 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 .cal-day:disabled { opacity: 0.35; }
 .date-time-row { justify-content: center; }
 .share-form .share-listed { padding-left: 24px; font-size: 11.5px; }
+
+/* 窓割り: ちがうタブの文書を並べる (mado.js) */
+#mado-root { position: absolute; inset: 0; display: none; }
+#editors.mado-on #mado-root { display: flex; }
+#mado-root > .mado-node, #mado-root > .mado-pane { flex: 1 1 0; }
+.mado-node { display: flex; min-width: 0; min-height: 0; }
+.mado-node.row { flex-direction: row; }
+.mado-node.col { flex-direction: column; }
+.mado-pane { display: flex; flex-direction: column; min-width: 60px; min-height: 60px; overflow: hidden; }
+.mado-head { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; height: 22px; padding: 0 2px 0 8px; background: var(--chrome-bg2); color: var(--chrome-dim); border-bottom: 1px solid var(--chrome-border); border-top: 2px solid transparent; cursor: grab; font-size: 11.5px; }
+.mado-pane.focused > .mado-head { color: var(--chrome-fg); background: var(--chrome-active); border-top-color: var(--accent); }
+.mado-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mado-close { border: none; background: transparent; min-height: 18px; width: 20px; padding: 0; font-size: 10px; border-radius: 3px; flex: 0 0 auto; }
+.mado-close:hover { background: var(--chrome-border); }
+.mado-body { position: relative; flex: 1; min-height: 0; min-width: 0; }
+#mado-root .tab-view { display: flex; position: absolute; inset: 0; }
+.mado-divider { flex: 0 0 4px; background: var(--chrome-border); }
+.mado-node.row > .mado-divider { cursor: col-resize; }
+.mado-node.col > .mado-divider { cursor: row-resize; }
+.mado-drop { position: absolute; z-index: 30; pointer-events: none; background: color-mix(in srgb, var(--accent) 28%, transparent); border: 2px solid var(--accent); border-radius: 4px; display: flex; align-items: center; justify-content: center; }
+.mado-drop-label { background: var(--accent); color: var(--accent-fg); padding: 2px 8px; border-radius: 3px; font-size: 12px; }
+.mado-drop-label:empty { display: none; }
+body.mado-dragging, body.mado-dragging * { cursor: grabbing !important; }
+.tab.in-mado .tab-name { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }

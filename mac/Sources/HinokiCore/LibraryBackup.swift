@@ -57,8 +57,8 @@ public enum LibraryBackup {
         case newerVersion
         public var errorDescription: String? {
             switch self {
-            case .notBackup: return I18n.translate("さとるエディタのバックアップではありません")
-            case .newerVersion: return I18n.translate("新しい版のさとるエディタで作ったバックアップです。アプリを新しくしてください")
+            case .notBackup: return I18n.translate("エディタβのバックアップではありません")
+            case .newerVersion: return I18n.translate("新しい版のエディタβで作ったバックアップです。アプリを新しくしてください")
             }
         }
     }

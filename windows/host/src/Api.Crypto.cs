@@ -178,7 +178,7 @@ namespace SatoEdit {
         var id = Hex(Primitives.Random(8));
         enrollments[id] = secret;
         var account = S(a, 0);
-        return new JObj { { "enrollId", id }, { "base32", Totp.Base32(secret) }, { "uri", Totp.Uri(secret, account == "" ? "document" : account, S(a, 1, "さとるエディタ")) } };
+        return new JObj { { "enrollId", id }, { "base32", Totp.Base32(secret) }, { "uri", Totp.Uri(secret, account == "" ? "document" : account, S(a, 1, "エディタβ")) } };
       });
       OnBg("makeKey", a => {
         try {
