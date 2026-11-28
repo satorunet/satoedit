@@ -708,6 +708,13 @@ enum TextLibrary {
             || t.conforms(to: .executable) || t.conforms(to: .font)
     }
 
+    /// 開いている文書の、一覧と同じ右クリックのメニュー用の 1 件 (並べた画面の ≡ から)
+    static func menuItem(for url: URL) -> Item? {
+        guard var it = item(for: url) else { return nil }
+        it.pinned = (UserDefaults.standard.stringArray(forKey: pinnedKey) ?? []).contains(url.path)
+        return it
+    }
+
     /// 一覧の 1 件。テキストでないもの (拡張子か中身がバイナリ) は nil
     private static func item(for url: URL, group g: String??  = .none, modified m: Date? = nil) -> Item? {
         if isNonTextType(url) { return nil }

@@ -5,23 +5,18 @@
     <link>https://github.com/satorunet/satoedit</link>
     <language>ja</language>
     <item>
-      <title>satoEdit 1.0.5</title>
-      <pubDate>Sat, 28 Nov 2026 03:43:05 +0000</pubDate>
-      <sparkle:version>1.0.5</sparkle:version>
-      <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
+      <title>satoEdit 1.0.6</title>
+      <pubDate>Sat, 28 Nov 2026 04:27:16 +0000</pubDate>
+      <sparkle:version>1.0.6</sparkle:version>
+      <sparkle:shortVersionString>1.0.6</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.5</sparkle:fullReleaseNotesLink>
-      <description><![CDATA[<h2>satoEdit 1.0.5</h2>
+      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.6</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>satoEdit 1.0.6</h2>
 <ul>
-<li>名前を「satoEdit」にしました (設定やテキストはそのまま使えます)</li>
-<li>テキスト一覧を閉じているとき、画面の左はしにつまみを出すように (押すと一覧が出ます)</li>
-<li>テキスト一覧を閉じる ✕ を、一覧のいちばん上 (置き場所) の右に</li>
-<li>ツールバーの「色・フォント」を「各種設定」に (押すと設定が開きます)</li>
-<li>Windows: タブをつかむとタブが持ち上がってついてくるように。タブのバーの上で並び替えも</li>
-<li>Windows: 今見ているタブを編集画面の端へドラッグしても、窓割りで並ぶように</li>
-<li>Windows: 窓割りで並べているタブに、窓の数のバッジを出すように</li>
+<li>タブの左に「≡」を出すように。押すと、テキスト一覧で右クリックしたときと同じ、そのファイルのメニュー (履歴・名前の変更・ピン固定・移動・削除など) が出ます</li>
+<li>窓割りで並べた画面の「≡」(Windows は見出しの右クリック) にも、同じファイルのメニューを出すように</li>
 </ul>]]></description>
-      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.5/SatoruEditor-1.0.5-mac.dmg" sparkle:edSignature="4q4TuB4ilS+Z+ybR+c24E9W1kBE8fvssYL58NQLBFDp1O3x4sbdy3Vv2e/hVk9zVxly4j9eHqEOeW6oAoEgXAg==" length="7781331" type="application/octet-stream"/>
+      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.6/SatoruEditor-1.0.6-mac.dmg" sparkle:edSignature="mqPl116BTlh6I9YAmDyTzjFCmn3cARo1vhxN83HNI+Ftw3hWcVP0MAHPTRaYayK/Y/hvS0pTWY+Ab8PVxYWcCg==" length="7777642" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>

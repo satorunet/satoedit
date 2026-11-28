@@ -77,7 +77,7 @@ export function installHostAPI() {
   let locale = navigator.language || 'ja';
   let theme = themeDef.defaults();
   let menuState = {};
-  let version = '1.0.5';
+  let version = '1.0.6';
   let priceOverrides = {};
   let menuTimer = null;
 

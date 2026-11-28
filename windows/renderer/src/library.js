@@ -1230,6 +1230,11 @@ export class TextLibrary {
   async rowMenu(it, x, y) {
     // いくつも選んでいる中で右クリックしたら、まとめて扱うメニュー
     if (this.picked.size > 1 && this.picked.has(norm(it.path))) { this.multiMenu(this.pickedPaths(), x, y); return; }
+    popupMenu(await this.rowMenuItems(it), x, y);
+  }
+
+  /// 1 件の右クリックのメニューの中身 (並べた画面の見出しのメニューでも使う)
+  async rowMenuItems(it) {
     const app = this.app, share = app.share;
     let versions = [];
     const vOn = this.prefs.versionHistory !== false && this.prefs.libraryEnabled !== false;
@@ -1275,7 +1280,7 @@ export class TextLibrary {
     for (let i = items.length - 1; i >= 0; i--) if (items[i] === null) items.splice(i, 1);
     if (!it.inFolder) items.push({ label: t('一覧から外す (ファイルは残す)'), action: () => this.forget(it.path) });
     items.push({ label: t('削除 (ごみ箱に入れる)'), icon: '🗑', disabled: it.locked, action: () => this.trash([it.path]) });
-    popupMenu(items, x, y);
+    return items;
   }
 
   /// いくつも選んだときの右クリック (まとめて ピン・ロック・移動・削除)

@@ -462,6 +462,8 @@ module.exports = {
   '新規ファイルの改行コード': 'Line endings for new files',
   '上書き保存の前にバックアップ (ファイル名.bak) を作る': 'Make a backup (filename.bak) before overwriting',
   '{n} 個の窓に並べています': 'Shown in {n} panes',
+  'このファイルのメニュー': 'File menu',
+  '保存…': 'Save…',
   '各種設定': 'Settings',
   'テキスト一覧を出す': 'Show the text list',
   '保存するとき行末の空白を削除する': 'Trim trailing spaces when saving',

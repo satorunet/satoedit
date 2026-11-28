@@ -1594,16 +1594,32 @@ extension EditorWindowController {
         let key = local ?? ("." + ext)
         guard key != shownTabIconExt || w.tab.accessoryView == nil else { return }
         shownTabIconExt = key
-        let type = ext.isEmpty ? UTType.plainText : (UTType(filenameExtension: ext) ?? .plainText)
-        let image = local.map { NSWorkspace.shared.icon(forFile: $0) } ?? NSWorkspace.shared.icon(for: type)
-        image.size = NSSize(width: 16, height: 16)
-        let iv = NSImageView(image: image)
-        iv.imageScaling = .scaleProportionallyDown
-        iv.translatesAutoresizingMaskIntoConstraints = false
-        iv.widthAnchor.constraint(equalToConstant: 16).isActive = true
-        iv.heightAnchor.constraint(equalToConstant: 16).isActive = true
-        w.tab.accessoryView = iv
+        // ファイルのアイコンの代わりに「≡」: 押すと、テキスト一覧で右クリックしたときと同じこのファイルのメニュー
+        let b = NSButton(image: NSImage(systemSymbolName: "line.3.horizontal", accessibilityDescription: L("このファイルのメニュー")) ?? NSImage(),
+                         target: self, action: #selector(showTabFileMenu(_:)))
+        b.isBordered = false
+        b.toolTip = L("このファイルのメニュー")
+        b.contentTintColor = .secondaryLabelColor
+        b.symbolConfiguration = .init(pointSize: 11, weight: .medium)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.widthAnchor.constraint(equalToConstant: 16).isActive = true
+        b.heightAnchor.constraint(equalToConstant: 16).isActive = true
+        w.tab.accessoryView = b
         if madoSplit != nil { PaneCountBadge.refreshAll() }   // 窓割りの画面の数のバッジを付け直す
+    }
+
+    /// タブの「≡」: このファイルのメニュー (テキスト一覧の右クリックと同じ)。まだ保存していない文書は、保存だけ
+    @objc func showTabFileMenu(_ sender: NSButton) {
+        let m: NSMenu
+        if let url = hdoc?.fileURL, hdoc?.remote == nil, let it = TextLibrary.menuItem(for: url) {
+            m = TextLibrary.contextMenu(for: it, target: TextLibraryActions.shared)
+        } else {
+            m = NSMenu()
+            let i = NSMenuItem(title: L("保存…"), action: #selector(NSDocument.save(_:)), keyEquivalent: "")
+            i.target = hdoc
+            m.addItem(i)
+        }
+        m.popUp(positioning: nil, at: NSPoint(x: 0, y: sender.bounds.maxY + 2), in: sender)
     }
 
     /// タブのアイコンを作り直す (窓割りのバッジを外したあと)

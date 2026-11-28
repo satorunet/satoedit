@@ -243,7 +243,15 @@ export class Mado {
       this.trackDrag(tab, e, () => app.activate(tab));
     });
     head.addEventListener('dblclick', () => this.equalize());
-    head.addEventListener('contextmenu', e => { e.preventDefault(); app.activate(tab); popupMenu(this.paneMenu(tab), e.clientX, e.clientY); });
+    head.addEventListener('contextmenu', async e => {
+      e.preventDefault();
+      app.activate(tab);
+      const x = e.clientX, y = e.clientY;
+      // いちばん上に、テキスト一覧で右クリックしたときと同じ、このファイルのメニュー (Mac 版と同じ)
+      const it = tab.path && app.library && app.library.itemFor(tab.path);
+      const top = it ? await app.library.rowMenuItems(it) : [];
+      popupMenu(top.length ? [...top, 'sep', ...this.paneMenu(tab)] : this.paneMenu(tab), x, y);
+    });
     const body = h('div', { class: 'mado-body' });
     body.append(tab.el);
     const p = h('div', { class: 'mado-pane' }, head, body);

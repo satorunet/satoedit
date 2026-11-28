@@ -3949,6 +3949,12 @@ Close the text list
 テキスト一覧を出す
 Show the text list
 
+このファイルのメニュー
+File menu
+
+保存…
+Save…
+
 各種設定
 Settings
 

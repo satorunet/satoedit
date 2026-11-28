@@ -372,6 +372,14 @@ final class TabSplit: NSObject, NSSplitViewDelegate {
             m.addItem(it)
             return it
         }
+        // いちばん上に、テキスト一覧で右クリックしたときと同じ、このファイルのメニュー
+        if let url = c.hdoc?.fileURL, let it = TextLibrary.menuItem(for: url) {
+            for i in TextLibrary.contextMenu(for: it, target: TextLibraryActions.shared).items {
+                i.menu?.removeItem(i)
+                m.addItem(i)
+            }
+            m.addItem(.separator())
+        }
         let mark = item(c.paneMarked ? L("この画面の選択を外す") : L("この画面を選ぶ"),
                         #selector(PaneMenuHandler.toggleMark(_:)), enabled: panes.count > 1)
         mark.state = c.paneMarked ? .on : .off

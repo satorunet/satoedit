@@ -68,6 +68,8 @@ body.no-toolbar #toolbar { display: none; }
 .tab { display: flex; align-items: center; gap: 6px; padding: 3px 6px 3px 10px; max-width: 220px; min-width: 70px; border: 1px solid transparent; border-bottom: none; border-radius: 4px 4px 0 0; color: var(--chrome-dim); margin-bottom: -1px; flex: 0 1 auto; }
 .tab:hover { background: var(--chrome-hover); }
 .tab.active { background: var(--chrome-active); border-color: var(--chrome-border); color: var(--chrome-fg); }
+.tab-menu { flex: 0 0 auto; width: 16px; height: 16px; line-height: 15px; text-align: center; border-radius: 3px; font-size: 14px; color: var(--chrome-dim); cursor: pointer; }
+.tab-menu:hover { background: var(--chrome-hover); color: var(--chrome-fg); }
 .tab-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .tab-close { width: 16px; height: 16px; line-height: 16px; text-align: center; border-radius: 3px; font-size: 10px; flex: 0 0 auto; }
 .tab-close:hover { background: var(--chrome-border); }

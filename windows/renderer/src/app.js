@@ -305,6 +305,14 @@ app.focusEditor = function () {
   app.active.target().focus();
 };
 
+/// タブの「≡」のメニュー: 一覧の右クリックと同じ。一覧に無い (保存していない) 文書は、保存だけ
+app.tabFileMenu = async function (tab, el) {
+  const r = el.getBoundingClientRect();
+  const it = tab.path && !tab.remote && app.library && app.library.itemFor(tab.path);
+  const items = it ? await app.library.rowMenuItems(it) : [{ label: t('保存…'), action: () => { app.activate(tab); app.run('file.save'); } }];
+  popupMenu(items, r.left, r.bottom + 2);
+};
+
 app.updateTabs = function () {
   const bar = app.el.tabs;
   if (app.mado) app.mado.titlesChanged();
@@ -334,7 +342,8 @@ app.updateTabs = function () {
         ], e.clientX, e.clientY);
       },
     },
-    fileTypeIcon(tab),
+    // ファイルのアイコンの代わりに「≡」: 押すと、テキスト一覧で右クリックしたときと同じこのファイルのメニュー (Mac 版と同じ)
+    h('span', { class: 'tab-menu', title: t('このファイルのメニュー'), onmousedown: e => e.stopPropagation(), onclick: e => { e.stopPropagation(); app.tabFileMenu(tab, e.currentTarget); } }, '≡'),
     // 窓割りで並べているタブには、並べている窓の数を丸いバッジで出す (Mac 版のタブのバッジと同じ)
     inMado(tab) ? h('span', { class: 'mado-count', title: t('{n} 個の窓に並べています', { n: app.mado.tabs.length }) }, String(app.mado.tabs.length)) : null,
     h('span', { class: 'tab-name' }, (tab.enc ? '🔒 ' : '') + tab.name + (tab.isDirty() ? ' ' + t('＊') : '')),
