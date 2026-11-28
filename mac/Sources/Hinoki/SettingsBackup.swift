@@ -16,7 +16,7 @@ enum SettingsBackup {
         panel.message = L("動作環境・ファイルタイプ別の設定・色とフォント・キー割り当て・メニュー編集をまとめて保存します")
         let f = DateFormatter()
         f.dateFormat = "yyyyMMdd"
-        panel.nameFieldStringValue = L("エディタβ設定_{0}.json", f.string(from: Date()))
+        panel.nameFieldStringValue = L("satoEdit設定_{0}.json", f.string(from: Date()))
         panel.allowedContentTypes = [.json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
@@ -86,7 +86,7 @@ enum SettingsBackup {
         guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let kind = root["_形式"] as? String, kind == formatName || kind == "さと丸エディタ設定" else {
             throw NSError(domain: "Satomaru", code: 2, userInfo: [
-                NSLocalizedDescriptionKey: L("エディタβの設定ファイルではありません"),
+                NSLocalizedDescriptionKey: L("satoEditの設定ファイルではありません"),
             ])
         }
         let d = UserDefaults.standard

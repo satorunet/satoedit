@@ -84,7 +84,7 @@ enum MenuCustomizer {
             // 自分で作った項目は identifier に日本語の名前が入っている (MainMenu)。システムが足した項目は題名そのまま
             let name = item.identifier?.rawValue ?? item.title
             let id = prefix.map { $0 + " > " + name } ?? name
-            // 画面に出す名前では、アプリ名 (エディタβ) を「エディタ」と短く出す
+            // 画面に出す名前では、アプリ名 (satoEdit) を「エディタ」と短く出す
             let title = item.title.replacingOccurrences(of: MainMenu.appName, with: L("エディタ"))
             let shown = path.map { $0 + " > " + title } ?? title
             body(id, shown, item)

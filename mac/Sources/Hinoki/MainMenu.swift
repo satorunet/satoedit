@@ -2,7 +2,7 @@ import AppKit
 import HinokiCore
 
 enum MainMenu {
-    static var appName: String { L("エディタβ") }
+    static var appName: String { L("satoEdit") }
 
     static func build() -> NSMenu {
         let main = NSMenu()

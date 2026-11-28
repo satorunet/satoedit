@@ -26,16 +26,16 @@ fs.rmSync(path.join(out, 'README.txt'), { force: true });
 fs.mkdirSync(path.join(out, 'data'), { recursive: true });
 // 目印は data の中に置く (開いたときに見えるのは exe・README・data だけにする)
 fs.writeFileSync(path.join(out, 'data', 'portable.txt'), [
-  'このファイルがあると、エディタβはポータブル版として動きます。',
+  'このファイルがあると、satoEditはポータブル版として動きます。',
   '設定・テキスト・版の履歴は、すべてこのフォルダの中の data フォルダに入ります (この PC には残しません)。',
   'このファイルは消さないでください。',
   '',
-  'While this file exists, Editor β runs as a portable app.',
+  'While this file exists, satoEdit runs as a portable app.',
   'Settings, texts and version history are all kept in the "data" folder here (nothing is left on this PC).',
   'Please do not delete this file.', '',
 ].join('\r\n'));
 fs.writeFileSync(path.join(out, 'README.txt'), [
-  'エディタβ ' + pkg.version + ' (ポータブル版)', '',
+  'satoEdit ' + pkg.version + ' (ポータブル版)', '',
   'satoruEditor.exe をダブルクリックすると、インストールしないで、すぐ使えます。',
   'フォルダごと好きな場所 (USB メモリなど) に置いてください。書いたテキストや設定は data フォルダに入ります。',
   'ほかのパソコンで続きを書くときは、このフォルダごと持っていってください。', '',

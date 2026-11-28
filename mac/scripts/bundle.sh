@@ -1,5 +1,5 @@
 #!/bin/bash
-# release ビルドして build/エディタβ.app を作る
+# release ビルドして build/satoEdit.app を作る
 #   ./scripts/bundle.sh          … この Mac 用 (速い)
 #   ./scripts/bundle.sh --universal … Apple Silicon (arm64) と Intel (x86_64) 両対応
 #   ./scripts/bundle.sh --dmg       … 両対応でビルドして配布用の DMG も作る
@@ -8,7 +8,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # 版: 上げるときはここを変える (自動アップデートは CFBundleVersion で新旧を比べるので、版と同じにする)
-VERSION="${VERSION:-1.0.4}"
+VERSION="${VERSION:-1.0.5}"
 BUILD_NUMBER="$VERSION"
 BUNDLE_ID="${BUNDLE_ID:-net.satoru.satoruEditor}"
 
@@ -36,7 +36,7 @@ else
 fi
 BINDIR="$(dirname "$BIN")"
 
-APP="build/エディタβ.app"
+APP="build/satoEdit.app"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/satoruEditor"
@@ -47,10 +47,10 @@ cp -R Resources/Icons "$APP/Contents/Resources/Icons"
 mkdir -p "$APP/Contents/Frameworks"
 ditto "$BINDIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
 
-# 画面の言語ごとのアプリ名 (日本語は「エディタβ」、英語は Editor β)
+# 画面の言語ごとのアプリ名 (日本語は「satoEdit」、英語は satoEdit)
 for l in ja en; do
     mkdir -p "$APP/Contents/Resources/$l.lproj"
-    if [ "$l" = ja ]; then n="エディタβ"; else n="Editor β"; fi
+    if [ "$l" = ja ]; then n="satoEdit"; else n="satoEdit"; fi
     printf '"CFBundleName" = "%s";\n"CFBundleDisplayName" = "%s";\n' "$n" "$n" > "$APP/Contents/Resources/$l.lproj/InfoPlist.strings"
 done
 
@@ -61,8 +61,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <dict>
     <key>CFBundleExecutable</key><string>satoruEditor</string>
     <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
-    <key>CFBundleName</key><string>エディタβ</string>
-    <key>CFBundleDisplayName</key><string>エディタβ</string>
+    <key>CFBundleName</key><string>satoEdit</string>
+    <key>CFBundleDisplayName</key><string>satoEdit</string>
     <key>LSHasLocalizedDisplayName</key><true/>
     <key>CFBundleIconFile</key><string>AppIcon</string>
     <key>CFBundlePackageType</key><string>APPL</string>
@@ -85,16 +85,16 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSServices</key>
     <array>
         <dict>
-            <key>NSMenuItem</key><dict><key>default</key><string>エディタβで開く</string></dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>satoEditで開く</string></dict>
             <key>NSMessage</key><string>openFilesService</string>
-            <key>NSPortName</key><string>エディタβ</string>
+            <key>NSPortName</key><string>satoEdit</string>
             <key>NSRequiredContext</key><dict/>
             <key>NSSendFileTypes</key><array><string>public.data</string><string>public.text</string></array>
         </dict>
         <dict>
-            <key>NSMenuItem</key><dict><key>default</key><string>エディタβで grep</string></dict>
+            <key>NSMenuItem</key><dict><key>default</key><string>satoEditで grep</string></dict>
             <key>NSMessage</key><string>grepFolderService</string>
-            <key>NSPortName</key><string>エディタβ</string>
+            <key>NSPortName</key><string>satoEdit</string>
             <key>NSRequiredContext</key><dict/>
             <key>NSSendFileTypes</key><array><string>public.folder</string></array>
         </dict>
@@ -147,7 +147,7 @@ lipo -archs "$APP/Contents/MacOS/satoruEditor" | sed 's/^/arch: /'
 if [ "$DMG" = 1 ]; then
     # 開くと「アプリ → アプリケーション」の矢印の絵が出る、よくある形の DMG を作る
     STAGE="build/dmg"
-    VOL="エディタβ ${VERSION}"
+    VOL="satoEdit ${VERSION}"
     rm -rf "$STAGE"
     mkdir -p "$STAGE/.background"
     cp -R "$APP" "$STAGE/"
@@ -183,7 +183,7 @@ tell application "Finder"
         set icon size of opts to 128
         set text size of opts to 13
         set background picture of opts to file ".background:bg.tiff"
-        set position of item "エディタβ.app" of container window to {170, 190}
+        set position of item "satoEdit.app" of container window to {170, 190}
         set position of item "Applications" of container window to {470, 190}
         close
         open

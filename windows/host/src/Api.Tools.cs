@@ -16,7 +16,7 @@ namespace SatoEdit {
         var o = O(a, 0);
         var labels = o.Obj("labels") ?? new JObj();
         var r = Assoc.Apply(System.Reflection.Assembly.GetExecutingAssembly().Location, (o.Arr("extensions") ?? new List<object>()).Select(x => Convert.ToString(x)).ToList(),
-          o.Bool("fileMenu"), o.Bool("folderMenu"), labels.Str("open", "エディタβで開く"), labels.Str("grep", "エディタβで grep"));
+          o.Bool("fileMenu"), o.Bool("folderMenu"), labels.Str("open", "satoEditで開く"), labels.Str("grep", "satoEditで grep"));
         return r == "" ? new JObj { { "status", "ok" } } : new JObj { { "status", "error" }, { "message", r } };
       });
     }
@@ -191,7 +191,7 @@ namespace SatoEdit {
         try {
           using (var k = Registry.CurrentUser.OpenSubKey(key, true)) {
             if (k?.GetValue("") is string v && (v.Contains("さとるエディタ") || v.Contains("Satoru Editor")))
-              k.SetValue("", v.Replace("さとるエディタ", "エディタβ").Replace("Satoru Editor", "Editor β"), RegistryValueKind.String);
+              k.SetValue("", v.Replace("さとるエディタ", "satoEdit").Replace("Satoru Editor", "satoEdit"), RegistryValueKind.String);
           }
         } catch { }
       }
@@ -215,7 +215,7 @@ namespace SatoEdit {
         try { using (var k = Registry.CurrentUser.OpenSubKey(Classes + "\\." + e + "\\OpenWithProgids", true)) k?.DeleteValue(ProgId, false); } catch { }
       }
       if (exts.Count > 0) {
-        Must(() => Set(Classes + "\\" + ProgId, null, "エディタβ"), "ProgID");
+        Must(() => Set(Classes + "\\" + ProgId, null, "satoEdit"), "ProgID");
         Must(() => Set(Classes + "\\" + ProgId, "Extensions", string.Join(" ", exts)), "ProgID");
         Must(() => Set(Classes + "\\" + ProgId + "\\DefaultIcon", null, $"\"{exe}\",0"), "icon");
         Must(() => Set(Classes + "\\" + ProgId + @"\shell\open\command", null, $"\"{exe}\" \"%1\""), "command");

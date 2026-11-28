@@ -472,7 +472,7 @@ export async function joinShare(app) {
       h('div', { class: 'form-row' }, h('label', {}, t('アドレス')), address),
       h('div', { class: 'form-row' }, h('label', {}, t('共有コード')), code),
       h('div', { class: 'form-row' }, h('label', {}, t('自分の名前')), name),
-      h('div', { class: 'dim' }, t('相手から聞いた「アドレス:ポート」と共有コードを入れます。Mac 版のエディタβにも参加できます。')),
+      h('div', { class: 'dim' }, t('相手から聞いた「アドレス:ポート」と共有コードを入れます。Mac 版のsatoEditにも参加できます。')),
       error),
     buttons: [{ label: t('参加する'), value: true, primary: true, validate: () => {
       if (!/^[^\s:]+(:\d{1,5})?$/.test(address.value.trim())) { error.textContent = t('アドレスは「192.168.1.10:7650」の形で入れてください。'); return false; }

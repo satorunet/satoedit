@@ -7,7 +7,7 @@ using System.Threading;
 using System.Windows.Forms;
 
 namespace SatoEdit {
-  /// エディタβ 軽量版の入口。1 つしか起動しないようにして、2 つめはファイルを 1 つめに渡して終わる
+  /// satoEdit 軽量版の入口。1 つしか起動しないようにして、2 つめはファイルを 1 つめに渡して終わる
   static class Program {
     /// アプリの版 (AssemblyInfo.cs の AssemblyInformationalVersion。package.json の版とそろえる)
     public static readonly string Version =

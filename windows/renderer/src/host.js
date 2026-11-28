@@ -77,7 +77,7 @@ export function installHostAPI() {
   let locale = navigator.language || 'ja';
   let theme = themeDef.defaults();
   let menuState = {};
-  let version = '1.0.4';
+  let version = '1.0.5';
   let priceOverrides = {};
   let menuTimer = null;
 
@@ -502,7 +502,7 @@ export function installHostAPI() {
     async clearRecent() { prefs.recent = []; await call('clearRecent'); rebuildMenu(); return true; },
 
     // 暗号化
-    totpBegin(account) { return call('totpBegin', account || 'document', t('エディタβ')); },
+    totpBegin(account) { return call('totpBegin', account || 'document', t('satoEdit')); },
     newKeyFile() { return call('newKeyFile', { title: t('鍵ファイルを作る (USB メモリなどに置く)'), filters: [{ name: t('鍵ファイル'), extensions: ['satorukey'] }] }); },
 
     // ふりがな
@@ -538,11 +538,11 @@ export function installHostAPI() {
     },
 
     // 関連付け
-    assocApply(o) { return call('assocApply', Object.assign({}, o, { labels: { open: t('エディタβで開く'), grep: t('エディタβで grep') } })); },
+    assocApply(o) { return call('assocApply', Object.assign({}, o, { labels: { open: t('satoEditで開く'), grep: t('satoEditで grep') } })); },
 
     async about() {
       return call('about', {
-        title: t('エディタβについて'), message: `${t('エディタβ')} ${version}`,
+        title: t('satoEditについて'), message: `${t('satoEdit')} ${version}`,
         detail: t('Windows 用の軽いテキストエディタです。\n\nMIT License') + '\n\n' + t('公式サイト') + ': ' + OFFICIAL_URL,
         buttons: ['OK', t('公式サイトを開く')], url: OFFICIAL_URL,
       });

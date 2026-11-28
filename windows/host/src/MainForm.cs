@@ -37,7 +37,7 @@ namespace SatoEdit {
       // 前の版の名前 (さとるエディタ) で登録した右クリックメニューの名前を、今の名前に直す
       System.Threading.Tasks.Task.Run(() => Assoc.RenameOldLabels());
 
-      Text = "エディタβ";
+      Text = "satoEdit";
       BackColor = Color.FromArgb(0xf0, 0xf0, 0xf0);
       AutoScaleMode = AutoScaleMode.Dpi;
       KeyPreview = false;
@@ -111,7 +111,7 @@ namespace SatoEdit {
         return;
       } catch (Exception e) {
         Log.Error("webview", e);
-        MessageBox.Show(this, "画面を表示できませんでした。\n" + e.Message, "エディタβ", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        MessageBox.Show(this, "画面を表示できませんでした。\n" + e.Message, "satoEdit", MessageBoxButtons.OK, MessageBoxIcon.Error);
         AllowClose = true;
         Close();
         return;
@@ -260,7 +260,7 @@ namespace SatoEdit {
       return outl;
     }
 
-    /// エクスプローラーの右クリック「エディタβで grep」から渡されるフォルダ (--grep=フォルダ)
+    /// エクスプローラーの右クリック「satoEditで grep」から渡されるフォルダ (--grep=フォルダ)
     public static string GrepArg(IEnumerable<string> args) {
       var a = args.FirstOrDefault(x => x.StartsWith("--grep="));
       if (a == null) return "";

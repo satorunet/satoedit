@@ -22,8 +22,8 @@ echo "1. 入れる (/S)"
 x "$SETUP /S"
 VER=$(node -p "require('./package.json').version")
 ok "$(x "reg query $KEY /v DisplayVersion" | grep -o "$VER" | head -1)" "$VER" "DisplayVersion $VER"
-x "del \"%USERPROFILE%\\Desktop\\エディタβ.lnk\"" >/dev/null
-ok "$(x "if exist \"%USERPROFILE%\\Desktop\\エディタβ.lnk\" (echo yes) else (echo no)" | tail -1)" no "デスクトップのショートカットを消した"
+x "del \"%USERPROFILE%\\Desktop\\satoEdit.lnk\"" >/dev/null
+ok "$(x "if exist \"%USERPROFILE%\\Desktop\\satoEdit.lnk\" (echo yes) else (echo no)" | tail -1)" no "デスクトップのショートカットを消した"
 echo "2. アプリを起動して、/update /wait-pid=PID /S がアプリの終了を待つか"
 bg "start \"\" \"$DIR\\satoruEditor.exe\""
 sleep 6
@@ -39,13 +39,13 @@ for i in $(seq 1 20); do [ "$(procs $NAME)" = 0 ] && break; sleep 2; done
 ok "$(procs $NAME)" 0 "アプリが閉じたらインストーラーが終わる"
 ok "$(x "if exist $DIR\\README.txt (echo yes) else (echo no)")" yes "入れ替えた (消したファイルが戻った)"
 ok "$(x "if exist $DIR\\satoruEditor.exe (echo yes) else (echo no)")" yes "本体がある"
-ok "$(x "if exist \"%USERPROFILE%\\Desktop\\エディタβ.lnk\" (echo yes) else (echo no)" | tail -1)" no "デスクトップのショートカットは作らない (前の選び方を引き継ぐ)"
+ok "$(x "if exist \"%USERPROFILE%\\Desktop\\satoEdit.lnk\" (echo yes) else (echo no)" | tail -1)" no "デスクトップのショートカットは作らない (前の選び方を引き継ぐ)"
 ok "$(procs satoruEditor.exe)" 0 "/S では起動しない"
 echo "3. /update (小窓を出して入れ替え、起動し直す)"
 bg "start \"\" $SETUP /update"
 for i in $(seq 1 30); do [ "$(procs satoruEditor.exe)" -ge 1 ] && [ "$(procs $NAME)" = 0 ] && break; sleep 2; done
 ok "$(procs $NAME)" 0 "インストーラーが終わった"
-ok "$(procs satoruEditor.exe)" 1 "エディタβが起動し直した"
+ok "$(procs satoruEditor.exe)" 1 "satoEditが起動し直した"
 WHERE=$(x "wmic process where name='satoruEditor.exe' get ExecutablePath" | grep -i satoruEditor.exe | head -1)
 echo "  動いている exe: $WHERE"
 sleep 3

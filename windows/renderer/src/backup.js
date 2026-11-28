@@ -37,8 +37,8 @@ export async function exportBackup(app, preset) {
   const ask = preset || await askNewPassword();
   if (!ask) return null;
   const d = new Date(), p = n => String(n).padStart(2, '0');
-  const name = t('エディタβのバックアップ') + `-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.satorubackup`;
-  const out = ask.path || await api.saveDialog({ title: t('テキストをバックアップ'), defaultPath: name, filters: [{ name: t('エディタβのバックアップ'), extensions: ['satorubackup'] }] });
+  const name = t('satoEditのバックアップ') + `-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.satorubackup`;
+  const out = ask.path || await api.saveDialog({ title: t('テキストをバックアップ'), defaultPath: name, filters: [{ name: t('satoEditのバックアップ'), extensions: ['satorubackup'] }] });
   if (!out) return null;
   // 書きかけは先に保存しておく (ファイルの中身を入れるため)。待っている版の記録も済ませる
   for (const tab of app.tabs) if (tab.path && tab.isDirty() && !tab.remote) await app.save(tab, { auto: !preset });
@@ -68,7 +68,7 @@ export async function importBackup(app, preset) {
   const api = app.api;
   let file = preset && preset.path;
   if (!file) {
-    const files = await api.openDialog({ single: true, title: t('読み込むバックアップ (.satorubackup) を選んでください'), filters: [{ name: t('エディタβのバックアップ'), extensions: ['satorubackup'] }] });
+    const files = await api.openDialog({ single: true, title: t('読み込むバックアップ (.satorubackup) を選んでください'), filters: [{ name: t('satoEditのバックアップ'), extensions: ['satorubackup'] }] });
     file = files && files[0];
   }
   if (!file) return null;
@@ -85,8 +85,8 @@ export async function importBackup(app, preset) {
     const r = await api.backupOpen({ path: file, password: pw });
     if (r.status === 'ok') { opened = r; break; }
     if (preset) return r;
-    if (r.status === 'notBackup') { await alertBox(t('読み込めませんでした'), t('エディタβのバックアップではありません')); return null; }
-    if (r.status === 'newer') { await alertBox(t('読み込めませんでした'), t('新しい版のエディタβで作ったバックアップです。アプリを新しくしてください')); return null; }
+    if (r.status === 'notBackup') { await alertBox(t('読み込めませんでした'), t('satoEditのバックアップではありません')); return null; }
+    if (r.status === 'newer') { await alertBox(t('読み込めませんでした'), t('新しい版のsatoEditで作ったバックアップです。アプリを新しくしてください')); return null; }
     if (r.status === 'error') { await alertBox(t('読み込めませんでした'), r.message); return null; }
     if (!(await confirmBox(t('パスワードが違います'), '', t('もう一度')))) return null;
   }

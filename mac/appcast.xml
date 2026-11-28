@@ -1,28 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>エディタβ</title>
+    <title>satoEdit</title>
     <link>https://github.com/satorunet/satoedit</link>
     <language>ja</language>
     <item>
-      <title>エディタβ 1.0.4</title>
-      <pubDate>Fri, 27 Nov 2026 15:49:18 +0000</pubDate>
-      <sparkle:version>1.0.4</sparkle:version>
-      <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+      <title>satoEdit 1.0.5</title>
+      <pubDate>Sat, 28 Nov 2026 03:43:05 +0000</pubDate>
+      <sparkle:version>1.0.5</sparkle:version>
+      <sparkle:shortVersionString>1.0.5</sparkle:shortVersionString>
       <sparkle:minimumSystemVersion>11.0</sparkle:minimumSystemVersion>
-      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.4</sparkle:fullReleaseNotesLink>
-      <description><![CDATA[<h2>エディタβ 1.0.4</h2>
+      <sparkle:fullReleaseNotesLink>https://github.com/satorunet/satoedit/releases/tag/v1.0.5</sparkle:fullReleaseNotesLink>
+      <description><![CDATA[<h2>satoEdit 1.0.5</h2>
 <ul>
-<li>名前を「エディタβ」に変え、アイコンを新しくしました (設定やテキストはそのまま使えます)</li>
-<li>窓割り: ちがう文書を 1 つのウインドウに左右・上下に並べられるように</li>
-<li>大きなファイル: 数百 MB〜数 GB でも、見ている所の近くだけを読んですぐ開けるように</li>
-<li>文字を打ったときの描き直しを速くしました (大きな文書・原稿用紙)</li>
-<li>選択の色が、文字のある所だけに付くように</li>
-<li>ツールバーを、よく使うボタンだけの名前付きにしました (ほかのボタンは右クリックで足せます)</li>
-<li>はじめて起動したときは、左の一覧を出さないふつうのエディタに</li>
-<li>タブの「＋」は、いつも新しいタブで開くように</li>
+<li>名前を「satoEdit」にしました (設定やテキストはそのまま使えます)</li>
+<li>テキスト一覧を閉じているとき、画面の左はしにつまみを出すように (押すと一覧が出ます)</li>
+<li>テキスト一覧を閉じる ✕ を、一覧のいちばん上 (置き場所) の右に</li>
+<li>ツールバーの「色・フォント」を「各種設定」に (押すと設定が開きます)</li>
+<li>Windows: タブをつかむとタブが持ち上がってついてくるように。タブのバーの上で並び替えも</li>
+<li>Windows: 今見ているタブを編集画面の端へドラッグしても、窓割りで並ぶように</li>
+<li>Windows: 窓割りで並べているタブに、窓の数のバッジを出すように</li>
 </ul>]]></description>
-      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.4/SatoruEditor-1.0.4-mac.dmg" sparkle:edSignature="iJ9WezWtujKjZkrvW9hYcO5pJDpMKSmw+Z0q7ioRViTV8xdq3aD1h5Zl6gSYklrKLl/mutnodDWY1J4J645sCQ==" length="7773167" type="application/octet-stream"/>
+      <enclosure url="https://github.com/satorunet/satoedit/releases/download/v1.0.5/SatoruEditor-1.0.5-mac.dmg" sparkle:edSignature="4q4TuB4ilS+Z+ybR+c24E9W1kBE8fvssYL58NQLBFDp1O3x4sbdy3Vv2e/hVk9zVxly4j9eHqEOeW6oAoEgXAg==" length="7781331" type="application/octet-stream"/>
     </item>
   </channel>
 </rss>

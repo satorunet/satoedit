@@ -25,7 +25,7 @@ ok "$(x "if exist \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\さと�
 ok "$(x "if exist $DIR\\satoruEditor.exe (echo yes) else (echo no)")" yes "本体 satoruEditor.exe"
 ok "$(x "if exist $DIR\\uninstall.exe (echo yes) else (echo no)")" yes "uninstall.exe"
 ok "$(x "if exist $DIR\\*.dll (echo no) else (echo yes)")" yes "exe 1 つ (部品は exe の中)"
-ok "$(x "if exist \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\エディタβ.lnk\" (echo yes) else (echo no)" | tail -1)" yes "スタートメニューのショートカット"
+ok "$(x "if exist \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\satoEdit.lnk\" (echo yes) else (echo no)" | tail -1)" yes "スタートメニューのショートカット"
 ok "$(x "reg query $KEY /v DisplayName >nul 2>&1 && echo yes || echo no")" yes "「アプリ」一覧への登録"
 WV='Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'
 ok "$(x "(reg query \"HKCU\Software\\$WV\" /v pv || reg query \"HKLM\SOFTWARE\WOW6432Node\\$WV\" /v pv) >nul 2>&1 && echo yes || echo no")" yes "WebView2 ランタイム (入っているか、いっしょに入れた)"
@@ -49,6 +49,6 @@ x "$DIR\\uninstall.exe /uninstall /S"
 sleep 6
 ok "$(x "if exist $DIR (echo yes) else (echo no)")" no "入れた先のフォルダが消えた"
 ok "$(x "reg query $KEY >nul 2>&1 && echo yes || echo no")" no "「アプリ」一覧から消えた"
-ok "$(x "if exist \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\エディタβ.lnk\" (echo yes) else (echo no)" | tail -1)" no "ショートカットが消えた"
+ok "$(x "if exist \"%APPDATA%\\Microsoft\\Windows\\Start Menu\\Programs\\satoEdit.lnk\" (echo yes) else (echo no)" | tail -1)" no "ショートカットが消えた"
 x "del C:\\Users\\$WINUSER\\$NAME" >/dev/null
 [ $FAIL = 0 ] && echo "すべて OK" || echo "うまくいかなかった項目があります"

@@ -22,9 +22,9 @@ export async function checkForUpdates(app, { manual = false } = {}) {
   if (r.status === 'update') { r.answer = await offer(app, r); return r; }
   if (!manual) return r;
   if (r.status === 'latest') {
-    await alertBox(t('アップデートを確認'), t('最新の版です') + '\n' + t('エディタβ') + ' ' + (r.current || app.version || ''));
+    await alertBox(t('アップデートを確認'), t('最新の版です') + '\n' + t('satoEdit') + ' ' + (r.current || app.version || ''));
   } else if (r.status === 'noasset') {
-    await alertBox(t('アップデートを確認'), t('エディタβ {version} の Windows 用のファイルが、まだ用意されていません。しばらくしてから、もう一度お試しください。', { version: r.version }));
+    await alertBox(t('アップデートを確認'), t('satoEdit {version} の Windows 用のファイルが、まだ用意されていません。しばらくしてから、もう一度お試しください。', { version: r.version }));
   } else if (r.status === 'error') {
     await alertBox(t('アップデートを確認できませんでした'), t('インターネットにつながっているかを確かめて、もう一度お試しください。') + '\n\n' + (r.message || ''));
   }
@@ -35,7 +35,7 @@ export async function checkForUpdates(app, { manual = false } = {}) {
 async function offer(app, r) {
   const api = window.api;
   const body = h('div', {},
-    h('div', { class: 'modal-line' }, t('エディタβ {version} が出ています (いまは {current})。ダウンロードして入れ替えますか？', { version: r.version, current: r.current })),
+    h('div', { class: 'modal-line' }, t('satoEdit {version} が出ています (いまは {current})。ダウンロードして入れ替えますか？', { version: r.version, current: r.current })),
     r.notes ? h('div', { class: 'modal-line', style: { marginTop: '8px' } },
       h('a', { href: '#', class: 'update-notes', onclick: e => { e.preventDefault(); api.openExternal(r.notes); } }, t('この版で変わったこと (リリースノート) を見る'))) : null);
   const answer = await modal({

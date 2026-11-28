@@ -92,7 +92,7 @@ function build(state) {
     sep,
     item('スクリーンショット (画像にする)…', 'file.screenshot', 'Ctrl+Alt+S'),
     sep,
-    item('エディタβの終了', 'app.quit', 'Alt+F4'));
+    item('satoEditの終了', 'app.quit', 'Alt+F4'));
 
   const edit = [
     item('元に戻す', 'edit.undo', 'Ctrl+Z'),
@@ -326,7 +326,7 @@ function build(state) {
     { label: 'テーマ', submenu: PRESETS.map(t => radio(t.name, 'theme.preset:' + t.name, state.themePreset === t.name)) },
     sep,
     item('アップデートを確認…', 'app.checkUpdate'),
-    item('エディタβについて', 'app.about'),
+    item('satoEditについて', 'app.about'),
   ] });
   return translate(customize(menus, p, !!state.forSettings));
 }

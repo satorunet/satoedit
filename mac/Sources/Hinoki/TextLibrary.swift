@@ -1638,7 +1638,6 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         layoutButton = iconButton(TextLibrary.oneColumn ? "rectangle.split.2x1" : "rectangle.split.1x2",
                                   L("上下 / 左右に並べ替える"), #selector(toggleColumns(_:)))
         let gridButton = iconButton("square.grid.2x2", L("サムネで一覧 (カードで見渡す)"), #selector(showGrid(_:)))
-        let closeButton = iconButton("xmark", L("テキスト一覧を閉じる"), #selector(closePanel(_:)))
         // ゴミ箱: 押すと選んだテキストを削除。ファイルやフォルダをつかんで置いても削除できる
         let trashButton = TrashDropButton(image: NSImage(systemSymbolName: "trash", accessibilityDescription: L("削除")) ?? NSImage(),
                                           target: self, action: #selector(trashClicked(_:)))
@@ -1653,7 +1652,7 @@ final class TextLibraryPanel: NSView, NSTableViewDataSource, NSTableViewDelegate
         let moreButton = iconButton("ellipsis.circle", L("履歴の操作"), #selector(showMore(_:)))
         // 見出しの文字は出さない (ボタンだけ)
         _ = title
-        let header = NSStackView(views: [newButton, NSView(), searchButton, layoutButton, moreButton, trashButton, closeButton])
+        let header = NSStackView(views: [newButton, NSView(), searchButton, layoutButton, moreButton, trashButton])
         header.orientation = .horizontal
         header.spacing = 2
 
@@ -2358,6 +2357,8 @@ final class FolderNode: NSObject {
 }
 
 final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDelegate, NSMenuDelegate {
+    @objc private func closeLibrary(_ sender: Any?) { TextLibrary.setVisible(false) }
+
     private let outline = FolderOutlineView()
     /// 自分で作ったフォルダがまだ無いときの案内 (フォルダの並びのすぐ下)
     private let folderHint = HoverLabel(wrappingLabelWithString: "")
@@ -2488,7 +2489,14 @@ final class TextFolderPanel: NSView, NSOutlineViewDataSource, NSOutlineViewDeleg
         storageTabs.action = #selector(storageTabChanged(_:))
         storageTabs.toolTip = L("見るテキストの置き場所: iCloud (iPhone 版と同じ)・この Mac・好きなフォルダ")
         refreshStorageTabs()
-        let header = NSStackView(views: [openButton, NSView(), storageTabs])
+        // 一覧を閉じる ✕ は、いちばん上 (置き場所) の右に
+        let closeButton = NSButton(image: NSImage(systemSymbolName: "xmark", accessibilityDescription: L("テキスト一覧を閉じる")) ?? NSImage(),
+                                   target: self, action: #selector(closeLibrary(_:)))
+        closeButton.isBordered = false
+        closeButton.toolTip = L("テキスト一覧を閉じる")
+        closeButton.contentTintColor = .secondaryLabelColor
+        closeButton.symbolConfiguration = .init(pointSize: 11, weight: .regular)
+        let header = NSStackView(views: [openButton, NSView(), storageTabs, closeButton])
         header.orientation = .horizontal
         header.spacing = 4
 

@@ -45,7 +45,7 @@ final class EditorToolbar: NSObject, NSToolbarDelegate {
         Button(id: "speak", label: L("読み上げ"), symbol: "speaker.wave.2", action: "readAloudHM:", tip: L("読み上げる / 止める (⌥⌘R)")),
         Button(id: "dictate", label: L("音声入力"), symbol: "mic", action: "toggleDictationHM:", tip: L("声で入力。もう一度押すと止まる")),
         Button(id: "ai", label: L("AI"), symbol: "sparkles", action: "toggleAIHM:", tip: L("AI アシスタント (⇧⌘A)")),
-        Button(id: "theme", label: L("色・フォント"), symbol: "paintpalette", action: "openThemeHM:", tip: L("色・フォント (⌘,)")),
+        Button(id: "theme", label: L("各種設定"), symbol: "gearshape", action: "openSettingsHM:", tip: L("各種設定 (⌘,)")),
     ]
 
     private static func id(_ s: String) -> NSToolbarItem.Identifier { NSToolbarItem.Identifier("satomaru.\(s)") }

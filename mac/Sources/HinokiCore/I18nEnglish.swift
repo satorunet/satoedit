@@ -256,27 +256,27 @@ Follow macOS
 profiles.json を直接編集…
 Edit profiles.json Directly…
 
-エディタβで grep
-grep with Editor β
+satoEditで grep
+grep with satoEdit
 
-エディタβ
-Editor β
+satoEdit
+satoEdit
 
 # 書類・iCloud Drive のフォルダの名前 (前のアプリ名。今のテキストがあるので変えない)
 さとるエディタ
 Satoru Editor
 
-エディタβで開く
-Open with Editor β
+satoEditで開く
+Open with satoEdit
 
-エディタβの設定ファイルではありません
-This is not a Editor β settings file
+satoEditの設定ファイルではありません
+This is not a satoEdit settings file
 
-エディタβの鍵.
-Editor β key.
+satoEditの鍵.
+satoEdit key.
 
-エディタβ設定_{0}.json
-Editor β settings_{0}.json
+satoEdit設定_{0}.json
+satoEdit settings_{0}.json
 
 theme.json に問題があります (その項目は既定値を使います)
 There is a problem in theme.json (defaults are used for those items)
@@ -500,8 +500,8 @@ Later
 あなた
 You
 
-あなたはテキストエディタ「エディタβ」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。
-You are a writing assistant built into the text editor "Editor β". Output only the requested result, with no preamble or closing remarks. Do not use Markdown formatting unless the original text uses it.
+あなたはテキストエディタ「satoEdit」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。
+You are a writing assistant built into the text editor "satoEdit". Output only the requested result, with no preamble or closing remarks. Do not use Markdown formatting unless the original text uses it.
 
 ある鍵ファイルを選ぶ…
 Choose an Existing Key File…
@@ -602,8 +602,8 @@ Sakura (Pink)
 しまう
 Minimize
 
-すべてエディタβで開く
-Open All with Editor β
+すべてsatoEditで開く
+Open All with satoEdit
 
 すべてのタブを表示
 Show All Tabs
@@ -962,8 +962,8 @@ Double-click, then press a key. Bold items have been changed.
 ダーク
 Dark
 
-チェックした拡張子は、ダブルクリックでエディタβが開きます。
-Checked extensions open in Editor β when double-clicked.
+チェックした拡張子は、ダブルクリックでsatoEditが開きます。
+Checked extensions open in satoEdit when double-clicked.
 
 チェックを外すとメニューに出なくなります。
 Unchecked items no longer appear in the menus.
@@ -1067,8 +1067,8 @@ Files:
 ファイルから検索 (⌘⇧F)
 Find in files (⌘⇧F)
 
-ファイルを右クリック →「エディタβで開く」
-Right-click a file → "Open with Editor β"
+ファイルを右クリック →「satoEditで開く」
+Right-click a file → "Open with satoEdit"
 
 ファイルを開いたとき、前回のカーソル位置に戻す
 Return to the last caret position when opening a file
@@ -1106,8 +1106,8 @@ The folder's contents go to the Trash too. You can put them back from the Trash.
 フォルダの中身を左にツリーで表示。たくさんのファイルを行き来できます。
 Shows a folder as a tree on the left, to move between many files.
 
-フォルダを右クリック →「エディタβで grep」
-Right-click a folder → "grep with Editor β"
+フォルダを右クリック →「satoEditで grep」
+Right-click a folder → "grep with satoEdit"
 
 フォルダを選ぶ
 Choose a folder
@@ -3619,8 +3619,8 @@ Speech recognition limit reached
 Apple の音声認識は、短い時間に使える回数が決まっています。少し時間をおいてから、もう一度お試しください。
 Apple's speech recognition can only be used a limited number of times in a short period. Please wait a while and try again.
 
-「システム設定 > プライバシーとセキュリティ」で、エディタβに {0} を許可してください。
-Allow {0} for Editor β in "System Settings > Privacy & Security".
+「システム設定 > プライバシーとセキュリティ」で、satoEditに {0} を許可してください。
+Allow {0} for satoEdit in "System Settings > Privacy & Security".
 
 メニュー「音声 > 声で入力」かツールバーのマイクのボタンで始めます。話した言葉はカーソルの位置に入ります。少し黙ると、そこまでが文章に入ります。\n声は Apple のサーバに送って文字にします (インターネットが必要です)。
 Start with "Speech > Dictate" or the microphone button in the toolbar. Your words go in at the cursor; when you pause, what you said so far is added.\nYour voice is sent to Apple's servers to be turned into text (an internet connection is needed).
@@ -3945,6 +3945,15 @@ Show / hide the text list (⌘⇧L)
 
 テキスト一覧を閉じる
 Close the text list
+
+テキスト一覧を出す
+Show the text list
+
+各種設定
+Settings
+
+各種設定 (⌘,)
+Settings (⌘,)
 
 題名・本文で絞り込み
 Filter by title or text
@@ -4806,7 +4815,7 @@ Backup password
 Restored from the backup
 公開したリンクの記録も入れる (更新・公開をやめるための合言葉も)
 Include published-link records (with the tokens to update or unpublish)
-エディタβのバックアップ
+satoEditのバックアップ
 SatoruEditor Backup
 バックアップから戻しますか？
 Restore from this backup?
@@ -4816,13 +4825,13 @@ Creating the backup…
 Backup exported
 バックアップを書き出せませんでした
 Couldn't export the backup
-エディタβのバックアップではありません
+satoEditのバックアップではありません
 This isn't a SatoruEditor backup
 テキスト一覧のファイルを、パスワードで鍵をかけた 1 つのファイルに書き出します。読み込むと、別の Mac にも戻せます。
 Exports your text library into one file locked with a password. You can restore it on another Mac.
 パスワードを忘れると、このバックアップは開けません。
 If you forget the password, this backup can't be opened.
-新しい版のエディタβで作ったバックアップです。アプリを新しくしてください
+新しい版のsatoEditで作ったバックアップです。アプリを新しくしてください
 This backup was made by a newer SatoruEditor. Please update the app
 さとるエディタのフォルダに戻します。今あるファイルは消しません。同じ名前で中身が違うものは「(バックアップ)」を付けて別に置きます。
 Restores into the SatoruEditor folder. Existing files are kept; a file with the same name but different content is saved alongside with "(backup)".

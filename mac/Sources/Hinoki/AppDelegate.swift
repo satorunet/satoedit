@@ -339,7 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     /// 公式サイト
     static let officialURL = "https://docs.satoru.net"
 
-    /// 「エディタβについて」: 標準の画面に、公式サイトのリンクを足す
+    /// 「satoEditについて」: 標準の画面に、公式サイトのリンクを足す
     @objc func showAboutHM(_ sender: Any?) {
         let center = NSMutableParagraphStyle()
         center.alignment = .center

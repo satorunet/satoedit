@@ -748,7 +748,48 @@ final class EditorWindowController: NSWindowController, NSTextViewDelegate, NSMe
         } else if libraryPanelCreated {
             slideSide(TextLibrary.oneColumn ? [libraryColumn] : [folderListPanel, libraryPanel], open: false, fromLeft: true)
         }
+        updateLibraryTab()
     }
+
+    /// テキスト一覧を閉じているあいだ、画面の左の端に出す小さなつまみ (AI のつまみを左右反対にしたもの。押すと出す)
+    private var libraryTab: NSButton {
+        if let b = objc_getAssociatedObject(self, &libraryTabKey) as? NSButton { return b }
+        let img = NSImage(systemSymbolName: "list.bullet.rectangle", accessibilityDescription: L("テキスト一覧"))?
+            .withSymbolConfiguration(.init(pointSize: 11, weight: .regular)) ?? NSImage()
+        // 左の 8pt は画面の外なので、アイコンはそのぶん右に寄せる
+        let padded = NSImage(size: NSSize(width: img.size.width + 8, height: img.size.height), flipped: false) { _ in
+            img.draw(in: NSRect(x: 8, y: 0, width: img.size.width, height: img.size.height))
+            return true
+        }
+        padded.isTemplate = true
+        let b = AITabButton(image: padded, target: self, action: #selector(openLibraryFromTab(_:)))
+        b.onLeft = true
+        b.isBordered = false
+        b.contentTintColor = .controlAccentColor
+        b.toolTip = L("テキスト一覧を出す")
+        b.wantsLayer = true
+        b.applyColors()
+        b.translatesAutoresizingMaskIntoConstraints = false
+        objc_setAssociatedObject(self, &libraryTabKey, b, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        return b
+    }
+
+    func updateLibraryTab() {
+        let show = EditorExtension.library.isOn && !TextLibrary.isVisible && !remoteTreeShown && madoAllowsSidePanels
+        let b = libraryTab
+        if show && b.superview == nil, let host = editorArea.superview {
+            host.addSubview(b, positioned: .above, relativeTo: nil)
+            NSLayoutConstraint.activate([
+                b.leadingAnchor.constraint(equalTo: editorArea.leadingAnchor, constant: -8),
+                b.centerYAnchor.constraint(equalTo: editorArea.centerYAnchor, constant: -40),
+                b.widthAnchor.constraint(equalToConstant: 28),
+                b.heightAnchor.constraint(equalToConstant: 36),
+            ])
+        }
+        b.isHidden = !show
+    }
+
+    @objc private func openLibraryFromTab(_ sender: Any?) { TextLibrary.setVisible(true) }
 
     /// テキスト一覧をカード (サムネ) で、本文の場所いっぱいに出す。もう一度押すか「閉じる」・Esc で戻る
     @objc func showLibraryGridHM(_ sender: Any?) {
@@ -1692,6 +1733,7 @@ private var aiWindowKey = 0
 private var aiWindowCloseKey = 0
 private var aiClientKey = 0
 private var aiTabKey = 0
+private var libraryTabKey = 0
 private var pendingSlideKey = 0
 private var aiLastAnswerKey = 0
 
@@ -1979,6 +2021,7 @@ extension EditorWindowController {
             ])
         }
         b.isHidden = !show
+        updateLibraryTab()   // 左の一覧のつまみも (起動した直後は画面がまだ無いので、ここでも確かめる)
     }
 
     @objc private func openAIFromTab(_ sender: Any?) {
@@ -2076,7 +2119,7 @@ extension EditorWindowController {
             return
         }
         let job = AIJob(from: selected ? sel.location : 0, to: selected ? NSMaxRange(sel) : ns.length, original: target, kind: kind)
-        var system = L("あなたはテキストエディタ「エディタβ」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。")
+        var system = L("あなたはテキストエディタ「satoEdit」に組み込まれた文章作成アシスタントです。依頼された結果だけを出力し、前置きや締めの言葉は書かないでください。元の文章がマークダウンを使っていない限り、マークダウンの装飾は使わないでください。")
         // 原稿用紙 (作文) を開いているときは、作文の書き方の決まりを守ってもらう
         if paperMode == .genko {
             system += L("\n\nいま書いているのは、原稿用紙 (縦書き 400 字詰め) の作文です。作文の形と、原稿用紙の書き方の決まりを守ってください。\n作文の形: 1 行目に題名、2 行目に名前、3 行目は空けて、4 行目から本文。題名・名前の行には空白を入れない (題名を 3 マス下げる・名前を下に寄せるのは、アプリが自動で行う)。文書全体を書き直すときは、この形のまま出力する。\n本文の決まり: 段落の初めは全角スペース 1 つで 1 字下げる。会話は「」で囲み、行を改める (会話の行は字下げしない)。数字は漢数字で書く。英字・記号・半角の文字はできるだけ使わない (使うときは全角)。句読点やかっこも 1 字として数える。文体 (です・ます / だ・である) はもとの作文にそろえる。マークダウンや箇条書きは使わない。")
@@ -2889,6 +2932,8 @@ extension Notification.Name {
 
 /// 画面の右はしの AI タブ: 地は上のバー・下の状態表示と同じ色で塗る (ほんの少しだけ透ける)。明るい・暗いの切り替えにも合わせる
 final class AITabButton: NSButton {
+    /// 左の端にくっつけるつまみ (テキスト一覧) なら true: 右の角だけ丸く
+    var onLeft = false
     func applyColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
             layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor   // ほんの少しだけ透かす
@@ -2896,7 +2941,7 @@ final class AITabButton: NSButton {
         }
         layer?.borderWidth = 1
         layer?.cornerRadius = 7
-        layer?.maskedCorners = [.layerMinXMinYCorner, .layerMinXMaxYCorner]   // 左の角だけ丸く (右の端にくっつける)
+        layer?.maskedCorners = onLeft ? [.layerMaxXMinYCorner, .layerMaxXMaxYCorner] : [.layerMinXMinYCorner, .layerMinXMaxYCorner]   // 端にくっつく側の角は丸めない
     }
     override func layout() {
         super.layout()

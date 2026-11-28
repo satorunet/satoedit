@@ -116,6 +116,7 @@ enum Mado {
         guard c.madoSplit === sp else { return false }
         sp.focus(c)
         c.updateAITab()
+        c.updateLibraryTab()
         return true
     }
 }

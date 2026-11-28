@@ -97,7 +97,7 @@ async function main() {
   fs.rmSync(app, { recursive: true, force: true }); // 画面は exe の中に入れたので、横には置かない
 
   fs.writeFileSync(path.join(out, 'README.txt'), [
-    'エディタβ ' + pkg.version + ' (軽量版)', '',
+    'satoEdit ' + pkg.version + ' (軽量版)', '',
     'satoruEditor.exe をダブルクリックして起動します。フォルダごと好きな場所に置いてください。',
     'Double-click satoruEditor.exe to start. Keep the whole folder together.', '',
     '動かすには Windows 10 / 11 に最初から入っている .NET Framework 4.8 と Microsoft Edge WebView2 ランタイムを使います。',

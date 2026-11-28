@@ -33,7 +33,7 @@ import genko from '../../shared/genko';
 import langGuess from '../../shared/langguess';
 
 const { t } = i18n;
-const appName = () => t('エディタβ');
+const appName = () => t('satoEdit');
 if (!window.api && window.chrome && window.chrome.webview) installHostAPI(); // 軽量版 (WebView2) の本体とつなぐ
 if (!window.api) installMockAPI();
 const api = window.api;
@@ -116,7 +116,14 @@ app.resetAllSettings = async function () {
 /// 左のテキスト一覧を出し入れする (サーバツリーを出しているあいだは隠す。Mac 版と同じ)
 app.applyLibrary = function () {
   const p = app.prefs;
-  if (app.library) app.library.setVisible(p.libraryEnabled !== false && p.libraryVisible === true && !(app.remoteTree && app.remoteTree.visible));
+  const remote = !!(app.remoteTree && app.remoteTree.visible);
+  if (app.library) app.library.setVisible(p.libraryEnabled !== false && p.libraryVisible === true && !remote);
+  // 一覧を閉じているときの、左はしのつまみ (AI の右はしのつまみと同じ。押すと出す)
+  if (!app.libTab) {
+    app.libTab = h('button', { id: 'lib-tab', title: t('テキスト一覧を出す'), 'aria-label': t('テキスト一覧を出す'), onclick: () => app.setPref('libraryVisible', true) }, icon('library', 16));
+    document.getElementById('main').append(app.libTab);
+  }
+  app.libTab.hidden = !(p.libraryEnabled !== false && p.libraryVisible !== true && !remote);
 };
 
 app.applyTheme = function () {
@@ -328,6 +335,8 @@ app.updateTabs = function () {
       },
     },
     fileTypeIcon(tab),
+    // 窓割りで並べているタブには、並べている窓の数を丸いバッジで出す (Mac 版のタブのバッジと同じ)
+    inMado(tab) ? h('span', { class: 'mado-count', title: t('{n} 個の窓に並べています', { n: app.mado.tabs.length }) }, String(app.mado.tabs.length)) : null,
     h('span', { class: 'tab-name' }, (tab.enc ? '🔒 ' : '') + tab.name + (tab.isDirty() ? ' ' + t('＊') : '')),
     h('span', { class: 'tab-close', title: t('閉じる'), onmousedown: e => e.stopPropagation(), onclick: () => app.closeTab(tab) }, '✕')));
   }
@@ -1216,7 +1225,7 @@ const TOOLBAR = [
   ['cut', '切り取り', 'edit.cut', '切り取り'], ['copy', 'コピー', 'edit.copy', 'コピー'], ['paste', '貼り付け', 'edit.paste', '貼り付け'], ['duplicate', '行複製', 'line.duplicate', '行を複製'], '-',
   ['find', '検索', 'find.show', '検索'], ['replace', '置換', 'find.replace', '置換'], ['grep', 'grep', 'grep.show', 'ファイルから検索'], ['goto', '行移動', 'goto.line', '指定行へ移動'], ['diff', '差分', 'view.diff', '差分: 編集前とどこが変わったかを横に表示 (Ctrl+Shift+D)'], '-',
   ['split', '分割', 'view.split', '上下に分割 / 分割をやめる'], ['splitSide', '左右分割', 'view.splitSide', '左右に分割 / 分割をやめる'], ['mado', '窓割り', 'mado.toggle', '窓割り: タブを左右に並べる / 並べるのをやめる', 'mado'], ['share', '共有', 'collab.host', 'この文書を共有して共同編集する', 'collab'], ['paper', '用紙', 'paper.cycle', '用紙切替: 標準エディタ → 原稿用紙 → A4用紙', 'paper'], ['publish', '公開', 'share.publish', 'リンクで公開共有 (docs.satoru.net)', 'share'], ['ai', 'AI', 'ai.toggle', 'AI アシスタント', 'ai'],
-  'space', ['camera', 'スクショ', 'file.screenshot', 'スクリーンショット (画像にする)'], ['theme', '色・フォント', 'settings.open:theme', '色・フォント'],
+  'space', ['camera', 'スクショ', 'file.screenshot', 'スクリーンショット (画像にする)'], ['theme', '各種設定', 'settings.open:general', '各種設定'],
 ];
 /// 最初に並べるもの: よく使うものだけ (Mac 版と同じ。ほかのボタンは「ツールバーを編集…」で足せる)
 const TOOLBAR_DEFAULT = ['new', 'open', 'save', '-', 'undo', 'redo', '-', 'find', '-', 'paper', 'split', 'camera', 'ai', 'space', 'theme'];
@@ -1343,7 +1352,7 @@ const commands = {
     const next = i18n.resolve(lang, navigator.language);
     if (next === i18n.language()) return;
     // 画面を作り直す。保存していない文書があるときは、次に起動したときから切り替える
-    if (app.tabs.some(x => x.isDirty())) { toast(next === 'en' ? 'The language will change the next time you start Editor β.' : '次に起動したときから日本語になります。'); return; }
+    if (app.tabs.some(x => x.isDirty())) { toast(next === 'en' ? 'The language will change the next time you start satoEdit.' : '次に起動したときから日本語になります。'); return; }
     try { sessionStorage.setItem('reopen', JSON.stringify(app.tabs.filter(x => x.path).map(x => x.path))); } catch (e) { /* なくてもよい */ }
     location.reload();
   },

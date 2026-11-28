@@ -492,14 +492,14 @@ function assocPane(app) {
     const result = h('div', { class: 'ai-test', role: 'status' });
     pane.append(
       box(t('エクスプローラーの右クリックメニュー'),
-        h('label', { class: 'check-row' }, fileMenu, t('ファイルの右クリックに「エディタβで開く」を出す')),
-        h('label', { class: 'check-row' }, folderMenu, t('フォルダの右クリックに「エディタβで grep」を出す'))),
-      box(t('「プログラムから開く」の一覧にエディタβを出す拡張子'),
+        h('label', { class: 'check-row' }, fileMenu, t('ファイルの右クリックに「satoEditで開く」を出す')),
+        h('label', { class: 'check-row' }, folderMenu, t('フォルダの右クリックに「satoEditで grep」を出す'))),
+      box(t('「プログラムから開く」の一覧にsatoEditを出す拡張子'),
         exts,
         h('div', { class: 'form-row' },
           h('button', { onclick: () => { exts.value = st.defaults.join(' '); } }, t('よく使う拡張子を入れる')),
           h('button', { onclick: () => { exts.value = ''; } }, t('空にする'))),
-        h('div', { class: 'dim' }, t('ダブルクリックで開く「既定のアプリ」は、Windows が守っているのでここからは変えられません。ファイルを右クリック →「プログラムから開く」→「別のプログラムを選択」でエディタβを選び、「常にこのアプリを使って開く」にチェックしてください。'))),
+        h('div', { class: 'dim' }, t('ダブルクリックで開く「既定のアプリ」は、Windows が守っているのでここからは変えられません。ファイルを右クリック →「プログラムから開く」→「別のプログラムを選択」でsatoEditを選び、「常にこのアプリを使って開く」にチェックしてください。'))),
       h('div', { class: 'form-row' }, h('button', { class: 'primary', onclick: async () => {
         result.textContent = t('設定しています…');
         result.className = 'ai-test';

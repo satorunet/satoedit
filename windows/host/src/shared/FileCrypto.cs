@@ -56,7 +56,7 @@ namespace SatoEdit {
 
     // 鍵ファイル
     public static byte[] NewKeyFileContents() =>
-      Encoding.UTF8.GetBytes(KeyfileHeader + "\n# Editor β key file. If you lose it, documents encrypted with it can never be opened.\n"
+      Encoding.UTF8.GetBytes(KeyfileHeader + "\n# satoEdit key file. If you lose it, documents encrypted with it can never be opened.\n"
         + Convert.ToBase64String(Primitives.Random(32)) + "\n");
 
     /// 鍵ファイルの中身から元の乱数を取り出す。鍵ファイルでなければ null

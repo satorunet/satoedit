@@ -514,7 +514,8 @@ export class TextLibrary {
     this.refreshStorage();
     this.folderLoading = loadingMark();
     this.folderPane = h('div', { class: 'lib-folder-pane' },
-      h('div', { class: 'lib-head' }, this.newFolderButton, h('span', { class: 'lib-space' }), this.storageButton),
+      h('div', { class: 'lib-head' }, this.newFolderButton, h('span', { class: 'lib-space' }), this.storageButton,
+        h('button', { class: 'icon-button lib-close', title: t('テキスト一覧を閉じる'), 'aria-label': t('テキスト一覧を閉じる'), onclick: () => this.app.setPref('libraryVisible', false) }, '✕')),
       this.folderLoading, this.folderList);
     this.search = h('input', { type: 'search', class: 'lib-search', placeholder: t('題名・本文で絞り込み'), hidden: true });
     this.search.addEventListener('input', () => { this.query = this.search.value.trim().toLowerCase(); this.renderList(); });
@@ -545,8 +546,7 @@ export class TextLibrary {
         h('button', { class: 'icon-button', title: t('検索'), onclick: () => this.toggleSearch() }, icon('find', 15)),
         this.layoutButton,
         this.moreButton,
-        this.trashButton,
-        h('button', { class: 'icon-button', title: t('テキスト一覧を閉じる'), onclick: () => this.app.setPref('libraryVisible', false) }, '✕')),
+        this.trashButton),
       this.search, this.listLoading, this.list);
     const resizer = (pane, key, min, max) => {
       const r = h('div', { class: 'lib-resizer', title: t('ドラッグで幅を変える') });

@@ -640,6 +640,13 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 #ai-tab[hidden] { display: none; }
 #ai-tab svg { stroke: currentColor; flex: 0 0 auto; }
 #ai-tab svg path { fill: currentColor; fill-opacity: .3; }
+/* テキスト一覧を閉じているときの、左はしのつまみ (AI のつまみを左右反対にしたもの) */
+#lib-tab { position: absolute; left: -8px; top: calc(50% - 58px); width: 30px; height: 36px; z-index: 30; padding: 0 0 0 8px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: color-mix(in srgb, var(--footer-bg, var(--chrome-bg)) 90%, transparent); border: 1px solid var(--chrome-border); border-radius: 7px; color: var(--accent); }
+#lib-tab:hover { background: var(--footer-bg, var(--chrome-bg)); }
+#lib-tab[hidden] { display: none; }
+#lib-tab svg { stroke: currentColor; flex: 0 0 auto; }
 /* 公開の期間・期日の小窓 */
 .period-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
 .period-unit { display: inline-flex; align-items: center; gap: 2px; }
@@ -682,4 +689,7 @@ body[data-chrome="dark"] .rs-green { color: #5ad487; } body[data-chrome="dark"] 
 .mado-drop-label { background: var(--accent); color: var(--accent-fg); padding: 2px 8px; border-radius: 3px; font-size: 12px; }
 .mado-drop-label:empty { display: none; }
 body.mado-dragging, body.mado-dragging * { cursor: grabbing !important; }
+.mado-ghost { position: fixed; z-index: 1000; pointer-events: none; opacity: 0.92; box-shadow: 0 6px 18px rgba(0,0,0,0.28); background: var(--chrome-active); border: 1px solid var(--chrome-border); border-radius: 4px; transform: scale(1.04); transition: transform 0.08s; color: var(--chrome-fg); }
+.mado-drag-source { opacity: 0.35; }
+.mado-count { flex: 0 0 auto; min-width: 16px; height: 16px; padding: 0 5px; box-sizing: border-box; border-radius: 8px; background: var(--accent); color: var(--accent-fg, #fff); font-size: 10.5px; font-weight: 700; line-height: 16px; text-align: center; }
 .tab.in-mado .tab-name { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }

@@ -87,7 +87,7 @@ namespace SatoEdit {
         var files = Dialogs.Open(form, new JObj { { "title", o.Str("title") }, { "single", true }, { "filters", o.Arr("filters") } });
         if (files.Count == 0) return new JObj { { "status", "cancel" } };
         var s = Store.ReadJSON(files[0], null) as JObj;
-        if (s == null || s.Str("app") != "satoru-editor") return new JObj { { "status", "error" }, { "message", "エディタβの設定ファイルではありません。" } };
+        if (s == null || s.Str("app") != "satoru-editor") return new JObj { { "status", "error" }, { "message", "satoEditの設定ファイルではありません。" } };
         var p = s.Obj("prefs");
         if (p != null) {
           foreach (var k in Store.PrefDefaults.Keys) {

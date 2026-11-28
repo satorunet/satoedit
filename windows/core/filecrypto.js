@@ -68,7 +68,7 @@ async function twoStepKey(password, totpSecret, { salt, iterations } = {}) {
 
 // 鍵ファイル
 function newKeyFileContents() {
-  return Buffer.from(`${KEYFILE_HEADER}\n# Editor β key file. If you lose it, documents encrypted with it can never be opened.\n`
+  return Buffer.from(`${KEYFILE_HEADER}\n# satoEdit key file. If you lose it, documents encrypted with it can never be opened.\n`
     + crypto.randomBytes(32).toString('base64') + '\n', 'utf8');
 }
 

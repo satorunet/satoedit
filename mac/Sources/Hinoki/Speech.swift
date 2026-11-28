@@ -62,7 +62,7 @@ final class Dictation: NSObject {
     private static func explainDenied(_ what: String) {
         let a = NSAlert()
         a.messageText = L("{0} が許可されていません", what)
-        a.informativeText = L("「システム設定 > プライバシーとセキュリティ」で、エディタβに {0} を許可してください。", what)
+        a.informativeText = L("「システム設定 > プライバシーとセキュリティ」で、satoEditに {0} を許可してください。", what)
         a.addButton(withTitle: L("システム設定を開く"))
         a.addButton(withTitle: L("閉じる"))
         if a.runModal() == .alertFirstButtonReturn,

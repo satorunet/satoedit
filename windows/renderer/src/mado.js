@@ -308,14 +308,30 @@ export class Mado {
 
   /// 押したまま動かしたらドラッグ。動かさずに離したら click()
   trackDrag(tab, down, click) {
-    let dragging = false;
+    let dragging = false, ghost = null;
+    const app = this.app;
+    const source = down.target && down.target.closest ? down.target.closest('.tab, .mado-head') : null;
+    const fromBar = !!(source && source.classList.contains('tab'));
+    const grab = source ? (() => { const r = source.getBoundingClientRect(); return { x: down.clientX - r.left, y: down.clientY - r.top }; })() : { x: 10, y: 10 };
     const move = e => {
       if (!dragging) {
         if (Math.abs(e.clientX - down.clientX) + Math.abs(e.clientY - down.clientY) < DRAG_START) return;
-        if (!this.enabled || this.app.tabs.length < 2) return;
+        if (!this.enabled || app.tabs.length < 2) return;
         dragging = true;
         document.body.classList.add('mado-dragging');
+        // つまんだタブ (見出し) の写しを持ち上げて、マウスについてこさせる
+        if (source) {
+          const r = source.getBoundingClientRect();
+          ghost = source.cloneNode(true);
+          ghost.classList.add('mado-ghost');
+          Object.assign(ghost.style, { width: r.width + 'px', height: r.height + 'px' });
+          document.body.append(ghost);
+          source.classList.add('mado-drag-source');
+        }
       }
+      if (ghost) { ghost.style.left = (e.clientX - grab.x) + 'px'; ghost.style.top = (e.clientY - grab.y) + 'px'; }
+      // タブのバーの上なら、タブの並びを入れ替える
+      if (fromBar && !this.has(tab) && this.overBar(e.clientX, e.clientY)) { this.reorder(tab, source, e.clientX); this.showDrop(null); return; }
       this.showDrop(this.dropAt(tab, e.clientX, e.clientY));
     };
     const up = e => {
@@ -323,12 +339,36 @@ export class Mado {
       window.removeEventListener('mouseup', up, true);
       if (!dragging) { click(); return; }
       document.body.classList.remove('mado-dragging');
+      if (ghost) ghost.remove();
+      if (source) source.classList.remove('mado-drag-source');
+      if (fromBar && !this.has(tab) && this.overBar(e.clientX, e.clientY)) { this.showDrop(null); app.activate(tab); app.updateTabs(); return; }
       const drop = this.dropAt(tab, e.clientX, e.clientY);
       this.showDrop(null);
       if (drop) this.dropped(tab, drop);
+      else app.updateTabs();
     };
     window.addEventListener('mousemove', move, true);
     window.addEventListener('mouseup', up, true);
+  }
+
+  overBar(x, y) {
+    const b = this.app.el.tabs.getBoundingClientRect();
+    return x >= b.left && x <= b.right && y >= b.top - 4 && y <= b.bottom + 4;
+  }
+
+  /// タブのバーの x の所へ、tab を移す (並び app.tabs と、バーの中の要素の両方)
+  reorder(tab, el, x) {
+    const app = this.app, bar = app.el.tabs;
+    const els = Array.from(bar.children).filter(c => c.classList.contains('tab'));
+    const from = app.tabs.indexOf(tab);
+    if (from < 0 || els.length !== app.tabs.length) return;
+    // 自分以外のタブのうち、まん中が x より左にあるものの数 = 入る場所
+    const others = els.filter(c => c !== el);
+    const to = others.filter(c => { const r = c.getBoundingClientRect(); return r.left + r.width / 2 < x; }).length;
+    if (to === from) return;
+    app.tabs.splice(from, 1);
+    app.tabs.splice(to, 0, tab);
+    bar.insertBefore(el, others[to] || null);
   }
 
   /// その場所で離したら、どこに入るか: { at: 画面の文書 (null なら外側の端), side, rect, label }。入れられなければ null
@@ -354,6 +394,8 @@ export class Mado {
       r = p.getBoundingClientRect();
     } else {
       at = app.active;
+      // 今見ているタブそのものをドラッグしたら、となりのタブと並べる (Mac 版と同じ)
+      if (at === tab) at = this.partner();
     }
     if (!at || at === tab) return null;
     // 画面の中で、いちばん近い辺の側に半分ずつ

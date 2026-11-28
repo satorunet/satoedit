@@ -16,7 +16,7 @@ enum LibraryBackupUI {
         let df = DateFormatter()
         df.locale = Locale(identifier: "en_US_POSIX")
         df.dateFormat = "yyyyMMdd-HHmm"
-        panel.nameFieldStringValue = L("エディタβのバックアップ") + "-" + df.string(from: Date()) + "." + LibraryBackup.fileExtension
+        panel.nameFieldStringValue = L("satoEditのバックアップ") + "-" + df.string(from: Date()) + "." + LibraryBackup.fileExtension
         panel.directoryURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         if let t = UTType(filenameExtension: LibraryBackup.fileExtension) { panel.allowedContentTypes = [t] }
         panel.isExtensionHidden = false
